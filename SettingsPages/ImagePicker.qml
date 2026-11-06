@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "../"
 
@@ -42,7 +43,7 @@ Item {
     }
 
     function helperPath() {
-        return homeDir + "/.config/quickshell/scripts/yakushi-image-picker.py"
+        return Quickshell.shellDir + "/scripts/yakushi-image-picker.py"
     }
 
     function openAt(path) {

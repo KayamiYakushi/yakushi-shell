@@ -14,7 +14,7 @@ Item {
     property string statusMessage: ""
 
     function helperPath() {
-        return homeDir + "/.config/quickshell/scripts/yakushi-sddmctl.py"
+        return Quickshell.shellDir + "/scripts/yakushi-sddmctl.py"
     }
 
     function loadState() {

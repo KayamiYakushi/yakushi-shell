@@ -61,7 +61,7 @@ WAYBAR_ACCENT = HOME / ".config/waybar/accent.css"
 HYPRLOCK = HOME / ".config/hypr/hyprlock.conf"
 HELPERS = (
     HOME / ".config/hypr/scripts/yakushi-windowctl.py",
-    HOME / ".config/quickshell/scripts/yakushi-termctl.py",
+    Path(__file__).resolve().parent / "yakushi-termctl.py",
 )
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 

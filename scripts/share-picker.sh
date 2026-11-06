@@ -10,7 +10,7 @@ export QT_QPA_PLATFORMTHEME=qt6ct
 export QT_STYLE_OVERRIDE=Fusion
 export QT_QUICK_CONTROLS_STYLE=Fusion
 
-picker_qml="$HOME/.config/quickshell/share-picker-shell.qml"
+picker_qml="$(cd "$(dirname "$0")/.." && pwd)/share-picker-shell.qml"
 runtime_root="${XDG_RUNTIME_DIR:-/tmp/yakushi-$(id -u)}/yakushi"
 log_file="$runtime_root/share-picker.log"
 

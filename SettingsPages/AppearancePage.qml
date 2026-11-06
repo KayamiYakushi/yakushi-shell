@@ -62,14 +62,14 @@ Item {
         if (schemeJob.running || value === scheme)
             return
         scheme = value                  // the cards answer at once
-        schemeJob.command = ["python3", homeDir + "/.config/quickshell/scripts/yakushi-schemectl.py", "set", value]
+        schemeJob.command = ["python3", Quickshell.shellDir + "/scripts/yakushi-schemectl.py", "set", value]
         schemeJob.running = true
     }
 
     Process {
         id: schemeJob
 
-        command: ["python3", page.homeDir + "/.config/quickshell/scripts/yakushi-schemectl.py", "get"]
+        command: ["python3", Quickshell.shellDir + "/scripts/yakushi-schemectl.py", "get"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -342,7 +342,7 @@ Item {
     }
 
     function termHelperPath() {
-        return homeDir + "/.config/quickshell/scripts/yakushi-termctl.py"
+        return Quickshell.shellDir + "/scripts/yakushi-termctl.py"
     }
 
     function describeTerm(data) {

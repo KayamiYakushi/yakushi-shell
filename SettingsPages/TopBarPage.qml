@@ -13,8 +13,8 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string helper: (Quickshell.env("HOME") || "")
-        + "/.config/quickshell/scripts/yakushi-topbarctl.py"
+    readonly property string helper: Quickshell.shellDir
+        + "/scripts/yakushi-topbarctl.py"
 
     property bool loaded: false
     property string style: "island"

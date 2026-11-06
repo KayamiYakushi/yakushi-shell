@@ -120,7 +120,7 @@ Item {
         running: true
         command: [
             "python3",
-            (Quickshell.env("HOME") || "") + "/.config/quickshell/scripts/yakushi-topbarctl.py",
+            Quickshell.shellDir + "/scripts/yakushi-topbarctl.py",
             "sensors"
         ]
 

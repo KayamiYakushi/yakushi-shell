@@ -21,7 +21,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-DIR = Path.home() / ".config/quickshell"
+DIR = Path.home() / ".config/quickshell"          # user state
+CODE = Path(__file__).resolve().parent.parent     # the shell itself
 STATE = DIR / "yakushi-ui.local.json"
 LEGACY = DIR / "yakushi-panel-opacity.local.json"
 
@@ -125,8 +126,8 @@ def set_state(opacity_raw: str, accent: str) -> None:
     # Let the island top bar, the launcher, window borders and the terminal
     # follow the new accent (best effort, neither blocks).
     for args in (
-        ["qs", "-p", str(DIR / "topbar-shell.qml"), "ipc", "call", "topbar", "reload"],
-        ["python3", str(DIR / "scripts/yakushi-themesync.py")],
+        ["qs", "-p", str(CODE / "topbar-shell.qml"), "ipc", "call", "topbar", "reload"],
+        ["python3", str(CODE / "scripts/yakushi-themesync.py")],
     ):
         try:
             subprocess.Popen(

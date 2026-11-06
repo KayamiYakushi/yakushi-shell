@@ -66,7 +66,7 @@ Item {
         running: media.spectrumWanted
         command: [
             "cava", "-p",
-            (Quickshell.env("HOME") || "") + "/.config/quickshell/topbar/cava.conf"
+            Quickshell.shellDir + "/topbar/cava.conf"
         ]
 
         stdout: SplitParser {

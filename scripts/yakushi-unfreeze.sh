@@ -11,4 +11,4 @@ done
 runtime_root="${XDG_RUNTIME_DIR:-/tmp/yakushi-$uid}/yakushi"
 rm -f "$runtime_root/topbar.pid" "$runtime_root/settings.pid"
 sleep 0.3
-exec sh "$HOME/.config/quickshell/scripts/yakushi-bar.sh" start
+exec sh "$(dirname "$0")/yakushi-bar.sh" start

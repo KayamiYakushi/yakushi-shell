@@ -20,7 +20,7 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string helper: (Quickshell.env("HOME") || "") + "/.config/quickshell/scripts/yakushi-removectl.py"
+    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-removectl.py"
 
     // ---- the catalog
     property var items: []

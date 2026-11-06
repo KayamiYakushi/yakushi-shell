@@ -66,7 +66,7 @@ Item {
     }
 
     // ---- mouse cursor themes (scripts/yakushi-cursorctl.py)
-    readonly property string cursorHelper: homeDir + "/.config/quickshell/scripts/yakushi-cursorctl.py"
+    readonly property string cursorHelper: Quickshell.shellDir + "/scripts/yakushi-cursorctl.py"
     property var cursorThemes: []
     property string cursorTheme: ""
     property string cursorNote: ""

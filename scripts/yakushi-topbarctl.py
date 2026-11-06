@@ -68,7 +68,7 @@ def write_safely(path, text: str) -> None:
 HOME = Path.home()
 DIR = HOME / ".config/quickshell"
 STATE = DIR / "yakushi-topbar.local.json"
-BAR_SCRIPT = DIR / "scripts/yakushi-bar.sh"
+BAR_SCRIPT = Path(__file__).resolve().parent / "yakushi-bar.sh"
 ISLAND_QML = DIR / "topbar-shell.qml"
 CLOCK_HELPER = HOME / ".config/hypr/scripts/yakushi-clockctl.py"
 WAYBAR_OPACITY_HELPER = HOME / ".config/hypr/scripts/yakushi-waybar-opacityctl.py"

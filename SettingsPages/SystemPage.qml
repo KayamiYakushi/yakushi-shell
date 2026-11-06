@@ -14,7 +14,7 @@ Item {
     property var hostWindow: null
 
     readonly property string home: Quickshell.env("HOME") || ""
-    readonly property string scripts: home + "/.config/quickshell/scripts/"
+    readonly property string scripts: Quickshell.shellDir + "/scripts/"
 
     // ---- facts
     property var facts: ({ host: "...", os: "...", kernel: "...", user: "...", cpu: "...", storage: "..." })

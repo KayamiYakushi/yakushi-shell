@@ -1,7 +1,7 @@
 #!/bin/sh
 # SUPER + W: index the images under ~/Documents, then open the picker.
 
-dir="$HOME/.config/quickshell/wallpicker"
+dir="$(cd "$(dirname "$0")" && pwd)"
 found="$(python3 "$dir/index.py" 2>/dev/null)"
 
 if [ "${found:-0}" = 0 ]; then

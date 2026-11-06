@@ -65,7 +65,7 @@ def write_safely(path, text: str) -> None:
 HOME = Path.home()
 DIR = HOME / ".config/quickshell"
 STATE = DIR / "yakushi-topbar.local.json"
-ISLAND_QML = Path(__file__).resolve().parent.parent / "topbar-shell.qml"
+SHELL_QML = Path(__file__).resolve().parent.parent / "shell.qml"
 
 MODULES = (
     "workspaces",
@@ -211,7 +211,7 @@ def ping_island() -> None:
     """Tell a running island bar to re-read its settings (best effort)."""
     try:
         subprocess.Popen(
-            ["qs", "-p", str(ISLAND_QML), "ipc", "call", "topbar", "reload"],
+            ["qs", "-p", str(SHELL_QML), "ipc", "call", "topbar", "reload"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

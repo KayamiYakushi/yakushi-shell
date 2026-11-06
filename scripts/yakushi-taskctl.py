@@ -52,10 +52,10 @@ INTERPRETERS = re.compile(r"^(python[\d.]*|perl[\d.]*|ruby[\d.]*|node|nodejs|bas
 
 # Yakushi's own parts, recognised by a file in the command line
 YAKUSHI_PARTS = {
-    "topbar-shell.qml": "Yakushi top bar",
-    "settings-shell.qml": "Yakushi Settings (this window)",
-    "volume-osd-shell.qml": "Yakushi volume pop-up",
-    "wallpicker": "Yakushi wallpaper picker",
+    "wallpicker": "Yakushi wallpaper picker",       # before "/shell.qml": it has its own
+    "share-picker-shell.qml": "Yakushi screen-share picker",
+    "/settings.qml": "Yakushi Settings (this window)",
+    "/shell.qml": "Yakushi shell (top bar and Settings)",
     "yakushi-shake.py": "Yakushi shake to find",
     "yakushi-taskctl.py": "Yakushi Tasks helper (this page)",
 }
@@ -753,8 +753,10 @@ def guard(pid: int, st: dict, argv: list[str], uid: int) -> dict:
         return {"level": "session", "text": "X11 apps (Steam, many games, some older apps) close with it."}
     if comm == "systemd" and uid == ME:
         return {"level": "session", "text": "Your session's service manager: ending it logs you out."}
-    if "settings-shell.qml" in cmd or "yakushi-taskctl.py" in cmd:
+    if "/settings.qml" in cmd or "yakushi-taskctl.py" in cmd:
         return {"level": "self", "text": "This is Settings itself: it closes."}
+    if "/shell.qml" in cmd and "wallpicker" not in cmd:
+        return {"level": "self", "text": "This is the Yakushi shell: the top bar and Settings close with it."}
     if SYSTEM_CRITICAL.match(comm) and uid != ME:
         return {"level": "system", "text": "Linux needs this. Ending it can cut the network, freeze the screen or crash the system."}
     return {"level": "", "text": ""}

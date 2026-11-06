@@ -126,7 +126,7 @@ def set_state(opacity_raw: str, accent: str) -> None:
     # Let the island top bar, the launcher, window borders and the terminal
     # follow the new accent (best effort, neither blocks).
     for args in (
-        ["qs", "-p", str(CODE / "topbar-shell.qml"), "ipc", "call", "topbar", "reload"],
+        ["qs", "-p", str(CODE / "shell.qml"), "ipc", "call", "topbar", "reload"],
         ["python3", str(CODE / "scripts/yakushi-themesync.py")],
     ):
         try:

@@ -9,6 +9,6 @@ for name in qs quickshell rofi; do
     pkill -KILL -u "$uid" -x "$name" 2>/dev/null
 done
 runtime_root="${XDG_RUNTIME_DIR:-/tmp/yakushi-$uid}/yakushi"
-rm -f "$runtime_root/topbar.pid" "$runtime_root/settings.pid"
+rm -f "$runtime_root/shell.pid"
 sleep 0.3
-exec sh "$(dirname "$0")/yakushi-bar.sh" start
+exec sh "$(dirname "$0")/yakushi-shell.sh" start

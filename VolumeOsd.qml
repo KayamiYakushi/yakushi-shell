@@ -5,8 +5,8 @@ import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 
 // The little volume pill that drops in under the bar when you press the
-// volume keys. Click-through; scripts/volume-osd.sh starts it and it quits
-// by itself shortly after the last change.
+// volume keys. Click-through; the shell loads it on "ipc call volumeOsd
+// show" (scripts/volume-osd.sh) and frees it shortly after the last change.
 PanelWindow {
     id: osd
 

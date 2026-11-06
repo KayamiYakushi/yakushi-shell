@@ -2,13 +2,16 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
+// Settings app. Started by shell.qml as its own short-lived process, so all
+// of its memory is handed back the moment it closes. Talk to it through the
+// shell (ipc call settings ...), not directly.
 ShellRoot {
     id: root
 
     SettingsWindow {
         id: settingsWindow
 
-        // toggle-settings.sh tasks -> opens on Tasks
+        // the shell passes the start page (e.g. "tasks")
         Component.onCompleted: show(Quickshell.env("YAKUSHI_SETTINGS_PAGE") || "")
 
         onDismissed: quitTimer.restart()

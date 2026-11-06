@@ -5,7 +5,7 @@ import "../"
 
 // Settings -> Top Bar
 //
-// Chooses the bar (Island or Waybar), which island modules are shown, the
+// Chooses which modules the island shows and in what order, the
 // clock format and the bar opacity. Every change is saved by
 // scripts/yakushi-topbarctl.py and applied to the running bar at once.
 Item {
@@ -17,7 +17,6 @@ Item {
         + "/scripts/yakushi-topbarctl.py"
 
     property bool loaded: false
-    property string style: "island"
     property bool seconds: true
     property bool clock24: true
     property real barOpacity: 0.90
@@ -28,8 +27,6 @@ Item {
         "date", "time", "media", "volume", "power"
     ]
     property string status: ""
-
-    readonly property bool island: style === "island"
 
     function glyph(code) {
         return String.fromCodePoint(code)
@@ -90,8 +87,6 @@ Item {
     property var queue: []
 
     function applyState(data) {
-        if (data.style === "island" || data.style === "waybar")
-            style = data.style
         if (typeof data.seconds === "boolean")
             seconds = data.seconds
         if (typeof data.clock24 === "boolean")
@@ -217,141 +212,6 @@ Item {
                 color: Theme.line
             }
 
-            // ---------------- Style ----------------
-            Text {
-                textFormat: Text.PlainText
-                text: "STYLE"
-                color: Theme.inkSoft
-                font.family: Theme.mono
-                font.pixelSize: 11
-                font.letterSpacing: 2
-            }
-
-            Row {
-                width: parent.width
-                spacing: 12
-
-                Repeater {
-                    model: [
-                        { key: "island", name: "ISLAND", note: "Notch hanging from the top edge" },
-                        { key: "waybar", name: "WAYBAR", note: "Three plain capsules, same look" }
-                    ]
-
-                    delegate: Rectangle {
-                        id: card
-
-                        required property var modelData
-                        readonly property bool selected: page.style === modelData.key
-
-                        width: (body.width - 12) / 2
-                        height: 76
-                        color: Theme.card
-                        border.width: 1
-                        border.color: selected
-                            ? Theme.accent
-                            : (cardMouse.containsMouse ? Theme.lineHot : Theme.line)
-
-                        Behavior on border.color {
-                            ColorAnimation { duration: Theme.tFast }
-                        }
-
-                        // Miniature of the bar
-                        Item {
-                            id: preview
-
-                            anchors.top: parent.top
-                            anchors.topMargin: 12
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width - 32
-                            height: 14
-
-                            Rectangle {
-                                anchors.fill: parent
-                                color: Theme.groove
-                            }
-
-                            // Island: one notch in the middle
-                            Rectangle {
-                                visible: card.modelData.key === "island"
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                anchors.top: parent.top
-                                width: parent.width * 0.46
-                                height: 10
-                                bottomLeftRadius: 5
-                                bottomRightRadius: 5
-                                color: card.selected ? Theme.accent : Theme.inkMute
-                            }
-
-                            // Waybar: three floating sections
-                            Row {
-                                visible: card.modelData.key === "waybar"
-                                anchors.fill: parent
-                                anchors.margins: 3
-                                spacing: (width - 3 * (width * 0.24)) / 2
-
-                                Repeater {
-                                    model: 3
-
-                                    Rectangle {
-                                        width: preview.width * 0.24 - 2
-                                        height: 8
-                                        color: card.selected ? Theme.accent : Theme.inkMute
-                                    }
-                                }
-                            }
-                        }
-
-                        Column {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            anchors.margins: 12
-                            spacing: 3
-
-                            Text {
-                                textFormat: Text.PlainText
-                                text: card.modelData.name
-                                color: card.selected ? Theme.ink : Theme.inkSoft
-                                font.family: Theme.mono
-                                font.pixelSize: 11
-                                font.letterSpacing: 2
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                width: parent.width
-                                text: card.modelData.note
-                                elide: Text.ElideRight
-                                color: Theme.inkMute
-                                font.family: Theme.mono
-                                font.pixelSize: 9
-                            }
-                        }
-
-                        MouseArea {
-                            id: cardMouse
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: {
-                                if (card.selected)
-                                    return
-                                page.style = card.modelData.key
-                                page.send("style", card.modelData.key)
-                            }
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
             // ---------------- Modules ----------------
             Item {
                 width: parent.width
@@ -369,7 +229,6 @@ Item {
                 Text {
                     textFormat: Text.PlainText
                     anchors.right: parent.right
-                    visible: page.island
                     text: "RESET ORDER"
                     color: resetMouse.containsMouse ? Theme.accent : Theme.inkMute
                     font.family: Theme.mono
@@ -385,17 +244,6 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: page.resetOrder()
                     }
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.right: parent.right
-                    visible: !page.island
-                    text: "ISLAND ONLY"
-                    color: Theme.inkMute
-                    font.family: Theme.mono
-                    font.pixelSize: 9
-                    font.letterSpacing: 2
                 }
             }
 
@@ -432,7 +280,6 @@ Item {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 2
-                        opacity: page.island ? 1 : 0.35
 
                         Repeater {
                             model: [
@@ -443,7 +290,7 @@ Item {
                             delegate: Rectangle {
                                 required property var modelData
                                 readonly property int target: moduleRow.index + modelData.step
-                                readonly property bool usable: page.island
+                                readonly property bool usable: true
                                     && target >= 0 && target < orderList.count
 
                                 width: 20
@@ -484,7 +331,7 @@ Item {
                         icon: moduleRow.info.icon
                         label: moduleRow.info.label
                         checked: page.modules[moduleRow.key] !== false
-                        available: page.loaded && page.island
+                        available: page.loaded
                         onToggled: page.setModule(moduleRow.key, !checked)
                     }
                 }
@@ -494,7 +341,6 @@ Item {
             Item {
                 width: parent.width
                 height: 28
-                opacity: page.island ? 1 : 0.35
 
                 Text {
                     id: vizIcon
@@ -561,7 +407,7 @@ Item {
 
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                enabled: page.island && page.loaded
+                                enabled: page.loaded
                                 cursorShape: Qt.PointingHandCursor
 
                                 onClicked: {
@@ -612,7 +458,7 @@ Item {
                     icon: page.glyph(0xF00F0)
                     label: "24-hour clock"
                     checked: page.clock24
-                    available: page.loaded && page.island
+                    available: page.loaded
 
                     onToggled: {
                         page.clock24 = !page.clock24

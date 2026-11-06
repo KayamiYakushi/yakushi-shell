@@ -57,7 +57,6 @@ def write_safely(path, text: str) -> None:
 HOME = Path.home()
 UI_STATE = HOME / ".config/quickshell/yakushi-ui.local.json"
 ROFI_ACCENT = HOME / ".config/rofi/accent.rasi"
-WAYBAR_ACCENT = HOME / ".config/waybar/accent.css"
 HYPRLOCK = HOME / ".config/hypr/hyprlock.conf"
 HELPERS = (
     HOME / ".config/hypr/scripts/yakushi-windowctl.py",
@@ -88,16 +87,6 @@ def write_rofi(colour: str) -> None:
     )
 
 
-def write_waybar(colour: str) -> None:
-    """Waybar reloads its style on change (reload_style_on_change)."""
-    if not WAYBAR_ACCENT.parent.is_dir():
-        return
-    write_safely(WAYBAR_ACCENT, 
-        "/* Written by Yakushi Settings (accent colour). */\n"
-        f"@define-color accent {colour};\n"
-    )
-
-
 def write_hyprlock(colour: str) -> None:
     try:
         text = HYPRLOCK.read_text()
@@ -111,7 +100,6 @@ def write_hyprlock(colour: str) -> None:
 def main() -> None:
     colour = accent()
     write_rofi(colour)
-    write_waybar(colour)
     write_hyprlock(colour)
     for helper in HELPERS:
         if helper.exists():

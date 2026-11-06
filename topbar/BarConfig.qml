@@ -14,7 +14,6 @@ Item {
 
     readonly property string home: Quickshell.env("HOME") || ""
 
-    property string style: "island"
     property bool seconds: true
     property bool clock24: true
     property real barOpacity: 0.90
@@ -62,8 +61,6 @@ Item {
         if (!data || typeof data !== "object")
             return
 
-        if (data.style === "island" || data.style === "waybar")
-            style = data.style
 
         if (typeof data.seconds === "boolean")
             seconds = data.seconds

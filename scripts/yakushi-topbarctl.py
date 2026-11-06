@@ -4,7 +4,6 @@
 Commands:
     get                     Print the bar settings as JSON.
     set <key> <value>       Change one setting.
-                              style        island | waybar
                               seconds      on | off
                               clock24      on | off
                               opacity      0.40 .. 1.00
@@ -17,9 +16,7 @@ Commands:
 Settings live in ~/.config/quickshell/yakushi-topbar.local.json
 (machine-local, git-ignored). The island bar watches that file with inotify,
 so changes apply instantly without polling or restarts.
-
-"seconds" and "opacity" are shared with Waybar, so the choice survives a
-style switch. Runs only when called: no daemon, no timers.
+Runs only when called: no daemon, no timers.
 """
 from __future__ import annotations
 
@@ -68,10 +65,7 @@ def write_safely(path, text: str) -> None:
 HOME = Path.home()
 DIR = HOME / ".config/quickshell"
 STATE = DIR / "yakushi-topbar.local.json"
-BAR_SCRIPT = Path(__file__).resolve().parent / "yakushi-bar.sh"
-ISLAND_QML = DIR / "topbar-shell.qml"
-CLOCK_HELPER = HOME / ".config/hypr/scripts/yakushi-clockctl.py"
-WAYBAR_OPACITY_HELPER = HOME / ".config/hypr/scripts/yakushi-waybar-opacityctl.py"
+ISLAND_QML = Path(__file__).resolve().parent.parent / "topbar-shell.qml"
 
 MODULES = (
     "workspaces",
@@ -103,7 +97,6 @@ DEFAULT_ORDER = [
 VISUALIZER_MODES = ("hover", "always", "off")
 
 DEFAULTS: dict = {
-    "style": "island",
     "seconds": True,
     "clock24": True,
     "opacity": 0.90,
@@ -115,7 +108,7 @@ DEFAULTS: dict = {
 OPACITY_MIN = 0.40
 OPACITY_MAX = 1.00
 
-# Same sensor preferences as waybar/scripts/generate-hardware-local.py
+# Preferred temperature sensors, best first
 HWMON_ROOT = Path("/sys/class/hwmon")
 CPU_DRIVERS = ("k10temp", "zenpower", "coretemp", "cpu_thermal")
 CPU_LABEL_PRIORITY = ("Tctl", "Package id 0", "Tdie", "CPU")
@@ -171,9 +164,6 @@ def load() -> dict:
 
     if not isinstance(saved, dict):
         return state
-
-    if saved.get("style") in ("island", "waybar"):
-        state["style"] = saved["style"]
 
     for key in ("seconds", "clock24"):
         if isinstance(saved.get(key), bool):
@@ -232,140 +222,25 @@ def ping_island() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Waybar sync (best effort: the island never depends on these)
-# ---------------------------------------------------------------------------
-
-def run_quiet(args: list[str]) -> dict | None:
-    try:
-        proc = subprocess.run(args, capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-
-    try:
-        return json.loads(proc.stdout.strip().splitlines()[-1])
-    except (ValueError, IndexError):
-        return None
-
-
-def waybar_opacity() -> float | None:
-    if not WAYBAR_OPACITY_HELPER.exists():
-        return None
-
-    data = run_quiet(["python3", str(WAYBAR_OPACITY_HELPER), "get"])
-    if data and data.get("ok") and isinstance(data.get("opacity"), (int, float)):
-        return float(data["opacity"])
-
-    return None
-
-
-WAYBAR_CONFIG = HOME / ".config/waybar/config.jsonc"
-
-
-def sync_waybar_clock(state: dict) -> None:
-    """Give Waybar's clock the island's format (24/12 h, seconds)."""
-    try:
-        text = WAYBAR_CONFIG.read_text()
-    except OSError:
-        return
-    fmt = ("%H:%M" if state["clock24"] else "%I:%M") + (":%S" if state["seconds"] else "")
-    if not state["clock24"]:
-        fmt += " %p"
-    import re
-    block = re.search(r'"clock"\s*:\s*\{', text)
-    if not block:
-        return
-    start = block.end()
-    # end of the block: the first "}" outside a string
-    end, in_str, i = -1, False, start
-    while i < len(text):
-        c = text[i]
-        if c == "\\" and in_str:
-            i += 2
-            continue
-        if c == '"':
-            in_str = not in_str
-        elif c == "}" and not in_str:
-            end = i
-            break
-        i += 1
-    if end == -1:
-        return
-    body = text[start:end]
-    new_body = re.sub(r'("format"\s*:\s*)"[^"]*"', lambda m: m.group(1) + '"{:' + fmt + '}"', body, count=1)
-    new_body = re.sub(r'("interval"\s*:\s*)\d+', lambda m: m.group(1) + ("1" if state["seconds"] else "60"),
-                      new_body, count=1)
-    if new_body != body:
-        write_safely(WAYBAR_CONFIG, text[:start] + new_body + text[end:])
-        try:
-            subprocess.run(["pkill", "-SIGUSR2", "-x", "waybar"], capture_output=True, timeout=5)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-
-
-def sync_waybar_seconds(enabled: bool) -> None:
-    sync_waybar_clock(load())
-
-
-def sync_waybar_opacity(value: float) -> None:
-    if WAYBAR_OPACITY_HELPER.exists():
-        run_quiet(["python3", str(WAYBAR_OPACITY_HELPER), "set", f"{value:.3f}"])
-
-
-def restart_bar() -> None:
-    """Start the selected bar (and stop the other) without waiting for it."""
-    if not BAR_SCRIPT.exists():
-        return
-
-    subprocess.Popen(
-        ["sh", str(BAR_SCRIPT), "start"],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
 def get() -> None:
-    state = load()
-    result = {"ok": True, **state}
-
-    # The slider shows what the visible bar actually uses.
-    if state["style"] == "waybar":
-        value = waybar_opacity()
-        if value is not None:
-            result["opacity"] = round(value, 3)
-
-    emit(result)
+    emit({"ok": True, **load()})
 
 
 def set_value(key: str, raw: str) -> None:
     state = load()
     message = ""
 
-    if key == "style":
-        if raw not in ("island", "waybar"):
-            fail("Style must be island or waybar.")
-        state["style"] = raw
-        save(state)
-        if raw == "waybar":
-            sync_waybar_clock(state)
-        restart_bar()
-        message = "Top bar: " + ("Island" if raw == "island" else "Waybar") + "."
-
-    elif key == "seconds":
+    if key == "seconds":
         state["seconds"] = on_off(raw)
         save(state)
-        sync_waybar_seconds(state["seconds"])
         message = "Seconds " + ("on." if state["seconds"] else "off.")
 
     elif key == "clock24":
         state["clock24"] = on_off(raw)
         save(state)
-        sync_waybar_clock(state)
         message = ("24-hour" if state["clock24"] else "12-hour") + " clock."
 
     elif key == "opacity":
@@ -376,7 +251,6 @@ def set_value(key: str, raw: str) -> None:
             return
         state["opacity"] = round(value, 3)
         save(state)
-        sync_waybar_opacity(value)
         message = f"Top bar opacity {round(value * 100)}%."
 
     elif key == "visualizer":

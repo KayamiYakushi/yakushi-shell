@@ -8,6 +8,17 @@ into a single installable shell.
 **Status:** early. This first commit is the current live config imported as-is;
 the restructuring into one shell follows step by step.
 
+## Principles
+
+1. **Arch official repositories only.** Every dependency comes from `core`,
+   `extra` or `multilib` — no AUR, no pip/npm/cargo, no bundled binaries.
+2. **Security first.** Least privilege, secrets only through pipes, root
+   actions only through polkit, no needless network access.
+3. **As optimized as we can make it.** Load on demand, react to events
+   instead of polling, keep idle CPU and memory low.
+4. **One whole.** Every module shares the same theme, components and
+   behavior, so the shell looks and feels like one thing.
+
 ## Roadmap
 
 1. Single entry point (`shell.qml`) with one IPC surface

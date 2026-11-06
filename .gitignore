@@ -1,0 +1,6 @@
+*.local.json
+*.before-*
+*.bak
+__pycache__/
+*.pyc
+assets/system-profile

@@ -48,6 +48,12 @@ Hyprland's fade is turned off for its layer, with a blur behind the card:
 hl.layer_rule({ match = { namespace = "yakushi-launcher" }, blur = true, ignore_alpha = 0.15, no_anim = true })
 ```
 
+The wallpaper picker (SUPER + W) is the same kind of card:
+
+```lua
+hl.layer_rule({ match = { namespace = "yakushi-wallpaper" }, blur = true, ignore_alpha = 0.15, no_anim = true })
+```
+
 Windows get the same cut corners from Hyprland itself:
 
 ```lua

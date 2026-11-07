@@ -5,20 +5,22 @@ The pictures come from the "wallpaper" section of the config:
 
     "wallpaper": {
       "folder": "~/Pictures/Walls",   default: your XDG Documents folder
-      "visibleCount": 10,             tiles across the screen
-      "frameColor": "#80FFFFFF",      #RRGGBB or #AARRGGBB
+      "visibleCount": 10,             tiles across the strip
       "thumbJobs": 4                  thumbnails made at once
     }
 
 Every picture under the folder gets a stable symlink in
 ~/.cache/yakushi/wallpaper/index (so the picker can list one flat folder);
-links and thumbnails of pictures that are gone are removed.
+links and thumbnails of pictures that are gone are removed. "current" is
+the index name of the picture on screen now (from `awww query`), so the
+picker opens there.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,7 +30,6 @@ import yakushi_config as config  # noqa: E402
 import yakushi_paths as paths    # noqa: E402
 
 EXTS = {".jpg", ".jpeg", ".png", ".webp"}
-COLOUR = re.compile(r"^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 
 
 def number(value, default: int, low: int, high: int) -> int:
@@ -41,15 +42,30 @@ def settings() -> dict:
     saved = config.section("wallpaper")
     folder = saved.get("folder")
     folder = Path(folder).expanduser() if isinstance(folder, str) and folder.strip() else paths.user_dir("DOCUMENTS")
-    colour = saved.get("frameColor")
     return {
         "folder": str(folder),
         "index": str(paths.CACHE / "wallpaper/index"),
         "thumbs": str(paths.CACHE / "wallpaper/thumbs"),
         "visibleCount": number(saved.get("visibleCount"), 10, 3, 30),
-        "frameColor": colour if isinstance(colour, str) and COLOUR.match(colour) else "#80FFFFFF",
         "thumbJobs": number(saved.get("thumbJobs"), 4, 1, 64),
     }
+
+
+def on_screen() -> set[Path]:
+    """the pictures awww shows now (one per output)"""
+    try:
+        out = subprocess.run(["awww", "query"], capture_output=True, text=True, timeout=2).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    found = set()
+    for line in out.splitlines():
+        m = re.search(r"currently displaying: image: (/.+)$", line)
+        if m:
+            try:
+                found.add(Path(m.group(1).strip()).resolve())
+            except OSError:
+                pass
+    return found
 
 
 def main() -> None:
@@ -100,7 +116,17 @@ def main() -> None:
         except OSError:
             pass
 
-    print(json.dumps({**cfg, "count": len(wanted)}))
+    shown = on_screen()
+    current = ""
+    for name, src in wanted.items():
+        try:
+            if src.resolve() in shown:
+                current = name
+                break
+        except OSError:
+            pass
+
+    print(json.dumps({**cfg, "count": len(wanted), "current": current}))
 
 
 if __name__ == "__main__":

@@ -537,21 +537,6 @@ PanelWindow {
                     }
                 }
 
-                // 薬師 (Yakushi), large and faint; only where the list leaves room
-                Text {
-                    textFormat: Text.PlainText
-                    x: 18
-                    visible: y >= pageList.y + pageList.height + 8
-                    anchors.bottom: listFoot.top
-                    anchors.bottomMargin: 10
-                    text: "薬\n師"
-                    lineHeight: 0.92
-                    color: Theme.tint(Theme.ink, 0.09)
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 58
-                    font.bold: true
-                }
-
                 Item {
                     id: listFoot
 

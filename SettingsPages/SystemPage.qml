@@ -352,6 +352,20 @@ Item {
                 anchors.right: parent.right
                 height: parent.height
 
+                // 薬師 (Yakushi), large and faint, behind everything here
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "薬\n師"
+                    lineHeight: 0.92
+                    color: Theme.tint(Theme.ink, 0.09)
+                    font.family: "Noto Sans CJK JP"
+                    font.pixelSize: 62
+                    font.bold: true
+                }
+
                 Text {
                     id: tag
 

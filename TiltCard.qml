@@ -14,6 +14,7 @@ import QtQuick
 //   shown        visible or not
 //   leanDegrees  how far it leans toward the pointer
 //   still        no leaning (while it is being resized)
+//   duration     how long opening and closing take, in ms (0 = at once)
 Item {
     id: card
 
@@ -22,6 +23,7 @@ Item {
     property real leanDegrees: 5
     property bool still: false
     property real cut: Theme.cutLarge
+    property int duration: Theme.tSlow + 100     // opening / closing, ms (0 = none)
 
     // pointer position over the card, centre = (0, 0), edges = ±0.5
     property point pointer: Qt.point(0, 0)
@@ -31,7 +33,7 @@ Item {
     readonly property bool opening: reveal < 0.999
 
     Behavior on reveal {
-        NumberAnimation { duration: Theme.tSlow + 100; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: card.duration; easing.type: Easing.OutCubic }
     }
 
     property real tiltX: shown && !still ? -pointer.y * leanDegrees : 0
@@ -44,7 +46,7 @@ Item {
     opacity: shown || reveal > 0.002 ? 1 : 0
     visible: opacity > 0
 
-    Behavior on opacity { NumberAnimation { duration: Theme.tFast } }
+    Behavior on opacity { NumberAnimation { duration: Math.min(Theme.tFast, card.duration) } }
 
     readonly property real cx: width / 2
     readonly property real cy: height / 2

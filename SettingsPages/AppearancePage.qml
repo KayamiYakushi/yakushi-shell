@@ -23,6 +23,48 @@ Item {
         { name: "ORCHID",  accent: "#e070ff" }
     ]
 
+    // ---- launcher animation (scripts/yakushi-launchctl.py)
+    property bool launcherLoaded: false
+    property int launcherAnim: 480
+
+    function saveLauncherAnim() {
+        if (launcherSet.running) {
+            launcherSave.restart()          // try again once the last save is done
+            return
+        }
+        launcherSet.command = ["python3", Paths.script("yakushi-launchctl.py"), "set", "animation", String(launcherAnim)]
+        launcherSet.running = true
+    }
+
+    Process {
+        id: launcherGet
+
+        running: true
+        command: ["python3", Paths.script("yakushi-launchctl.py"), "get"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var data = JSON.parse(text)
+                    if (data.ok && typeof data.animationMs === "number")
+                        page.launcherAnim = data.animationMs
+                } catch (e) {
+                }
+                page.launcherLoaded = true
+            }
+        }
+    }
+
+    Process {
+        id: launcherSet
+    }
+
+    Timer {
+        id: launcherSave
+        interval: 150
+        onTriggered: page.saveLauncherAnim()
+    }
+
     // ---- apps light / dark (scripts/yakushi-schemectl.py)
     property string scheme: ""          // "dark" | "light", "" until known
     property string schemeNote: ""
@@ -714,6 +756,66 @@ Item {
 
                 onSettled: function(v) {
                     Theme.glass = 0.40 + (v * 0.60)
+                }
+            }
+
+            Divider {}
+
+            // ---------------- Launcher ----------------
+            SectionLabel { text: "LAUNCHER" }
+
+            Slider {
+                width: parent.width
+                opacity: page.launcherLoaded ? 1 : 0.35
+                enabled: page.launcherLoaded
+                label: "Opening animation  " + (page.launcherAnim > 0 ? page.launcherAnim + " ms" : "off")
+                icon: String.fromCodePoint(0xF0954)
+                tint: Theme.accent
+                value: page.launcherAnim / 1000
+
+                // in steps of 20 ms
+                onSliding: function(v) {
+                    var next = Math.round(v * 50) * 20
+                    if (next !== page.launcherAnim) {
+                        page.launcherAnim = next
+                        launcherSave.restart()
+                    }
+                }
+
+                onSettled: function(v) {
+                    page.launcherAnim = Math.round(v * 50) * 20
+                    launcherSave.stop()
+                    page.saveLauncherAnim()
+                }
+            }
+
+            // open the launcher to see the new speed
+            Rectangle {
+                width: tryLabel.implicitWidth + 28
+                height: 26
+                color: tryMouse.containsMouse ? Theme.tint(Theme.accent, 0.12) : Theme.card
+                border.width: 1
+                border.color: tryMouse.containsMouse ? Theme.accent : Theme.line
+
+                Text {
+                    id: tryLabel
+
+                    textFormat: Text.PlainText
+                    anchors.centerIn: parent
+                    text: "TRY IT"
+                    color: tryMouse.containsMouse ? Theme.ink : Theme.inkSoft
+                    font.family: Theme.mono
+                    font.pixelSize: 9
+                    font.letterSpacing: 2
+                }
+
+                MouseArea {
+                    id: tryMouse
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Quickshell.execDetached([Paths.shell + "/bin/yakushi", "launcher"])
                 }
             }
 

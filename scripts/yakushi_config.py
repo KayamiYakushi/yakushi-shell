@@ -8,7 +8,8 @@
       "appearance": { ... },   owned by yakushi-uistatectl.py
       "terminal":   { ... },   owned by yakushi-termctl.py
       "wallpaper":  { ... },   read by wallpicker/index.py
-      "notifications": { ... } owned by yakushi-notifyctl.py
+      "notifications": { ... }, owned by yakushi-notifyctl.py
+      "launcher":   { ... }    owned by yakushi-launchctl.py
     }
 
 Each section is validated by the helper that owns it; this module only keeps
@@ -43,7 +44,7 @@ import yakushi_paths as paths
 from typing import Callable, Iterator
 
 VERSION = 1
-SECTIONS = ("topbar", "appearance", "terminal", "wallpaper", "notifications")
+SECTIONS = ("topbar", "appearance", "terminal", "wallpaper", "notifications", "launcher")
 
 DIR = paths.CONFIG
 FILE = DIR / "config.json"

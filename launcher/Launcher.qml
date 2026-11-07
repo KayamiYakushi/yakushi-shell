@@ -79,10 +79,16 @@ PanelWindow {
         open(mode === "apps" ? "clipboard" : "apps")
     }
 
+    // Opening / closing time, Settings -> Appearance -> Launcher (0 = none)
+    readonly property int animation: {
+        var ms = Config.launcher.animationMs
+        return typeof ms === "number" ? Math.max(0, Math.min(1000, Math.round(ms))) : 480
+    }
+
     // the card closes back into its notches first
     Timer {
         id: closeTimer
-        interval: Theme.tSlow + 160
+        interval: launcher.animation + 60
         onTriggered: launcher.dismissed()
     }
 
@@ -248,9 +254,10 @@ PanelWindow {
         id: card
 
         anchors.centerIn: parent
-        width: Math.min(640, launcher.width - 40)
-        height: Math.min(480, launcher.height - 40)
+        width: Math.min(540, launcher.width - 40)
+        height: Math.min(400, launcher.height - 40)
         leanDegrees: 2
+        duration: launcher.animation
         shown: launcher.showing
 
         // clicks on the card stay on the card
@@ -263,12 +270,12 @@ PanelWindow {
             id: header
 
             width: parent.width
-            height: 46
+            height: 38
 
             Row {
-                x: 20
+                x: 16
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 12
+                spacing: 10
 
                 Text {
                     textFormat: Text.PlainText
@@ -276,9 +283,9 @@ PanelWindow {
                     text: launcher.mode === "apps" ? "LAUNCH" : "CLIPBOARD"
                     color: Theme.ink
                     font.family: Theme.mono
-                    font.pixelSize: 14
+                    font.pixelSize: 12
                     font.bold: true
-                    font.letterSpacing: 6
+                    font.letterSpacing: 5
                 }
 
                 Text {
@@ -287,20 +294,20 @@ PanelWindow {
                     text: launcher.mode === "apps" ? "起動" : "履歴"
                     color: Theme.inkSoft
                     font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 13
-                    font.letterSpacing: 3
+                    font.pixelSize: 11
+                    font.letterSpacing: 2
                 }
             }
 
             Text {
                 textFormat: Text.PlainText
                 anchors.right: parent.right
-                anchors.rightMargin: 28
+                anchors.rightMargin: 26
                 anchors.verticalCenter: parent.verticalCenter
                 text: (launcher.count > 0 ? launcher.selected + 1 : 0) + " / " + launcher.count
                 color: Theme.accent
                 font.family: Theme.mono
-                font.pixelSize: 11
+                font.pixelSize: 10
                 font.letterSpacing: 2
             }
 
@@ -316,11 +323,11 @@ PanelWindow {
         Rectangle {
             id: field
 
-            x: 20
+            x: 16
             anchors.top: header.bottom
-            anchors.topMargin: 16
-            width: parent.width - 40
-            height: 38
+            anchors.topMargin: 12
+            width: parent.width - 32
+            height: 32
             color: Theme.tint(Theme.ink, 0.04)
             border.width: 1
             border.color: search.activeFocus ? Theme.accent : Theme.line
@@ -329,26 +336,26 @@ PanelWindow {
                 id: glyph
 
                 textFormat: Text.PlainText
-                x: 12
+                x: 10
                 anchors.verticalCenter: parent.verticalCenter
                 text: String.fromCodePoint(launcher.mode === "apps" ? 0xF0349 : 0xF0147)
                 color: Theme.accent
                 font.family: Theme.glyphs
-                font.pixelSize: 15
+                font.pixelSize: 13
             }
 
             TextInput {
                 id: search
 
                 anchors.left: glyph.right
-                anchors.leftMargin: 10
+                anchors.leftMargin: 8
                 anchors.right: parent.right
-                anchors.rightMargin: 12
+                anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.ink
                 selectionColor: Theme.tint(Theme.accent, 0.4)
                 font.family: Theme.mono
-                font.pixelSize: 13
+                font.pixelSize: 12
                 clip: true
                 focus: true
 
@@ -394,14 +401,14 @@ PanelWindow {
         ListView {
             id: results
 
-            x: 20
+            x: 16
             anchors.top: field.bottom
-            anchors.topMargin: 12
+            anchors.topMargin: 8
             anchors.bottom: footer.top
-            anchors.bottomMargin: 8
-            width: parent.width - 40
+            anchors.bottomMargin: 6
+            width: parent.width - 32
             clip: true
-            spacing: 2
+            spacing: 1
             boundsBehavior: Flickable.StopAtBounds
             model: launcher.mode === "apps" ? launcher.apps : launcher.clipResults
             currentIndex: launcher.selected
@@ -416,18 +423,18 @@ PanelWindow {
                 readonly property var entry: launcher.mode === "apps" ? modelData.entry : null
 
                 width: results.width
-                height: launcher.mode === "apps" ? 44 : 32
+                height: launcher.mode === "apps" ? 32 : 26
                 color: here ? Theme.accent : (rowMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent")
 
                 Image {
                     id: icon
 
                     visible: launcher.mode === "apps" && status === Image.Ready
-                    x: 10
+                    x: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 26
-                    height: 26
-                    sourceSize: Qt.size(52, 52)
+                    width: 20
+                    height: 20
+                    sourceSize: Qt.size(40, 40)
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     source: row.entry && row.entry.icon !== ""
@@ -435,38 +442,42 @@ PanelWindow {
                         : ""
                 }
 
-                Column {
+                // one line: the name, and on the right, dimmer, what it is
+                Text {
+                    id: rowName
+
+                    textFormat: Text.PlainText
                     anchors.left: parent.left
-                    anchors.leftMargin: launcher.mode === "apps" ? 48 : 12
-                    anchors.right: parent.right
-                    anchors.rightMargin: 12
+                    anchors.leftMargin: launcher.mode === "apps" ? 38 : 10
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 2
+                    width: Math.min(implicitWidth, parent.width - anchors.leftMargin - 10
+                        - (rowWhat.visible ? Math.min(rowWhat.implicitWidth, parent.width * 0.4) + 14 : 0))
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    text: row.entry ? row.entry.name : String(row.modelData.text).replace(/\s+/g, " ")
+                    color: row.here ? launcher.onAccent : Theme.ink
+                    font.family: Theme.mono
+                    font.pixelSize: launcher.mode === "apps" ? 12 : 11
+                    font.bold: row.here && launcher.mode === "apps"
+                }
 
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: row.entry ? row.entry.name : String(row.modelData.text).replace(/\s+/g, " ")
-                        color: row.here ? launcher.onAccent : Theme.ink
-                        font.family: Theme.mono
-                        font.pixelSize: launcher.mode === "apps" ? 12 : 11
-                        font.bold: row.here && launcher.mode === "apps"
-                    }
+                Text {
+                    id: rowWhat
 
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        visible: row.entry !== null && text !== ""
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: row.entry ? (row.entry.genericName || row.entry.comment || "") : ""
-                        color: row.here ? Theme.tint(launcher.onAccent, 0.7) : Theme.inkMute
-                        font.family: Theme.mono
-                        font.pixelSize: 9
-                        font.letterSpacing: 0.5
-                    }
+                    textFormat: Text.PlainText
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, parent.width * 0.4)
+                    visible: row.entry !== null && text !== ""
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    text: row.entry ? (row.entry.genericName || row.entry.comment || "") : ""
+                    color: row.here ? Theme.tint(launcher.onAccent, 0.7) : Theme.inkMute
+                    font.family: Theme.mono
+                    font.pixelSize: 9
+                    font.letterSpacing: 0.5
                 }
 
                 MouseArea {
@@ -496,7 +507,7 @@ PanelWindow {
 
             anchors.bottom: parent.bottom
             width: parent.width
-            height: 34
+            height: 26
 
             Rectangle {
                 width: parent.width
@@ -506,7 +517,7 @@ PanelWindow {
 
             Text {
                 textFormat: Text.PlainText
-                x: 20
+                x: 16
                 anchors.verticalCenter: parent.verticalCenter
                 text: (launcher.mode === "apps" ? "↵ OPEN" : "↵ COPY") + "    ⇥ "
                     + (launcher.mode === "apps" ? "CLIPBOARD" : "APPS") + "    ESC CLOSE"

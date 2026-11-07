@@ -2,6 +2,9 @@
 """Helper for the launcher (SUPER + Space).
 
 Commands:
+    get                        Print the launcher settings as JSON.
+    set animation <0..1000>    Opening / closing time in ms (0 = none);
+                               config.json "launcher.animationMs".
     used <desktop id>          Count one launch (apps you use often rise in
                                the list). Kept in ~/.local/state/yakushi/
                                launcher.json: counts only, nothing else.
@@ -24,10 +27,44 @@ import subprocess
 import sys
 import tempfile
 
+import yakushi_config as config
 import yakushi_paths as paths
 
 STATE = paths.STATE / "launcher.json"
 MAX_APPS = 500
+ANIMATION_DEFAULT, ANIMATION_MAX = 480, 1000
+
+
+def emit(obj: dict) -> None:
+    print(json.dumps(obj), flush=True)
+
+
+def settings(saved: dict) -> dict:
+    ms = saved.get("animationMs")
+    if not isinstance(ms, int) or isinstance(ms, bool):
+        ms = ANIMATION_DEFAULT
+    return {"animationMs": max(0, min(ANIMATION_MAX, ms))}
+
+
+def set_animation(raw: str) -> None:
+    try:
+        ms = max(0, min(ANIMATION_MAX, int(raw)))
+    except ValueError:
+        emit({"ok": False, "message": "Use a whole number of milliseconds."})
+        raise SystemExit(1)
+
+    def change(saved: dict) -> dict:
+        saved.update(settings(saved))
+        saved["animationMs"] = ms
+        return saved
+
+    try:
+        state = settings(config.update("launcher", change))
+    except config.NewerConfig as error:
+        emit({"ok": False, "message": str(error)})
+        raise SystemExit(1)
+    emit({"ok": True, **state, "message": "Launcher animation " + (f"{ms} ms." if ms else "off.")})
+
 
 # Terminals that take the program after -e (the rest take it as is).
 DASH_E = {"alacritty", "ghostty", "xterm", "urxvt", "konsole", "xfce4-terminal", "st", "terminator", "tilix"}
@@ -97,12 +134,16 @@ def terminal(exec_line: str) -> None:
 
 def main() -> None:
     args = sys.argv[1:]
-    if len(args) == 2 and args[0] == "used":
+    if args == ["get"]:
+        emit({"ok": True, **settings(config.section("launcher"))})
+    elif len(args) == 3 and args[:2] == ["set", "animation"]:
+        set_animation(args[2])
+    elif len(args) == 2 and args[0] == "used":
         used(args[1])
     elif len(args) == 2 and args[0] == "terminal":
         terminal(args[1])
     else:
-        raise SystemExit("Usage: used <desktop id> | terminal <Exec line>")
+        raise SystemExit("Usage: get | set animation <ms> | used <desktop id> | terminal <Exec line>")
 
 
 if __name__ == "__main__":

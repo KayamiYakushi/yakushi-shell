@@ -1,8 +1,8 @@
 import QtQuick
 
 // The card of Settings and the screen-share picker, in the shell's shape:
-// top-right and bottom-left corners cut (Theme.cutLarge), an accent notch
-// on each cut and an L mark on each square corner.
+// top-right and bottom-left corners cut (Theme.cutLarge), with an accent
+// notch on each cut.
 //
 // Opening: at first there are only the two notches, crossed in the middle.
 // They slide apart along the top-right / bottom-left diagonal, the card opens
@@ -66,29 +66,6 @@ Item {
         onHoveredChanged: if (!hovered) card.pointer = Qt.point(0, 0)
     }
 
-    // L-shaped accent mark at a square corner
-    component CornerMark: Item {
-        property bool atRight: false
-        property bool atBottom: false
-
-        width: 18
-        height: 18
-
-        Rectangle {
-            y: parent.atBottom ? parent.height - 2 : 0
-            width: parent.width
-            height: 2
-            color: Theme.accent
-        }
-
-        Rectangle {
-            x: parent.atRight ? parent.width - 2 : 0
-            width: 2
-            height: parent.height
-            color: Theme.accent
-        }
-    }
-
     // Accent stroke along a cut corner, just outside it; while opening it
     // rides the edge of the band.
     component Notch: Rectangle {
@@ -136,9 +113,6 @@ Item {
                 cutTopLeft: false
                 cutBottomRight: false
             }
-
-            CornerMark { x: -4; y: -4 }
-            CornerMark { x: body.width - width + 4; y: body.height - height + 4; atRight: true; atBottom: true }
 
             Item {
                 id: inside

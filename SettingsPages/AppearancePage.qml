@@ -868,7 +868,8 @@ Item {
                 }
             }
 
-            // Corners: rounded or sharp
+            // Corners: cut (Hyprland rounding with rounding_power 1, set in
+            // hyprland.lua) or sharp
             Row {
                 width: parent.width
                 spacing: 12
@@ -876,7 +877,7 @@ Item {
 
                 Repeater {
                     model: [
-                        { key: "rounded", name: "ROUNDED" },
+                        { key: "rounded", name: "CUT" },
                         { key: "sharp", name: "SHARP" }
                     ]
 
@@ -905,14 +906,13 @@ Item {
                             spacing: 12
 
                             // Tiny window showing the corner style
-                            Rectangle {
+                            CutBox {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 26
                                 height: 18
-                                radius: cornerCard.modelData.key === "sharp" ? 0 : 5
-                                color: "transparent"
-                                border.width: 1.5
-                                border.color: cornerCard.selected ? Theme.accent : Theme.inkSoft
+                                cut: cornerCard.modelData.key === "sharp" ? 0 : 5
+                                strokeWidth: 1.5
+                                stroke: cornerCard.selected ? Theme.accent : Theme.inkSoft
                             }
 
                             Text {
@@ -947,7 +947,7 @@ Item {
             Slider {
                 width: parent.width
                 visible: page.rounding > 0
-                label: "Corner radius  " + page.rounding + "px"
+                label: "Corner cut  " + page.rounding + "px"
                 icon: String.fromCodePoint(0xF0607)
                 tint: Theme.accent
                 value: (page.rounding - 1) / 19

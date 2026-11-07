@@ -35,6 +35,12 @@ install them.
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
 ```
 
+Windows get the same cut corners from Hyprland itself:
+
+```lua
+decoration = { rounding = 14, rounding_power = 1.0 }  -- power 1 = straight 45-degree cut
+```
+
 `hypr/xdph.conf`: `custom_picker_binary = yakushi-share-picker`.
 `hyprlock.conf` can show `~/.config/yakushi/profile-picture`.
 
@@ -57,6 +63,10 @@ One shape rule for every part of the shell:
 - No rounded corners anywhere.
 - Settings opens from its two corner notches: they cross in the middle,
   slide apart along the diagonal and land on the card's cut corners.
+- A tile inside a cut outline is inset evenly with cuts parallel to the
+  outline's (a 45-degree cut moved in by d shrinks by d * (2 - sqrt 2)).
+- Windows: Hyprland `rounding_power = 1.0` turns its rounding into the
+  same straight cut.
 
 ## Configuration
 

@@ -72,21 +72,23 @@ PanelWindow {
             stroke: "#12ffffff"
         }
 
-        // speaker
+        // speaker: inset evenly from the pill, its cuts parallel to the
+        // pill's (a 45-degree cut moved in by `inset` shrinks by
+        // inset * (2 - sqrt 2)), so it never reaches past the outline
         Item {
             id: dot
 
-            x: 8
-            y: (pill.height - height) / 2
-            width: 32
-            height: 32
+            readonly property real inset: 6
+
+            x: inset
+            y: inset
+            width: pill.height - 2 * inset
+            height: pill.height - 2 * inset
 
             CutBox {
                 anchors.fill: parent
                 fill: Theme.tint(osd.tone, 0.18)
-                cut: Theme.cutSmall
-                cutTopLeft: false
-                cutBottomRight: false
+                cut: Theme.cut - dot.inset * (2 - Math.SQRT2)
             }
 
             Text {

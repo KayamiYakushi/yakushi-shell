@@ -29,7 +29,8 @@ src="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
 if [ "${1:-}" = "--uninstall" ]; then
     # stop the shell this copy runs, so the next `yakushi start` (e.g. the
     # package's) never finds a second bar still up
-    [ -x "$dest/bin/yakushi" ] && "$dest/bin/yakushi" stop 2>/dev/null
+    # (never fatal: under set -e a failing last step would end the script here)
+    if [ -x "$dest/bin/yakushi" ]; then "$dest/bin/yakushi" stop >/dev/null 2>&1 || true; fi
     for link in "$bin_dir/yakushi" "$bin_dir/yakushi-share-picker"; do
         # only our own links
         case "$(readlink -- "$link" 2>/dev/null)" in "$dest"/*) rm -f -- "$link" ;; esac

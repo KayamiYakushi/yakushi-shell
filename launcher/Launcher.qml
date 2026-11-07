@@ -251,14 +251,14 @@ PanelWindow {
     // the chosen row is marked by an accent bar, and only it shows what
     // the app is.
     // ------------------------------------------------------------------
-    readonly property int pad: 24
+    readonly property int pad: 28
 
     TiltCard {
         id: card
 
         anchors.centerIn: parent
-        width: Math.min(580, launcher.width - 40)
-        height: Math.min(470, launcher.height - 40)
+        width: Math.min(500, launcher.width - 40)
+        height: Math.min(490, launcher.height - 40)
         leanDegrees: 2
         duration: launcher.animation
         shown: launcher.showing
@@ -273,9 +273,9 @@ PanelWindow {
             id: field
 
             x: launcher.pad
-            y: 20
+            y: 26
             width: parent.width - 2 * launcher.pad
-            height: 44
+            height: 46
 
             Text {
                 id: glyph
@@ -372,12 +372,12 @@ PanelWindow {
 
             x: launcher.pad - 8
             anchors.top: field.bottom
-            anchors.topMargin: 14
+            anchors.topMargin: 20
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 20
+            anchors.bottomMargin: 26
             width: parent.width - 2 * launcher.pad + 16
             clip: true
-            spacing: 2
+            spacing: 4
             boundsBehavior: Flickable.StopAtBounds
             model: launcher.mode === "apps" ? launcher.apps : launcher.clipResults
             currentIndex: launcher.selected
@@ -392,7 +392,7 @@ PanelWindow {
                 readonly property var entry: launcher.mode === "apps" ? modelData.entry : null
 
                 width: results.width
-                height: launcher.mode === "apps" ? 42 : 36
+                height: launcher.mode === "apps" ? 46 : 40
 
                 Rectangle {
                     anchors.fill: parent
@@ -431,8 +431,8 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.leftMargin: launcher.mode === "apps" ? 54 : 16
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, parent.width - anchors.leftMargin - 16
-                        - (rowWhat.visible ? Math.min(rowWhat.implicitWidth, parent.width * 0.38) + 16 : 0))
+                    // the name comes first; the description only gets what is left
+                    width: Math.min(implicitWidth, parent.width - anchors.leftMargin - 16)
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     text: row.entry ? row.entry.name : String(row.modelData.text).replace(/\s+/g, " ")
@@ -449,8 +449,9 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.rightMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, parent.width * 0.38)
-                    visible: row.here && row.entry !== null && text !== ""
+                    readonly property real room: parent.width - rowName.x - rowName.width - 16 - 16
+                    width: Math.min(implicitWidth, room)
+                    visible: row.here && row.entry !== null && text !== "" && room >= 70
                     horizontalAlignment: Text.AlignRight
                     elide: Text.ElideRight
                     maximumLineCount: 1

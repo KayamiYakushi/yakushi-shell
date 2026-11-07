@@ -174,12 +174,9 @@ PanelWindow {
 
     function launch(entry) {
         if (entry.runInTerminal)
-            Quickshell.execDetached(Paths.cleanEnv.concat(["python3", Paths.script("yakushi-launchctl.py"), "terminal", entry.execString]))
+            Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "terminal", entry.execString])
         else
-            Quickshell.execDetached({
-                command: Paths.cleanEnv.concat(entry.command),
-                workingDirectory: entry.workingDirectory || Paths.home
-            })
+            entry.execute()
         Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "used", entry.id])
         hide()
     }

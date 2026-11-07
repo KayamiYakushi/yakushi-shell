@@ -149,6 +149,24 @@ PanelWindow {
         }
     }
 
+    // Accent stroke along a cut corner of the card, just outside it (the cut
+    // corners' twin of CornerMark)
+    component CutMark: Rectangle {
+        property real cutSize: Theme.cut
+        property real cx: 0          // centre of the cut, in the card
+        property real cy: 0
+        property real nx: 0          // outward direction (-1 / 1)
+        property real ny: 0
+
+        width: cutSize * Math.SQRT2 + 10
+        height: 2
+        x: cx + nx * 2.8 - width / 2
+        y: cy + ny * 2.8 - height / 2
+        rotation: 45
+        antialiasing: true
+        color: Theme.accent
+    }
+
     // ------------------------------------------------------------------
     // Outside the card: click to close, Esc anywhere
     // ------------------------------------------------------------------
@@ -366,17 +384,24 @@ PanelWindow {
             tint: Theme.accent
         }
 
-        Rectangle {
+        Item {
             id: frame
 
             anchors.fill: parent
-            color: Theme.backdrop
-            border.width: 1
-            border.color: Theme.tint(Theme.ink, 0.12)
+
+            // two opposite corners cut (Theme.cut), the island's shape language
+            CutBox {
+                anchors.fill: parent
+                fill: Theme.backdrop
+                stroke: Theme.tint(Theme.ink, 0.12)
+                cut: Theme.cut + 4
+                cutTopLeft: false
+                cutBottomRight: false
+            }
 
             CornerMark { x: -4; y: -4 }
-            CornerMark { x: frame.width - width + 4; y: -4; atRight: true }
-            CornerMark { x: -4; y: frame.height - height + 4; atBottom: true }
+            CutMark { cutSize: Theme.cut + 4; cx: frame.width - cutSize / 2; cy: cutSize / 2; nx: 1; ny: -1 }
+            CutMark { cutSize: Theme.cut + 4; cx: cutSize / 2; cy: frame.height - cutSize / 2; nx: -1; ny: 1 }
             CornerMark { x: frame.width - width + 4; y: frame.height - height + 4; atRight: true; atBottom: true }
 
             // ============ header strip ============

@@ -52,23 +52,25 @@ PanelWindow {
 
     readonly property color tone: silent ? Theme.alert : Theme.accent
 
-    Rectangle {
+    Item {
         id: pill
 
         x: (osd.width - width) / 2
         y: osd.up ? 46 : 34
         width: 300
         height: 46
-        radius: height / 2
-        color: "#eb050505"
-        border.width: 1
-        border.color: "#12ffffff"
         opacity: osd.up ? 1 : 0
         scale: osd.up ? 1 : 0.94
 
         Behavior on y { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
         Behavior on scale { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
+
+        CutBox {
+            anchors.fill: parent
+            fill: "#eb050505"
+            stroke: "#12ffffff"
+        }
 
         // speaker
         Rectangle {
@@ -78,7 +80,6 @@ PanelWindow {
             y: (pill.height - height) / 2
             width: 32
             height: 32
-            radius: 16
             color: Theme.tint(osd.tone, 0.18)
 
             Text {
@@ -99,12 +100,10 @@ PanelWindow {
             y: (pill.height - height) / 2
             width: readout.x - x - 12
             height: 6
-            radius: 3
             color: "#1affffff"
 
             Rectangle {
                 height: parent.height
-                radius: 3
                 width: osd.silent ? 0 : parent.width * Math.min(1, osd.level)
                 color: Theme.accent
 

@@ -1,4 +1,5 @@
 pragma Singleton
+import Quickshell
 import QtQuick
 
 // Yakushi design tokens: every Settings / bar colour, font and timing comes
@@ -29,6 +30,15 @@ QtObject {
     // ---- type
     readonly property string mono: "JetBrainsMono Nerd Font"
     property string glyphs: "JetBrainsMono Nerd Font"
+
+    // ---- shape
+    // One rule for the whole shell: outlines (anything that stands on the
+    // screen by itself: the island, its cards, pop-ups, the Settings card)
+    // get 45-degree cut corners of this size; everything inside a surface is
+    // square. No rounded corners anywhere.
+    // PROTOTYPE: YAKUSHI_PROTO_CUT overrides it for side-by-side screenshots.
+    readonly property int cut: Number(Quickshell.env("YAKUSHI_PROTO_CUT")) || 10
+    readonly property int cutSmall: Math.max(3, Math.round(cut / 2))
 
     // ---- motion (ms)
     readonly property int tFast: 120

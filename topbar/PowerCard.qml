@@ -167,7 +167,6 @@ Item {
 
                 width: Math.floor((card.width - 4 * tiles.spacing) / 5)
                 height: 66
-                radius: 14
                 color: armed
                     ? Theme.tint(Theme.alert, 0.16)
                     : lit ? Theme.tint(Theme.accent, 0.12) : Theme.tint(Theme.ink, 0.045)

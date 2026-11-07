@@ -114,13 +114,11 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 64
                 height: 4
-                radius: 2
                 color: Theme.tint(Theme.ink, 0.14)
 
                 Rectangle {
                     width: parent.width * Math.min(1, v.level)
                     height: parent.height
-                    radius: 2
                     color: v.muted ? Theme.inkSoft : Theme.accent
                 }
 
@@ -129,7 +127,6 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 8
                     height: 8
-                    radius: 4
                     color: Theme.ink
                 }
             }

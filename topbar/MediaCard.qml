@@ -63,7 +63,6 @@ Item {
         y: 0
         width: 52
         height: 52
-        radius: 10
         color: Theme.groove
 
         Text {
@@ -198,13 +197,11 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
                 height: seekMouse.containsMouse ? 5 : 4
-                radius: height / 2
                 color: Theme.tint(Theme.ink, 0.14)
 
                 Rectangle {
                     width: parent.width * track.ratio
                     height: parent.height
-                    radius: parent.radius
                     color: Theme.accent
                 }
             }

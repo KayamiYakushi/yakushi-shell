@@ -80,7 +80,6 @@ Item {
                     anchors.centerIn: parent
                     width: parent.width
                     height: dotMouse.containsMouse && !dot.active ? 9 : 7
-                    radius: height / 2
                     color: dot.active
                         ? Theme.accent
                         : dot.used

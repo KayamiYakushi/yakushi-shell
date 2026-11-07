@@ -7,8 +7,8 @@ import QtQuick
 import QtQuick.Shapes
 import "../"
 
-// The island: a notch hanging from the top edge of the screen, with
-// concave "ears" joining it to the edge and rounded lower corners.
+// The island: a notch hanging from the top edge of the screen, joined to
+// the edge by 45-degree shoulders, with cut lower corners (Theme.cut).
 // Modules are laid out in the order chosen in Settings -> Top Bar.
 // Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, the system
 // clock); only SystemStats ticks, every 2 seconds.
@@ -389,7 +389,7 @@ PanelWindow {
         id: island
 
         property real bodyWidth: Math.max(content.implicitWidth + 2 * win.padX, 96)
-        readonly property int cornerRadius: 14
+        readonly property int cornerRadius: Theme.cut     // the cut lower corners
 
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
@@ -413,29 +413,13 @@ PanelWindow {
                 startY: 0
 
                 PathLine { x: island.width; y: 0 }
-                PathArc {
-                    x: island.width - win.ear; y: win.ear
-                    radiusX: win.ear; radiusY: win.ear
-                    direction: PathArc.Counterclockwise
-                }
+                PathLine { x: island.width - win.ear; y: win.ear }
                 PathLine { x: island.width - win.ear; y: island.height - island.cornerRadius }
-                PathArc {
-                    x: island.width - win.ear - island.cornerRadius; y: island.height
-                    radiusX: island.cornerRadius; radiusY: island.cornerRadius
-                    direction: PathArc.Clockwise
-                }
+                PathLine { x: island.width - win.ear - island.cornerRadius; y: island.height }
                 PathLine { x: win.ear + island.cornerRadius; y: island.height }
-                PathArc {
-                    x: win.ear; y: island.height - island.cornerRadius
-                    radiusX: island.cornerRadius; radiusY: island.cornerRadius
-                    direction: PathArc.Clockwise
-                }
+                PathLine { x: win.ear; y: island.height - island.cornerRadius }
                 PathLine { x: win.ear; y: win.ear }
-                PathArc {
-                    x: 0; y: 0
-                    radiusX: win.ear; radiusY: win.ear
-                    direction: PathArc.Counterclockwise
-                }
+                PathLine { x: 0; y: 0 }
             }
         }
 
@@ -477,7 +461,6 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 3
                             height: 3
-                            radius: 1.5
                             color: Theme.tint(Theme.ink, 0.22)
                         }
 

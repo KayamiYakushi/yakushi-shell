@@ -72,7 +72,6 @@ Item {
 
                     anchors.bottom: parent.bottom
                     width: 2.5
-                    radius: 1.25
                     height: 2 + 10 * (m.media.levels[index] || 0)
                     color: Theme.accent
                 }

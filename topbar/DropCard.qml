@@ -3,7 +3,7 @@ import QtQuick.Shapes
 import "../"
 
 // A card that hangs from the island's lower edge below a module, joined to
-// the island by concave "ears", and grows downward when opened.
+// the island by 45-degree shoulders, and grows downward when opened.
 // Used for the now-playing card and the power menu. Nothing is drawn while
 // closed.
 Item {
@@ -59,7 +59,7 @@ Item {
 
         readonly property real h: drop.height
         readonly property real e: Math.max(0.01, Math.min(drop.ear, h))
-        readonly property real r: Math.max(0.01, Math.min(22, (h - e) / 2))
+        readonly property real r: Math.max(0.01, Math.min(Theme.cut, (h - e) / 2))
 
         anchors.fill: parent
         preferredRendererType: Shape.CurveRenderer
@@ -73,29 +73,13 @@ Item {
             startY: 0
 
             PathLine { x: drop.width; y: 0 }
-            PathArc {
-                x: drop.width - drop.ear; y: shape.e
-                radiusX: drop.ear; radiusY: shape.e
-                direction: PathArc.Counterclockwise
-            }
+            PathLine { x: drop.width - drop.ear; y: shape.e }
             PathLine { x: drop.width - drop.ear; y: shape.h - shape.r }
-            PathArc {
-                x: drop.width - drop.ear - shape.r; y: shape.h
-                radiusX: shape.r; radiusY: shape.r
-                direction: PathArc.Clockwise
-            }
+            PathLine { x: drop.width - drop.ear - shape.r; y: shape.h }
             PathLine { x: drop.ear + shape.r; y: shape.h }
-            PathArc {
-                x: drop.ear; y: shape.h - shape.r
-                radiusX: shape.r; radiusY: shape.r
-                direction: PathArc.Clockwise
-            }
+            PathLine { x: drop.ear; y: shape.h - shape.r }
             PathLine { x: drop.ear; y: shape.e }
-            PathArc {
-                x: 0; y: 0
-                radiusX: drop.ear; radiusY: shape.e
-                direction: PathArc.Counterclockwise
-            }
+            PathLine { x: 0; y: 0 }
         }
     }
 

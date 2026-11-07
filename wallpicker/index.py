@@ -4,7 +4,8 @@
 The pictures come from the "wallpaper" section of the config:
 
     "wallpaper": {
-      "folder": "~/Pictures/Walls",   default: your XDG Documents folder
+      "folder": "~/Pictures/Walls",   default: Pictures/Wallpapers when it has
+                                      pictures, else your XDG Documents folder
       "visibleCount": 10,             tiles across the strip
       "thumbJobs": 4                  thumbnails made at once
     }
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -38,10 +40,27 @@ def number(value, default: int, low: int, high: int) -> int:
     return default
 
 
+def has_pictures(folder: Path) -> bool:
+    """at least one picture right in the folder (stops at the first)"""
+    try:
+        with os.scandir(folder) as entries:
+            return any(e.is_file() and Path(e.name).suffix.lower() in EXTS for e in entries)
+    except OSError:
+        return False
+
+
+def default_folder() -> Path:
+    # (no XDG Pictures folder set: user_dir gives ~, so also look in ~/Pictures)
+    for walls in (paths.user_dir("PICTURES") / "Wallpapers", paths.HOME / "Pictures" / "Wallpapers"):
+        if has_pictures(walls):
+            return walls
+    return paths.user_dir("DOCUMENTS")
+
+
 def settings() -> dict:
     saved = config.section("wallpaper")
     folder = saved.get("folder")
-    folder = Path(folder).expanduser() if isinstance(folder, str) and folder.strip() else paths.user_dir("DOCUMENTS")
+    folder = Path(folder).expanduser() if isinstance(folder, str) and folder.strip() else default_folder()
     return {
         "folder": str(folder),
         "index": str(paths.CACHE / "wallpaper/index"),

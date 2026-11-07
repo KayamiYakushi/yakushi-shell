@@ -12,7 +12,7 @@ import "topbar"
 //
 // Everything is driven over IPC, e.g.
 //   qs -p <this dir> ipc call settings toggle
-//   qs -p <this dir> ipc call volumeOsd show
+//   qs -p <this dir> ipc call volumeOsd reveal
 //   qs -p <this dir> ipc call topbar toggle
 // bin/yakushi starts the shell and wraps these calls for keybinds
 // (yakushi settings, yakushi volume up, yakushi bar toggle, ...).
@@ -87,7 +87,8 @@ ShellRoot {
             barPower.requests += 1
         }
 
-        function show(): void {
+        // not "show": qs reads `ipc call <target> show` as its own `ipc show`
+        function reveal(): void {
             bar.active = true
         }
 
@@ -159,7 +160,7 @@ ShellRoot {
     IpcHandler {
         target: "volumeOsd"
 
-        function show(): void {
+        function reveal(): void {
             volumeOsd.active = true
             volumeOsd.item.poke()
             volumeOsdUnload.restart()

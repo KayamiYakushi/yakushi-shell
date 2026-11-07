@@ -94,7 +94,13 @@ stop() {
 }
 
 call() {
-    timeout 2 qs -p "$shell_qml" ipc call "$@" >/dev/null 2>&1
+    # qs answers an unknown function (or one named like its own subcommands,
+    # e.g. "show") by listing the targets, with exit code 0: that is a failure
+    out="$(timeout 2 qs -p "$shell_qml" ipc call "$@" 2>&1)" || return 1
+    case "$out" in
+        "target "*|*"No running instances"*|*"does not exist"*|*"not found"*) return 1 ;;
+    esac
+    return 0
 }
 
 ipc() {
@@ -165,10 +171,11 @@ case "$cmd" in
             show) ;;
             *)    usage ;;
         esac
-        ipc volumeOsd show ;;
+        ipc volumeOsd reveal ;;
     bar)
         case "${1:-}" in
-            show|hide|toggle) ipc topbar "$1" ;;
+            show)   ipc topbar reveal ;;
+            hide|toggle) ipc topbar "$1" ;;
             *) usage ;;
         esac ;;
     power)    ipc topbar power ;;

@@ -20,10 +20,9 @@ Item {
 
     readonly property var actions: [
         { key: "lock",     label: "Lock",      glyph: 0xF033E, confirm: false,
-          args: ["sh", "-c", "pidof hyprlock >/dev/null || exec hyprlock"] },
+          args: [Paths.shell + "/bin/yakushi", "lock"] },
         { key: "suspend",  label: "Suspend",   glyph: 0xF04B2, confirm: false,
-          args: ["sh", "-c", "pidof hyprlock >/dev/null || { setsid hyprlock >/dev/null 2>&1 & sleep 0.8; }; "
-                 + "exec systemctl suspend"] },
+          args: [Paths.shell + "/bin/yakushi", "suspend"] },     // locks first, then sleeps
         { key: "logout",   label: "Log out",   glyph: 0xF0343, confirm: true,
           args: ["sh", "-c",
                  "out=$(hyprctl eval 'hl.dispatch(hl.dsp.exit())' 2>&1); "

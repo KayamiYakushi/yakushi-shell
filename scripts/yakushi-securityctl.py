@@ -7,16 +7,15 @@ Used by Settings -> Security, and once at login.
                                             encryption, Secure Boot - and the guard's news
     yakushi-securityctl.py updates          look for updates and known security holes
                                             (checkupdates + arch-audit; needs the internet)
-    yakushi-securityctl.py login            at login: the guard check, the update check
-                                            (at most once a day), auto lock; a Hyprland
-                                            notification only when something is serious
+    yakushi-securityctl.py login            at login: the guard check and the update check
+                                            (at most once a day); a Hyprland notification
+                                            only when something is serious
     yakushi-securityctl.py guard            the guard check now
     yakushi-securityctl.py accept <key>|all "that was me": take changes into the baseline
     yakushi-securityctl.py firewall on|off  * ufw: block everything coming in, allow going out
     yakushi-securityctl.py ssh off          * stop and disable the SSH server
-    yakushi-securityctl.py autolock <min>|off   lock after <min> idle minutes and before
-                                            sleep (hypridle, with its own config;
-                                            * the first time, to install it)
+    yakushi-securityctl.py autolock <min>|off   lock after <min> idle minutes (the shell
+                                            watches for idle itself; config "lock")
     yakushi-securityctl.py upgrade          * the system update (pacman -Syu), right in Settings:
                                             one JSON line per step, then {"done": ...}.
                                             pacman runs on its own: closing Settings never
@@ -48,12 +47,14 @@ import sys
 import time
 from pathlib import Path
 
+import yakushi_config as config
 import yakushi_paths as paths
 
 HERE = paths.SCRIPTS
 HOME = paths.HOME
 STATE = paths.STATE / "security.json"
-IDLE_CONF = paths.STATE / "hypridle.conf"   # its own file: yours stays yours
+OLD_IDLE_CONF = paths.STATE / "hypridle.conf"   # auto lock of earlier builds
+AUTOLOCK_DEFAULT = 10               # minutes, when never set
 DAY = 20 * 3600                     # "once a day", with some room
 
 sys.dont_write_bytecode = True
@@ -182,11 +183,12 @@ def secure_boot() -> dict:
 
 
 def autolock() -> dict:
-    text = read(IDLE_CONF)
-    m = re.search(r"^# yakushi-autolock: (\d+|off)$", text, re.M)
-    minutes = m.group(1) if m else "off"
-    running = run(["pgrep", "-u", str(os.getuid()), "-f", f"hypridle -c {IDLE_CONF}"], 5).returncode == 0
-    return {"minutes": minutes, "installed": have("hypridle"), "running": running}
+    """the "lock" section of the config; the shell's idle watch reads the same"""
+    value = config.section("lock").get("idleMinutes", AUTOLOCK_DEFAULT)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        value = AUTOLOCK_DEFAULT
+    minutes = "off" if value == 0 else str(min(value, 240))
+    return {"minutes": minutes, "installed": True, "running": True}
 
 
 # ---- updates and known holes -------------------------------------------------------------
@@ -322,7 +324,8 @@ def journal_since(since: int) -> dict:
                "SYSLOG_IDENTIFIER=sudo", "+", "SYSLOG_IDENTIFIER=sshd", "+", "SYSLOG_IDENTIFIER=sshd-session",
                "+", "SYSLOG_IDENTIFIER=login", "+", "SYSLOG_IDENTIFIER=su",
                "+", "SYSLOG_IDENTIFIER=unix_chkpwd", "+", "SYSLOG_IDENTIFIER=polkit-agent-helper-1",
-               "+", "SYSLOG_IDENTIFIER=hyprlock", "+", "SYSLOG_IDENTIFIER=sddm-helper"], 30)
+               "+", "SYSLOG_IDENTIFIER=hyprlock", "+", "SYSLOG_IDENTIFIER=sddm-helper",
+               "+", "SYSLOG_IDENTIFIER=qs", "+", "SYSLOG_IDENTIFIER=quickshell"], 30)
     low = res.stderr.lower()
     if "insufficient permissions" in low or "not seeing messages" in low or (res.returncode != 0 and not res.stdout):
         out["readable"] = False
@@ -442,43 +445,27 @@ def ssh_off() -> dict:
     return r
 
 
-def write_idle(minutes: str) -> None:
-    if minutes == "off":
-        text = "# yakushi-autolock: off\n# Settings -> Security -> Auto lock writes this file.\n"
-    else:
-        sec = int(minutes) * 60
-        text = (f"# yakushi-autolock: {minutes}\n"
-                "# Settings -> Security -> Auto lock writes this file.\n"
-                "general {\n"
-                "    lock_cmd = pidof hyprlock || hyprlock\n"
-                "    before_sleep_cmd = loginctl lock-session\n"
-                "}\n\n"
-                "listener {\n"
-                f"    timeout = {sec}\n"
-                "    on-timeout = loginctl lock-session\n"
-                "}\n")
-    IDLE_CONF.parent.mkdir(parents=True, exist_ok=True)
-    IDLE_CONF.write_text(text)
-
-
-def start_idle(on: bool) -> None:
-    run(["pkill", "-u", str(os.getuid()), "-f", f"hypridle -c {IDLE_CONF}"], 5)   # only ours
-    if on and have("hypridle"):
-        subprocess.Popen(["setsid", "hypridle", "-c", str(IDLE_CONF)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL, start_new_session=True)
+def stop_old_idle() -> None:
+    """earlier builds ran hypridle with their own config: end it, once"""
+    if OLD_IDLE_CONF.exists():
+        run(["pkill", "-u", str(os.getuid()), "-f", f"hypridle -c {OLD_IDLE_CONF}"], 5)   # only ours
+        try:
+            OLD_IDLE_CONF.unlink()
+        except OSError:
+            pass
 
 
 def set_autolock(minutes: str) -> dict:
     if minutes != "off" and not (minutes.isdigit() and 1 <= int(minutes) <= 240):
         return {"ok": False, "message": "Minutes from 1 to 240, or off."}
-    if minutes != "off" and not have("hypridle"):
-        r = root(["pacman", "-S", "--needed", "--noconfirm", "hypridle"])
-        if not r["ok"]:
-            return r
-    write_idle(minutes)
-    start_idle(minutes != "off")
-    return {"ok": True, "message": "Auto lock off." if minutes == "off"
-            else f"The screen locks after {minutes} idle minutes, and before sleep."}
+    value = 0 if minutes == "off" else int(minutes)
+    try:
+        config.update("lock", lambda saved: saved.update(idleMinutes=value))
+    except config.NewerConfig as error:
+        return {"ok": False, "message": str(error)}
+    stop_old_idle()
+    return {"ok": True, "message": "Auto lock off." if value == 0
+            else f"The screen locks after {value} idle minutes."}
 
 
 # caches that pacman hooks rebuild after installs: they never match the
@@ -730,7 +717,7 @@ def status() -> dict:
         "guard": {"time": data.get("guardTime"), "changes": data.get("changes", []),
                   "events": data.get("events", {}), "baseline": isinstance(data.get("baseline"), dict)},
         "scan": data.get("scan"),
-        "tools": {t: have(t) for t in ("ufw", "arch-audit", "checkupdates", "hypridle", "ss")},
+        "tools": {t: have(t) for t in ("ufw", "arch-audit", "checkupdates", "ss")},
     }
 
 
@@ -744,8 +731,7 @@ def login() -> None:
             pass
         data["updates"] = check_updates()
     save(data)
-    if autolock()["minutes"] != "off":
-        start_idle(True)
+    stop_old_idle()
     news = []
     if g["changes"]:
         news.append(f"{len(g['changes'])} change(s) to what starts or listens on this computer")

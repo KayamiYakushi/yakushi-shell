@@ -11,6 +11,11 @@
 #   yakushi bar show|hide|toggle       The top bar.
 #   yakushi launcher [clipboard]       The app launcher, or clipboard history.
 #   yakushi power                      The top bar's power menu.
+#   yakushi lock                       Lock the screen (returns when unlocked).
+#   yakushi lock preview               The lock screen in a window, nothing locked:
+#                                      try the look and your password safely.
+#   yakushi suspend                    Lock, wait until every screen is covered,
+#                                      then sleep.
 #   yakushi notifications on|off|toggle|test
 #                                      Show notifications or not (off: apps are
 #                                      still answered at once, nothing is shown).
@@ -31,6 +36,7 @@ root="$(cd -- "$(dirname -- "$self")/.." && pwd -P)" || exit 1
 scripts="$root/scripts"
 shell_qml="$root/shell.qml"
 settings_qml="$root/settings.qml"
+lock_qml="$root/lock.qml"
 
 die() {
     printf 'yakushi: %s\n' "$*" >&2
@@ -121,6 +127,52 @@ ipc() {
 }
 
 # ---------------------------------------------------------------------------
+# Lock screen: its own process, never the shell's, so a crash or restart of
+# the bar cannot touch it.
+# ---------------------------------------------------------------------------
+
+lock() {
+    # one lock at a time: a second `yakushi lock` (auto lock while already
+    # locked, a key pressed twice) just returns
+    exec 9>"$run/lock.flock" || return 1
+    flock -n 9 || return 0
+
+    # If the lock process dies while locked, the compositor keeps the session
+    # locked; start it again so you get the password field back. A clean
+    # unlock exits 0. A lock that cannot even load (exit 255) never locked
+    # anything, so it is not retried for ever.
+    : >"$run/lock.log"
+    tries=0
+    while [ "$tries" -lt 5 ]; do
+        qs -n -p "$lock_qml" >>"$run/lock.log" 2>&1 </dev/null
+        [ $? -eq 0 ] && return 0
+        tries=$((tries + 1))
+        sleep 0.3
+    done
+    return 1
+}
+
+lock_preview() {
+    YAKUSHI_LOCK_PREVIEW=1 exec qs -p "$lock_qml" >/dev/null 2>&1 </dev/null
+}
+
+locked() {
+    [ "$(timeout 1 qs -p "$lock_qml" ipc call lock isLocked 2>/dev/null)" = yes ]
+}
+
+suspend_session() {
+    setsid "$self" lock >/dev/null 2>&1 </dev/null &
+    # wait (at most 3 s) until every screen is covered, so nothing shows for
+    # a moment on wake-up
+    i=0
+    while [ "$i" -lt 30 ] && ! locked; do
+        sleep 0.1
+        i=$((i + 1))
+    done
+    exec systemctl suspend
+}
+
+# ---------------------------------------------------------------------------
 # Session start
 # ---------------------------------------------------------------------------
 
@@ -189,6 +241,13 @@ case "$cmd" in
             *)         usage ;;
         esac ;;
     power)    ipc topbar power ;;
+    lock)
+        case "${1:-}" in
+            "")      lock ;;
+            preview) lock_preview ;;
+            *)       usage ;;
+        esac ;;
+    suspend)  suspend_session ;;
     notifications)
         case "${1:-}" in
             on|off) exec python3 "$scripts/yakushi-notifyctl.py" set enabled "$1" ;;

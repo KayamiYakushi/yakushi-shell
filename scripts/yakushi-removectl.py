@@ -96,7 +96,7 @@ SOFT = {
     "kitty": "the default terminal (SUPER + Q)", "nautilus": "the default file manager (SUPER + E)",
     "firefox": "the default browser (SUPER + B)", "wl-clipboard": "copy and paste in scripts",
     "cliphist": "clipboard history (SUPER + V)", "libnotify": "test notifications (Settings)", "grim": "screenshots", "slurp": "area screenshots",
-    "brightnessctl": "screen brightness keys", "hyprsunset": "night light", "hyprlock": "the lock screen",
+    "brightnessctl": "screen brightness keys", "hyprsunset": "night light",
     "playerctl": "now playing in the top bar", "pavucontrol": "advanced sound settings", "cava": "the visualizer",
     "awww": "wallpapers", "jq": "a few scripts", "imagemagick": "picture previews", "bluez": "Bluetooth",
     "bluez-utils": "Bluetooth", "pipewire-pulse": "sound for most apps", "noto-fonts": "the interface font",

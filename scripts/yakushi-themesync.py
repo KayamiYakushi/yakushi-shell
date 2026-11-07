@@ -4,7 +4,8 @@
 Called by yakushi-uistatectl.py whenever the accent changes (and safe to
 run by hand). Each step is independent and best effort:
 
-  * lock       $accent in ~/.config/hypr/hyprlock.conf
+  * hyprlock   $accent in ~/.config/hypr/hyprlock.conf (the old lock, if still
+               there; Yakushi's own lock reads the accent itself)
   * windows    border colour, when it follows the accent (yakushi-windowctl)
   * terminal   terminal + fish colours, when matching is on (yakushi-termctl)
 

@@ -1,13 +1,15 @@
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import Quickshell.Wayland
 import QtQuick
 import "topbar"
 import "notifications"
 import "launcher"
 
 // Yakushi Shell: the one entry point for the top bar, Settings, the volume
-// pill, notifications and the launcher.
+// pill, notifications, the launcher and auto lock. (The lock screen itself
+// is its own process: lock.qml, started by `yakushi lock`.)
 //
 // The bar and the notification server are always loaded. The volume pill
 // and the notification pop-ups are loaded only while they are on screen.
@@ -269,6 +271,30 @@ ShellRoot {
         NotificationPopups {
             server: notifications
             timeout: root.notificationTimeout
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Auto lock: after so many idle minutes (Settings -> Security; config
+    // "lock.idleMinutes", 0 = off, 10 when never set). The compositor tells
+    // us when you are idle, so nothing polls; a playing video (an idle
+    // inhibitor) keeps the screen open. The lock runs as its own process.
+    // ------------------------------------------------------------------
+    readonly property int lockMinutes: {
+        if (!Config.loaded)
+            return 0
+        var m = Config.lock.idleMinutes
+        return typeof m === "number" ? Math.max(0, Math.min(240, Math.round(m))) : 10
+    }
+
+    IdleMonitor {
+        enabled: root.lockMinutes > 0
+        timeout: root.lockMinutes * 60
+        respectInhibitors: true
+
+        onIsIdleChanged: {
+            if (isIdle)
+                Quickshell.execDetached([Paths.shell + "/bin/yakushi", "lock"])
         }
     }
 }

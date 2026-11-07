@@ -1284,7 +1284,7 @@ Item {
                 mood: page.lockMood
                 text: page.lock === null ? "…"
                     : page.lock.minutes === "off" ? "Off: the screen stays open when you walk away."
-                    : "Locks after " + page.lock.minutes + " idle minutes, and before sleep."
+                    : "Locks after " + page.lock.minutes + " idle minutes (a playing video keeps it open), and on Suspend."
 
                 Repeater {
                     model: [["off", "OFF"], ["5", "5"], ["10", "10"], ["15", "15"], ["30", "30 MIN"]]
@@ -1298,10 +1298,7 @@ Item {
                         onPicked: {
                             if (on)
                                 return
-                            if (modelData[0] !== "off" && !(page.st && page.st.tools.hypridle))
-                                page.ask(["autolock", modelData[0]], "Your password, to install hypridle (official repository)", "INSTALL")
-                            else
-                                page.run(["autolock", modelData[0]], "", "Setting auto lock…")
+                            page.run(["autolock", modelData[0]], "", "Setting auto lock…")
                         }
                     }
                 }

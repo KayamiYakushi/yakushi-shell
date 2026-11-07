@@ -1,7 +1,8 @@
 # Yakushi Shell
 
 A Quickshell (QML) desktop shell for Hyprland — the island top bar, Settings,
-OSD, wallpaper picker and screen-share picker from
+OSD, launcher, notifications, lock screen, wallpaper picker and screen-share
+picker from
 [yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles), growing
 into a single installable shell.
 
@@ -35,6 +36,7 @@ install them.
 "yakushi launcher"            -- SUPER + Space
 "yakushi launcher clipboard"  -- SUPER + V
 "yakushi power"               -- SUPER + `  (the island's power menu)
+"yakushi lock"                -- SUPER + Tab
 "yakushi notifications off"   -- or on | toggle | test
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
 ```
@@ -53,7 +55,33 @@ decoration = { rounding = 14, rounding_power = 1.0 }  -- power 1 = straight 45-d
 ```
 
 `hypr/xdph.conf`: `custom_picker_binary = yakushi-share-picker`.
-`hyprlock.conf` can show `~/.config/yakushi/profile-picture`.
+
+## Lock screen
+
+`yakushi lock` (SUPER + Tab, Power -> Lock, auto lock) runs `lock.qml` as its
+own process, so a crash or restart of the bar never touches it. It uses the
+ext-session-lock protocol: the compositor itself keeps the session locked,
+and only a password PAM accepts (the `login` stack, so faillock and any
+other module apply) ends the lock.
+
+- If the lock process dies, the screen stays locked and `yakushi lock`
+  starts it again. Let a new lock take over in Hyprland:
+
+  ```lua
+  misc = { allow_session_lock_restore = true }
+  ```
+
+- `yakushi lock preview` shows the same screen in a window and locks
+  nothing: try the look and your password safely (Esc closes it).
+- `yakushi suspend` locks, waits until every screen is covered, then sleeps
+  (Power -> Suspend uses it).
+- Auto lock: Settings -> Security (config `lock.idleMinutes`, 0 = off, 10
+  when never set). The shell asks the compositor for idle time, so nothing
+  polls, and a playing video keeps the screen open. hypridle is not needed.
+- It shows the wallpaper each screen has (dimmed), the clock, your
+  `~/.config/yakushi/profile-picture` and name, and the song that is
+  playing. The typed text is shown only as marks and cleared as soon as it
+  has gone to PAM.
 
 `yakushi` with no arguments lists every command. Nothing in the shell is a
 fixed path: user folders come from the XDG variables (and `user-dirs.dirs`,
@@ -90,7 +118,8 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
   "topbar":     { "seconds": true, "clock24": true, "opacity": 0.9, ... },
   "appearance": { "panelOpacity": 0.9, "accent": "#ff7a9d" },
   "terminal":   { "enabled": true, "opacity": 0.7, ... },
-  "wallpaper":  { "folder": "~/Pictures/Walls", "visibleCount": 10, ... }
+  "wallpaper":  { "folder": "~/Pictures/Walls", "visibleCount": 10, ... },
+  "lock":       { "idleMinutes": 10 }
 }
 ```
 
@@ -122,5 +151,6 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
 2. ✅ One versioned config (`~/.config/yakushi/config.json`) behind a `Config` singleton
 3. ✅ Code read-only, user state in `~/.config/yakushi` / `~/.local/state/yakushi`
 4. ✅ Power menu (the island's card) and ✅ notifications (built-in server, can be turned off completely);
-   ✅ launcher with clipboard history (replacing rofi); next: lock screen (replacing hyprlock)
+   ✅ launcher with clipboard history (replacing rofi); ✅ lock screen and auto lock
+   (replacing hyprlock and hypridle)
 5. Compositor abstraction (Niri later), PKGBUILD (the `yakushi` CLI and user install are done)

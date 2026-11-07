@@ -9,7 +9,8 @@
       "terminal":   { ... },   owned by yakushi-termctl.py
       "wallpaper":  { ... },   read by wallpicker/index.py
       "notifications": { ... }, owned by yakushi-notifyctl.py
-      "launcher":   { ... }    owned by yakushi-launchctl.py
+      "launcher":   { ... },   owned by yakushi-launchctl.py
+      "lock":       { ... }    owned by yakushi-securityctl.py (auto lock)
     }
 
 Each section is validated by the helper that owns it; this module only keeps
@@ -44,7 +45,7 @@ import yakushi_paths as paths
 from typing import Callable, Iterator
 
 VERSION = 1
-SECTIONS = ("topbar", "appearance", "terminal", "wallpaper", "notifications", "launcher")
+SECTIONS = ("topbar", "appearance", "terminal", "wallpaper", "notifications", "launcher", "lock")
 
 DIR = paths.CONFIG
 FILE = DIR / "config.json"
@@ -156,7 +157,7 @@ def _from_legacy() -> dict:
     if old_picture.is_file() and not PROFILE_PICTURE.exists():
         try:
             _ensure_dir()
-            shutil.copyfile(old_picture, PROFILE_PICTURE)     # copy: hyprlock still uses the old one
+            shutil.copyfile(old_picture, PROFILE_PICTURE)     # copy: the old setup still uses its own
         except OSError:
             pass
 

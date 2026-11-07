@@ -1,0 +1,115 @@
+-- Yakushi · Hyprland (starter config from yakushi-shell; `yakushi setup-hyprland`
+-- put it here and kept your old config next to it)
+--
+-- Settings (SUPER + I) edits a few values in this file in place: the apps
+-- below (Default Apps), kb_layout and sensitivity (Input), gaps_in,
+-- gaps_out and rounding (Appearance). Keep each of them on its own line.
+
+-- Apps opened by SUPER + Q / E / B and SUPER + Space ------------------------
+terminal    = "@TERMINAL@"
+fileManager = "@FILE_MANAGER@"
+browser     = "@BROWSER@"
+menu        = "yakushi launcher"
+
+-- Started once, at login -----------------------------------------------------
+local startup = {
+    "playerctld daemon",
+    "yakushi login",          -- Yakushi shell: bar, cursor, shake to find, night light, guard check
+    "wl-paste --type text --watch cliphist store",
+    "wl-paste --type image --watch cliphist store",
+    "systemctl --user start hyprpolkitagent.service",
+    "awww-daemon",
+}
+
+hl.on("hyprland.start", function()
+    for _, cmd in ipairs(startup) do
+        hl.exec_cmd(cmd)
+    end
+end)
+
+-- Environment ------------------------------------------------------------------
+local home = os.getenv("HOME") or ""
+for name, value in pairs({
+    XCURSOR_SIZE = "24",
+    -- where X11 apps look for cursors: apps that bring an old libXcursor
+    -- (Steam, ...) never look in ~/.local/share/icons by themselves
+    XCURSOR_PATH = home .. "/.local/share/icons:" .. home .. "/.icons:/usr/share/icons:/usr/share/pixmaps",
+    QT_QPA_PLATFORM = "wayland",
+    MOZ_ENABLE_WAYLAND = "1",
+}) do
+    hl.env(name, value)
+end
+
+-- the mouse cursor picked in Settings -> Input (overrides XCURSOR_SIZE above
+-- only if you change it there)
+pcall(dofile, home .. "/.config/hypr/cursor.local.lua")
+
+-- Everything else, in one table --------------------------------------------------
+hl.config({
+    input = {
+        kb_layout = "@KB_LAYOUT@",       -- Settings -> Input
+        sensitivity = 0.0,           -- Settings -> Input
+        follow_mouse = 1,
+        touchpad = {
+            tap_to_click = true,
+            natural_scroll = false,
+        },
+    },
+
+    general = {
+        layout = "dwindle",
+        gaps_in = 6,                 -- Settings -> Appearance
+        gaps_out = 9,                -- Settings -> Appearance
+        border_size = 0,             -- a border is added by window.local.lua
+        resize_on_border = true,
+        allow_tearing = false,
+    },
+
+    decoration = {
+        rounding = 14,               -- Settings -> Appearance (size of the corner cut)
+        rounding_power = 1.0,        -- 1 = straight 45-degree cut corners, the shell's shape
+        active_opacity = 1.0,        -- SUPER + O cycles it for the session
+        inactive_opacity = 1.0,      -- SUPER + O cycles it for the session
+        fullscreen_opacity = 1.0,    -- fullscreen stays solid
+        blur = { enabled = true, size = 5, passes = 1, vibrancy = 0.2 },
+        shadow = { enabled = true, range = 8, render_power = 3 },
+    },
+
+    render = { expand_undersized_textures = false },
+    -- Settings -> Input -> Cursor writes GSettings itself; this keeps the
+    -- quick size swaps of shake to find out of GSettings
+    cursor = { sync_gsettings_theme = false },
+    animations = { enabled = true },
+    dwindle = { preserve_split = true },
+    master = { new_status = "master" },
+
+    misc = {
+        disable_hyprland_logo = true,
+        disable_splash_rendering = true,
+        allow_session_lock_restore = true,   -- a restarted Yakushi lock takes over
+    },
+})
+
+-- Motion: a quick ease-out for windows, plain fades elsewhere -------------------
+hl.curve("easeOut", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.0 } } })
+
+for _, a in ipairs({
+    { "windows",    5, "easeOut" },
+    { "windowsOut", 5, "easeOut" },
+    { "border",     5, "default" },
+    { "fade",       4, "default" },
+    { "workspaces", 7, "default", "slidefade" },
+}) do
+    hl.animation({ leaf = a[1], enabled = true, speed = a[2], bezier = a[3], style = a[4] })
+end
+
+-- Machine-local pieces written by Settings (missing files are fine) -------------
+local hypr = os.getenv("HOME") .. "/.config/hypr/"
+
+pcall(dofile, hypr .. "window.local.lua")        -- shadow and border (Appearance)
+
+require("monitors")
+require("keybinds")
+require("rules")
+
+pcall(dofile, hypr .. "terminal.local.lua")      -- terminal blur / opacity (Appearance -> Terminal)

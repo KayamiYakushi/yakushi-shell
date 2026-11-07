@@ -3,11 +3,11 @@
 #   cd packaging && makepkg -si
 #
 # Every dependency is in the official repositories (core / extra). The source
-# is the local git repository, so building needs no network and no login;
-# for a fresh clone elsewhere, point `source` at the GitHub URL instead.
+# is the local git repository, so building needs no network and no login.
+# A fresh clone works the same: git clone, cd packaging, makepkg -si.
 
 pkgname=yakushi-shell
-pkgver=r31.85fc1d4
+pkgver=r36.e29daea
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
 arch=('any')
@@ -45,6 +45,7 @@ optdepends=(
     'hyprsunset: night light'
     'grim: screenshots'
     'slurp: area screenshots'
+    'hyprpolkitagent: password prompts for system changes (started by the starter config)'
     'libnotify: test notifications from Settings'
     'polkit: system changes from Settings'
     'ufw: Settings -> Security firewall'

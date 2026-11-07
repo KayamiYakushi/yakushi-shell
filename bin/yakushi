@@ -22,6 +22,8 @@
 #                                      still answered at once, nothing is shown).
 #   yakushi wallpaper                  The wallpaper picker.
 #   yakushi share-picker               Screen-share picker (for xdg-desktop-portal-hyprland).
+#   yakushi setup-hyprland             Put the starter Hyprland config in ~/.config/hypr
+#                                      (yours is moved aside, never deleted).
 #   yakushi unfreeze                   End every stuck Quickshell and start again.
 #   yakushi config init|path|get [s]   The settings file.
 #   yakushi ipc <target> <fn> [args]   Raw IPC call (starts the shell if needed).
@@ -273,6 +275,7 @@ case "$cmd" in
         esac ;;
     wallpaper) exec sh "$root/wallpicker/launch.sh" ;;
     share-picker) exec sh "$scripts/share-picker.sh" ;;
+    setup-hyprland) exec python3 "$scripts/yakushi-setup-hyprland.py" "$@" ;;
     unfreeze) unfreeze ;;
     config)   exec python3 "$scripts/yakushi-configctl.py" "$@" ;;
     ipc)      [ $# -ge 2 ] || usage; ipc "$@" ;;

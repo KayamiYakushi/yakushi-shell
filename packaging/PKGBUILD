@@ -7,7 +7,7 @@
 # for a fresh clone elsewhere, point `source` at the GitHub URL instead.
 
 pkgname=yakushi-shell
-pkgver=r0
+pkgver=r24.3dfd84c
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
 arch=('any')
@@ -67,7 +67,7 @@ package() {
 
     # the shell itself: committed files, without the packaging and the user installer
     install -d "$share"
-    git archive --format=tar HEAD | tar -xf - -C "$share"
+    git -c tar.umask=022 archive --format=tar HEAD | tar -xf - -C "$share"
     rm -rf "$share/packaging" "$share/install.sh" "$share/.gitignore"
     printf '%s\n' "$pkgver" > "$share/VERSION"
 

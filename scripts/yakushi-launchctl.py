@@ -10,6 +10,10 @@ Commands:
     used <desktop id>          Count one launch (apps you use often rise in
                                the list). Kept in ~/.local/state/yakushi/
                                launcher.json: counts only, nothing else.
+    clipboard on|off           Clipboard history (SUPER + SHIFT + V), "launcher.clipboard".
+                               off stops the recorder and deletes the history
+                               file itself (a wipe can leave old entries in it).
+    clipboard login            At login: start the recorder if it is on.
     terminal <Exec line>       Run a terminal app (Terminal=true) in your
                                terminal: the one Hyprland's SUPER + Q opens
                                (`terminal = "..."` in hypr/hyprland.lua),
@@ -25,9 +29,11 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 import yakushi_config as config
 import yakushi_paths as paths
@@ -45,7 +51,8 @@ def settings(saved: dict) -> dict:
     ms = saved.get("animationMs")
     if not isinstance(ms, int) or isinstance(ms, bool):
         ms = ANIMATION_DEFAULT
-    return {"animationMs": max(0, min(ANIMATION_MAX, ms))}
+    return {"animationMs": max(0, min(ANIMATION_MAX, ms)),
+            "clipboard": saved.get("clipboard") is not False}     # on unless turned off
 
 
 def set_animation(raw: str) -> None:
@@ -66,6 +73,87 @@ def set_animation(raw: str) -> None:
         emit({"ok": False, "message": str(error)})
         raise SystemExit(1)
     emit({"ok": True, **state, "message": "Launcher animation " + (f"{ms} ms." if ms else "off.")})
+
+
+# ---- clipboard history ----------------------------------------------------
+# The recorder: one wl-paste per type, each handing every copy to cliphist.
+RECORDERS = (
+    ["wl-paste", "--type", "text", "--watch", "cliphist", "store"],
+    ["wl-paste", "--type", "image", "--watch", "cliphist", "store"],
+)
+
+
+def recorder_pids() -> dict[int, list[str]]:
+    """{pid: argv} of your recorders now (read from /proc, exact argv match)"""
+    found = {}
+    uid = os.getuid()
+    for entry in os.scandir("/proc"):
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != uid:
+                continue
+            with open(f"/proc/{entry.name}/cmdline", "rb") as f:
+                argv = [a.decode(errors="replace") for a in f.read().split(b"\0") if a]
+        except OSError:
+            continue
+        if argv and os.path.basename(argv[0]) == "wl-paste" and argv[1:] in [r[1:] for r in RECORDERS]:
+            found[int(entry.name)] = argv
+    return found
+
+
+def start_recorders() -> None:
+    if not (shutil.which("wl-paste") and shutil.which("cliphist")):
+        return
+    running = [argv[1:] for argv in recorder_pids().values()]
+    for argv in RECORDERS:
+        if argv[1:] not in running:
+            subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def stop_recorders() -> None:
+    for pid in recorder_pids():
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+
+
+def forget_history() -> None:
+    """cliphist's database, gone: wipe first, then delete the file (a wipe
+    alone can leave old entries in the file's free pages)"""
+    if shutil.which("cliphist"):
+        subprocess.run(["cliphist", "wipe"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=10, check=False)
+    for name in ("db", "db.lock"):
+        try:
+            (paths.CACHE_HOME / "cliphist" / name).unlink()
+        except FileNotFoundError:
+            pass
+
+
+def set_clipboard(on: bool) -> None:
+    def change(saved: dict) -> dict:
+        saved["clipboard"] = on
+        return saved
+
+    try:
+        state = settings(config.update("launcher", change))
+    except config.NewerConfig as error:
+        emit({"ok": False, "message": str(error)})
+        raise SystemExit(1)
+    if on:
+        start_recorders()
+        message = "Clipboard history on: what you copy is kept (SUPER + SHIFT + V)."
+        if not (shutil.which("wl-paste") and shutil.which("cliphist")):
+            message = "Clipboard history on, but it needs cliphist and wl-clipboard (pacman -S cliphist wl-clipboard)."
+    else:
+        stop_recorders()
+        time.sleep(0.2)                     # let them close the database first
+        forget_history()
+        message = "Clipboard history off: nothing is kept, and the old history is deleted."
+    emit({"ok": True, **state, "message": message})
 
 
 # Terminals that take the program after -e (the rest take it as is).
@@ -175,10 +263,15 @@ def main() -> None:
         import_rofi()
     elif len(args) == 2 and args[0] == "used":
         used(args[1])
+    elif args in (["clipboard", "on"], ["clipboard", "off"]):
+        set_clipboard(args[1] == "on")
+    elif args == ["clipboard", "login"]:
+        if settings(config.section("launcher"))["clipboard"]:
+            start_recorders()
     elif len(args) in (2, 3) and args[0] == "terminal" and args[2:] in ([], ["--wait"]):
         terminal(args[1], wait=len(args) == 3)
     else:
-        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | terminal <Exec line> [--wait]")
+        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | clipboard on|off|login | terminal <Exec line> [--wait]")
 
 
 if __name__ == "__main__":

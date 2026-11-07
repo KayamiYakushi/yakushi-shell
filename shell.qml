@@ -178,7 +178,7 @@ ShellRoot {
     }
 
     // ------------------------------------------------------------------
-    // Launcher (SUPER + Space) and clipboard history (SUPER + V): loaded on
+    // Launcher (SUPER + Space) and clipboard history (SUPER + SHIFT + V): loaded on
     // open, freed once it has closed
     // ------------------------------------------------------------------
     LazyLoader {

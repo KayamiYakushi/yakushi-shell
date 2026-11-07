@@ -5,7 +5,7 @@ import Quickshell.Wayland
 import QtQuick
 import "../"
 
-// The launcher (SUPER + Space) and clipboard history (SUPER + V): one card in
+// The launcher (SUPER + Space) and clipboard history (SUPER + SHIFT + V): one card in
 // the Settings shape, opening from its notches like Settings does.
 //
 //   type          filter
@@ -55,9 +55,13 @@ PanelWindow {
     WlrLayershell.namespace: "yakushi-launcher"
     WlrLayershell.keyboardFocus: showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    // Clipboard history can be turned off (Settings -> Appearance ->
+    // Launcher): then there is no clipboard side at all.
+    readonly property bool clipboardOn: Config.launcher.clipboard !== false
+
     function open(which) {
         closeTimer.stop()
-        mode = which === "clipboard" ? "clipboard" : "apps"
+        mode = which === "clipboard" && clipboardOn ? "clipboard" : "apps"
         search.text = ""
         selected = 0
         if (mode === "clipboard")
@@ -76,7 +80,8 @@ PanelWindow {
     }
 
     function switchMode() {
-        open(mode === "apps" ? "clipboard" : "apps")
+        if (clipboardOn)
+            open(mode === "apps" ? "clipboard" : "apps")
     }
 
     // Opening / closing time, Settings -> Appearance -> Launcher (0 = none)
@@ -351,6 +356,7 @@ PanelWindow {
                 textFormat: Text.PlainText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                visible: launcher.clipboardOn
                 text: "Tab  " + (launcher.mode === "apps" ? "Clipboard" : "Apps")
                 color: Theme.inkMute
                 font.family: Theme.mono

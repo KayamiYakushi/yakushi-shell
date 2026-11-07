@@ -14,9 +14,7 @@ menu        = "yakushi launcher"
 -- Started once, at login -----------------------------------------------------
 local startup = {
     "playerctld daemon",
-    "yakushi login",          -- Yakushi shell: bar, cursor, shake to find, night light, guard check
-    "wl-paste --type text --watch cliphist store",
-    "wl-paste --type image --watch cliphist store",
+    "yakushi login",          -- Yakushi shell: bar, clipboard history (if on), cursor, night light, guard check
     "systemctl --user start hyprpolkitagent.service",
     "awww-daemon",
 }

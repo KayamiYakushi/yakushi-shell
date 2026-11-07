@@ -46,7 +46,7 @@ local function clamp(v, lo, hi)
     return v
 end
 
--- SUPER + SHIFT + V: lift the window out of the tiling into a centred box
+-- SUPER + V: lift the window out of the tiling into a centred box
 -- (70 % of the monitor); pressing again puts it back.
 local FLOAT_SHARE = 0.7
 
@@ -109,7 +109,7 @@ yakushi_bind("close", "SUPER + C", hl.dsp.window.close())
 -- YAKUSHI_BIND fullscreen|Windows|Fullscreen
 yakushi_bind("fullscreen", "SUPER + F", hl.dsp.window.fullscreen({ mode = 0 }))
 -- YAKUSHI_BIND float|Windows|Toggle Floating
-yakushi_bind("float", "SUPER + SHIFT + V", float_centered)
+yakushi_bind("float", "SUPER + V", float_centered)
 -- YAKUSHI_BIND opacity|Windows|Window Opacity
 yakushi_bind("opacity", "SUPER + O", cycle_opacity)
 -- YAKUSHI_BIND mouse_move|Windows|Move Window With Mouse
@@ -201,7 +201,7 @@ yakushi_bind("unfreeze", "SUPER + CTRL + Escape", hl.dsp.exec_cmd("yakushi unfre
 
 -- Tools ---------------------------------------------------------------------
 -- YAKUSHI_BIND clipboard|Utilities|Clipboard History
-yakushi_bind("clipboard", "SUPER + V", hl.dsp.exec_cmd("yakushi launcher clipboard"))
+yakushi_bind("clipboard", "SUPER + SHIFT + V", hl.dsp.exec_cmd("yakushi launcher clipboard"))
 -- YAKUSHI_BIND screenshot_full|Screenshots|Full Screenshot
 yakushi_bind("screenshot_full", "SUPER + Delete", hl.dsp.exec_cmd([[mkdir -p "$HOME/Pictures" && grim "$HOME/Pictures/$(date +%s).png"]]))
 -- (Esc while choosing the area cancels it: no empty file is left behind)

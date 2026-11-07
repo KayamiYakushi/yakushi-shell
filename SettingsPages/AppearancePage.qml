@@ -26,6 +26,30 @@ Item {
     // ---- launcher animation (scripts/yakushi-launchctl.py)
     property bool launcherLoaded: false
     property int launcherAnim: 480
+    property bool clipboardOn: true
+    property string clipboardNote: ""
+
+    function setClipboard(on) {
+        clipboardOn = on
+        clipboardSet.command = ["python3", Paths.script("yakushi-launchctl.py"), "clipboard", on ? "on" : "off"]
+        clipboardSet.running = true
+    }
+
+    Process {
+        id: clipboardSet
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var data = JSON.parse(text)
+                    page.clipboardNote = data.message || ""
+                    if (typeof data.clipboard === "boolean")
+                        page.clipboardOn = data.clipboard
+                } catch (e) {
+                }
+            }
+        }
+    }
 
     function saveLauncherAnim() {
         if (launcherSet.running) {
@@ -48,6 +72,8 @@ Item {
                     var data = JSON.parse(text)
                     if (data.ok && typeof data.animationMs === "number")
                         page.launcherAnim = data.animationMs
+                    if (data.ok && typeof data.clipboard === "boolean")
+                        page.clipboardOn = data.clipboard
                 } catch (e) {
                 }
                 page.launcherLoaded = true
@@ -817,6 +843,29 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Quickshell.execDetached([Paths.shell + "/bin/yakushi", "launcher"])
                 }
+            }
+
+            // Clipboard history: off = nothing recorded, the old history deleted
+            ToggleRow {
+                width: parent.width
+                icon: String.fromCodePoint(0xF0147)
+                label: "Clipboard history"
+                checked: page.clipboardOn
+                available: page.launcherLoaded && !clipboardSet.running
+
+                onToggled: page.setClipboard(!page.clipboardOn)
+            }
+
+            Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                textFormat: Text.PlainText
+                text: page.clipboardNote !== "" ? page.clipboardNote
+                    : page.clipboardOn ? "Keeps what you copy, passwords too (SUPER + SHIFT + V). Off: nothing is kept and the old history is deleted."
+                    : "Off: nothing you copy is kept."
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 11
             }
 
             Divider {}

@@ -57,6 +57,7 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | Keys | |
 |---|---|
 | SUPER + Space | Apps (Tab: clipboard history) |
+| SUPER + SHIFT + V | Clipboard history (can be turned off in Settings -> Appearance) |
 | SUPER + I | Settings |
 | SUPER + Q / E / B | Terminal / files / browser |
 | SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |
@@ -104,7 +105,7 @@ all of it):
 "yakushi bar toggle"
 "yakushi wallpaper"           -- SUPER + W
 "yakushi launcher"            -- SUPER + Space
-"yakushi launcher clipboard"  -- SUPER + V
+"yakushi launcher clipboard"  -- SUPER + SHIFT + V
 "yakushi power"               -- SUPER + `  (the island's power menu)
 "yakushi lock"                -- SUPER + Tab
 "yakushi notifications off"   -- or on | toggle | test

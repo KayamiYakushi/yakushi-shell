@@ -273,7 +273,7 @@ Item {
 
                     // no copy, cut or paste out of (or into) the field
                     Keys.onPressed: function(event) {
-                        surface.context.keyPressed()
+                        surface.context.keyPressed(event)
                         if (event.matches(StandardKey.Copy) || event.matches(StandardKey.Cut)
                                 || event.matches(StandardKey.Paste) || event.matches(StandardKey.SelectAll))
                             event.accepted = true

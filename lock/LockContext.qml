@@ -15,9 +15,12 @@ import Quickshell.Services.Pam
 //
 // The typed text is cleared the moment it has been handed to PAM.
 //
-// Caps Lock: Wayland gives an app no lock-key state, so it is read from the
-// keyboards' Caps Lock LEDs in /sys (world-readable, set by the compositor):
-// once when the lock opens and shortly after each key press, nothing polls.
+// Caps Lock: Wayland gives an app no lock-key state, so it is followed
+// from the keys themselves, with no timing involved:
+//   - when the lock opens: the keyboards' Caps Lock LEDs in /sys, read once;
+//   - each Caps Lock press flips it (key repeat ignored);
+//   - each letter typed settles it for sure: upper case without Shift (or
+//     lower case with Shift) means Caps Lock is on.
 Scope {
     id: ctx
 
@@ -31,61 +34,38 @@ Scope {
 
     signal unlocked()
 
-    // called on every key press in the field; the LED changes just after
-    // the key, so look a moment later
-    function keyPressed() {
-        capsTimer.restart()
-    }
+    property bool capsKnown: false       // a key has already told us
 
-    function readCaps() {
-        var on = false
-        for (var i = 0; i < capsLeds.count; i++) {
-            var view = capsLeds.objectAt(i)
-            if (view) {
-                view.reload()
-                if (view.text().trim() !== "" && view.text().trim() !== "0")
-                    on = true
+    // every key press in the field comes here first
+    function keyPressed(event) {
+        if (event.key === Qt.Key_CapsLock) {
+            if (!event.isAutoRepeat) {
+                capsLock = !capsLock
+                capsKnown = true
             }
+            return
         }
-        capsLock = on
+        var t = event.text
+        if (t.length === 1 && t.toUpperCase() !== t.toLowerCase()) {
+            var upper = t === t.toUpperCase()
+            var shift = (event.modifiers & Qt.ShiftModifier) !== 0
+            capsLock = upper !== shift
+            capsKnown = true
+        }
     }
 
-    Timer {
-        id: capsTimer
-
-        interval: 60
-        onTriggered: ctx.readCaps()
-    }
-
-    // the Caps Lock LEDs of every keyboard, found once
+    // the state when the lock opens: any keyboard's Caps Lock LED lit
     Process {
-        id: capsFind
-
-        property var paths: []
-
         running: true
-        command: ["sh", "-c", "for f in /sys/class/leds/*::capslock/brightness; do [ -r \"$f\" ] && printf '%s\\n' \"$f\"; done"]
+        command: ["sh", "-c", "cat /sys/class/leds/*::capslock/brightness 2>/dev/null"]
         stdout: StdioCollector {
             onStreamFinished: {
-                capsFind.paths = text.split("\n").filter(function(p) {
-                    return /^\/sys\/class\/leds\/[^\/]+::capslock\/brightness$/.test(p)
+                if (ctx.capsKnown)
+                    return
+                ctx.capsLock = text.split("\n").some(function(v) {
+                    return /^[1-9][0-9]*$/.test(v.trim())
                 })
-                ctx.readCaps()
             }
-        }
-    }
-
-    Instantiator {
-        id: capsLeds
-
-        model: capsFind.paths
-
-        FileView {
-            required property string modelData
-
-            path: modelData
-            blockLoading: true
-            printErrors: false
         }
     }
 

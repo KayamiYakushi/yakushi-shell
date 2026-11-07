@@ -107,7 +107,7 @@ other module apply) ends the lock.
   `~/.config/yakushi/profile-picture` and name, and the song that is
   playing. The typed text is shown only as marks and cleared as soon as it
   has gone to PAM. A quiet CAPS tag shows in the field while Caps Lock is
-  on (read from the keyboards' LEDs in /sys after a key press).
+  on (the LEDs in /sys when the lock opens, then the keys themselves).
 
 `yakushi` with no arguments lists every command. Nothing in the shell is a
 fixed path: user folders come from the XDG variables (and `user-dirs.dirs`,

@@ -39,6 +39,13 @@ install them.
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
 ```
 
+The launcher animates itself (Settings -> Appearance -> Launcher), so
+Hyprland's fade is turned off for its layer, with a blur behind the card:
+
+```lua
+hl.layer_rule({ match = { namespace = "yakushi-launcher" }, blur = true, ignore_alpha = 0.15, no_anim = true })
+```
+
 Windows get the same cut corners from Hyprland itself:
 
 ```lua

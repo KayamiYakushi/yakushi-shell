@@ -7,7 +7,7 @@
 # for a fresh clone elsewhere, point `source` at the GitHub URL instead.
 
 pkgname=yakushi-shell
-pkgver=r24.3dfd84c
+pkgver=r25.d6dfb56
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
 arch=('any')

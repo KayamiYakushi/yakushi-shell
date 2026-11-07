@@ -6,9 +6,23 @@ picker from
 [yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles), growing
 into a single installable shell.
 
-**Status:** early, Hyprland only.
+**Status:** early. Hyprland only, on purpose.
 
 ## Install
+
+As a package (system-wide, root-owned files; `/etc/pam.d/yakushi-lock` for
+the lock screen):
+
+```sh
+cd packaging && makepkg -si   # builds what is committed in this checkout
+yakushi restart               # after an upgrade
+```
+
+Coming from the user install below? Once:
+`~/.local/share/yakushi-shell/install.sh --uninstall` (it stops the shell),
+then `yakushi start`.
+
+Or for your user only, without root (handy while developing):
 
 ```sh
 ./install.sh              # copies this checkout to ~/.local/share/yakushi-shell
@@ -159,4 +173,4 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
 4. ✅ Power menu (the island's card) and ✅ notifications (built-in server, can be turned off completely);
    ✅ launcher with clipboard history (replacing rofi); ✅ lock screen and auto lock
    (replacing hyprlock and hypridle)
-5. Compositor abstraction (Niri later), PKGBUILD (the `yakushi` CLI and user install are done)
+5. ✅ PKGBUILD (`packaging/`), next to the user install

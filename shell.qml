@@ -1,14 +1,17 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Notifications
 import QtQuick
 import "topbar"
+import "notifications"
 
-// Yakushi Shell: the one entry point for the top bar, Settings and the
-// volume pill.
+// Yakushi Shell: the one entry point for the top bar, Settings, the volume
+// pill and notifications.
 //
-// The bar is always loaded. The volume pill is loaded only while it is on
-// screen. Settings runs as a child process of the shell (settings.qml), so
-// it costs nothing once closed.
+// The bar and the notification server are always loaded. The volume pill
+// and the notification pop-ups are loaded only while they are on screen.
+// Settings runs as a child process of the shell (settings.qml), so it costs
+// nothing once closed.
 //
 // Everything is driven over IPC, e.g.
 //   qs -p <this dir> ipc call settings toggle
@@ -164,6 +167,68 @@ ShellRoot {
             volumeOsd.active = true
             volumeOsd.item.poke()
             volumeOsdUnload.restart()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Notifications (org.freedesktop.Notifications)
+    //
+    // The server always runs, so an app sending a notification is answered
+    // at once and never waits on a missing daemon. Turned off in Settings
+    // (config "notifications.enabled"), a notification is simply not kept:
+    // the app is told it closed and nothing is shown. Until the config has
+    // been read, nothing is shown either.
+    // ------------------------------------------------------------------
+    readonly property bool notificationsOn: Config.loaded && Config.notifications.enabled !== false
+    readonly property int notificationTimeout: {
+        var t = Config.notifications.timeout
+        return typeof t === "number" ? Math.max(2, Math.min(30, Math.round(t))) : 5
+    }
+    readonly property int maxPopups: 4
+
+    NotificationServer {
+        id: notifications
+
+        keepOnReload: false
+        persistenceSupported: false
+        bodySupported: true
+        bodyMarkupSupported: false        // plain text only: nothing in a
+        bodyHyperlinksSupported: false    // notification is interpreted
+        bodyImagesSupported: false
+        actionsSupported: true
+        imageSupported: true
+
+        onNotification: function(notification) {
+            if (!root.notificationsOn)
+                return                      // not tracked: closed at once, never shown
+
+            notification.tracked = true
+
+            // keep the stack short: the oldest go first (the list may or
+            // may not hold the new one yet, so it is left out and counted)
+            var others = notifications.trackedNotifications.values.filter(function(other) {
+                return other !== notification
+            })
+            for (var i = 0; i < others.length - (root.maxPopups - 1); i++)
+                others[i].expire()
+        }
+    }
+
+    // turned off: clear what is on screen
+    onNotificationsOnChanged: {
+        if (notificationsOn)
+            return
+        var shown = notifications.trackedNotifications.values.slice()
+        for (var i = 0; i < shown.length; i++)
+            shown[i].dismiss()
+    }
+
+    LazyLoader {
+        active: notifications.trackedNotifications.values.length > 0
+
+        NotificationPopups {
+            server: notifications
+            timeout: root.notificationTimeout
         }
     }
 }

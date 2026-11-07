@@ -10,6 +10,9 @@
 #   yakushi volume up|down|mute        Change the volume and show the pill.
 #   yakushi bar show|hide|toggle       The top bar.
 #   yakushi power                      The top bar's power menu.
+#   yakushi notifications on|off|toggle|test
+#                                      Show notifications or not (off: apps are
+#                                      still answered at once, nothing is shown).
 #   yakushi wallpaper                  The wallpaper picker.
 #   yakushi share-picker               Screen-share picker (for xdg-desktop-portal-hyprland).
 #   yakushi unfreeze                   End every stuck Quickshell and start again.
@@ -179,6 +182,12 @@ case "$cmd" in
             *) usage ;;
         esac ;;
     power)    ipc topbar power ;;
+    notifications)
+        case "${1:-}" in
+            on|off) exec python3 "$scripts/yakushi-notifyctl.py" set enabled "$1" ;;
+            toggle|test) exec python3 "$scripts/yakushi-notifyctl.py" "$1" ;;
+            *) usage ;;
+        esac ;;
     wallpaper) exec sh "$root/wallpicker/launch.sh" ;;
     share-picker) exec sh "$scripts/share-picker.sh" ;;
     unfreeze) unfreeze ;;

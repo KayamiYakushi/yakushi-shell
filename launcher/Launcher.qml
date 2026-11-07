@@ -240,22 +240,25 @@ PanelWindow {
             copy(clipResults[index])
     }
 
-    // black or white, whichever reads on the accent
-    readonly property color onAccent: 0.299 * Theme.accent.r + 0.587 * Theme.accent.g + 0.114 * Theme.accent.b > 0.55
-        ? "#0a0a0a" : "#f5f5f5"
-
     // a click outside the card closes
     MouseArea {
         anchors.fill: parent
         onClicked: launcher.hide()
     }
 
+    // ------------------------------------------------------------------
+    // The card: a search line and the list, nothing else. Big, calm type;
+    // the chosen row is marked by an accent bar, and only it shows what
+    // the app is.
+    // ------------------------------------------------------------------
+    readonly property int pad: 24
+
     TiltCard {
         id: card
 
         anchors.centerIn: parent
-        width: Math.min(540, launcher.width - 40)
-        height: Math.min(400, launcher.height - 40)
+        width: Math.min(580, launcher.width - 40)
+        height: Math.min(470, launcher.height - 40)
         leanDegrees: 2
         duration: launcher.animation
         shown: launcher.showing
@@ -265,97 +268,39 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        // ---- header
+        // ---- search line
         Item {
-            id: header
-
-            width: parent.width
-            height: 38
-
-            Row {
-                x: 16
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: launcher.mode === "apps" ? "LAUNCH" : "CLIPBOARD"
-                    color: Theme.ink
-                    font.family: Theme.mono
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 5
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: launcher.mode === "apps" ? "起動" : "履歴"
-                    color: Theme.inkSoft
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 11
-                    font.letterSpacing: 2
-                }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                anchors.right: parent.right
-                anchors.rightMargin: 26
-                anchors.verticalCenter: parent.verticalCenter
-                text: (launcher.count > 0 ? launcher.selected + 1 : 0) + " / " + launcher.count
-                color: Theme.accent
-                font.family: Theme.mono
-                font.pixelSize: 10
-                font.letterSpacing: 2
-            }
-
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-        }
-
-        // ---- search
-        Rectangle {
             id: field
 
-            x: 16
-            anchors.top: header.bottom
-            anchors.topMargin: 12
-            width: parent.width - 32
-            height: 32
-            color: Theme.tint(Theme.ink, 0.04)
-            border.width: 1
-            border.color: search.activeFocus ? Theme.accent : Theme.line
+            x: launcher.pad
+            y: 20
+            width: parent.width - 2 * launcher.pad
+            height: 44
 
             Text {
                 id: glyph
 
                 textFormat: Text.PlainText
-                x: 10
+                anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 text: String.fromCodePoint(launcher.mode === "apps" ? 0xF0349 : 0xF0147)
                 color: Theme.accent
                 font.family: Theme.glyphs
-                font.pixelSize: 13
+                font.pixelSize: 18
             }
 
             TextInput {
                 id: search
 
                 anchors.left: glyph.right
-                anchors.leftMargin: 8
-                anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.leftMargin: 14
+                anchors.right: hint.left
+                anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.ink
                 selectionColor: Theme.tint(Theme.accent, 0.4)
                 font.family: Theme.mono
-                font.pixelSize: 12
+                font.pixelSize: 16
                 clip: true
                 focus: true
 
@@ -373,9 +318,9 @@ PanelWindow {
                     } else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) {
                         launcher.move(-1)
                     } else if (event.key === Qt.Key_PageDown) {
-                        launcher.move(8)
+                        launcher.move(6)
                     } else if (event.key === Qt.Key_PageUp) {
-                        launcher.move(-8)
+                        launcher.move(-6)
                     } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
                         launcher.switchMode()
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -390,30 +335,54 @@ PanelWindow {
                     textFormat: Text.PlainText
                     anchors.verticalCenter: parent.verticalCenter
                     visible: search.text === ""
-                    text: launcher.mode === "apps" ? "Type to search apps…" : "Type to search the clipboard…"
+                    text: launcher.mode === "apps" ? "Search apps" : "Search the clipboard"
                     color: Theme.inkMute
                     font: search.font
                 }
             }
+
+            // the one hint: Tab switches over
+            Text {
+                id: hint
+
+                textFormat: Text.PlainText
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Tab  " + (launcher.mode === "apps" ? "Clipboard" : "Apps")
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 11
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: search.text !== "" ? Theme.tint(Theme.accent, 0.6) : Theme.line
+
+                Behavior on color {
+                    ColorAnimation { duration: Theme.tFast }
+                }
+            }
         }
 
-        // ---- results
+        // ---- list
         ListView {
             id: results
 
-            x: 16
+            x: launcher.pad - 8
             anchors.top: field.bottom
-            anchors.topMargin: 8
-            anchors.bottom: footer.top
-            anchors.bottomMargin: 6
-            width: parent.width - 32
+            anchors.topMargin: 14
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 20
+            width: parent.width - 2 * launcher.pad + 16
             clip: true
-            spacing: 1
+            spacing: 2
             boundsBehavior: Flickable.StopAtBounds
             model: launcher.mode === "apps" ? launcher.apps : launcher.clipResults
             currentIndex: launcher.selected
 
-            delegate: Rectangle {
+            delegate: Item {
                 id: row
 
                 required property var modelData
@@ -423,18 +392,31 @@ PanelWindow {
                 readonly property var entry: launcher.mode === "apps" ? modelData.entry : null
 
                 width: results.width
-                height: launcher.mode === "apps" ? 32 : 26
-                color: here ? Theme.accent : (rowMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent")
+                height: launcher.mode === "apps" ? 42 : 36
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: row.here ? Theme.tint(Theme.accent, 0.13)
+                        : rowMouse.containsMouse ? Theme.tint(Theme.ink, 0.04) : "transparent"
+                }
+
+                // the chosen row's mark
+                Rectangle {
+                    visible: row.here
+                    width: 3
+                    height: parent.height
+                    color: Theme.accent
+                }
 
                 Image {
                     id: icon
 
                     visible: launcher.mode === "apps" && status === Image.Ready
-                    x: 8
+                    x: 16
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 20
-                    height: 20
-                    sourceSize: Qt.size(40, 40)
+                    width: 24
+                    height: 24
+                    sourceSize: Qt.size(48, 48)
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                     source: row.entry && row.entry.icon !== ""
@@ -442,42 +424,40 @@ PanelWindow {
                         : ""
                 }
 
-                // one line: the name, and on the right, dimmer, what it is
                 Text {
                     id: rowName
 
                     textFormat: Text.PlainText
                     anchors.left: parent.left
-                    anchors.leftMargin: launcher.mode === "apps" ? 38 : 10
+                    anchors.leftMargin: launcher.mode === "apps" ? 54 : 16
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, parent.width - anchors.leftMargin - 10
-                        - (rowWhat.visible ? Math.min(rowWhat.implicitWidth, parent.width * 0.4) + 14 : 0))
+                    width: Math.min(implicitWidth, parent.width - anchors.leftMargin - 16
+                        - (rowWhat.visible ? Math.min(rowWhat.implicitWidth, parent.width * 0.38) + 16 : 0))
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     text: row.entry ? row.entry.name : String(row.modelData.text).replace(/\s+/g, " ")
-                    color: row.here ? launcher.onAccent : Theme.ink
+                    color: row.here ? Theme.ink : (launcher.mode === "apps" ? Theme.ink : Theme.inkSoft)
                     font.family: Theme.mono
-                    font.pixelSize: launcher.mode === "apps" ? 12 : 11
-                    font.bold: row.here && launcher.mode === "apps"
+                    font.pixelSize: launcher.mode === "apps" ? 14 : 13
                 }
 
+                // what the app is: only on the chosen row
                 Text {
                     id: rowWhat
 
                     textFormat: Text.PlainText
                     anchors.right: parent.right
-                    anchors.rightMargin: 10
+                    anchors.rightMargin: 16
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, parent.width * 0.4)
-                    visible: row.entry !== null && text !== ""
+                    width: Math.min(implicitWidth, parent.width * 0.38)
+                    visible: row.here && row.entry !== null && text !== ""
                     horizontalAlignment: Text.AlignRight
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     text: row.entry ? (row.entry.genericName || row.entry.comment || "") : ""
-                    color: row.here ? Theme.tint(launcher.onAccent, 0.7) : Theme.inkMute
+                    color: Theme.inkSoft
                     font.family: Theme.mono
-                    font.pixelSize: 9
-                    font.letterSpacing: 0.5
+                    font.pixelSize: 11
                 }
 
                 MouseArea {
@@ -494,37 +474,10 @@ PanelWindow {
                 textFormat: Text.PlainText
                 anchors.centerIn: parent
                 visible: launcher.count === 0
-                text: launcher.mode === "apps" ? "No app matches." : (launcher.clips.length === 0 ? "The clipboard history is empty." : "Nothing matches.")
+                text: launcher.mode === "apps" ? "No app matches" : (launcher.clips.length === 0 ? "The clipboard is empty" : "Nothing matches")
                 color: Theme.inkMute
                 font.family: Theme.mono
-                font.pixelSize: 11
-            }
-        }
-
-        // ---- footer
-        Item {
-            id: footer
-
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 26
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                x: 16
-                anchors.verticalCenter: parent.verticalCenter
-                text: (launcher.mode === "apps" ? "↵ OPEN" : "↵ COPY") + "    ⇥ "
-                    + (launcher.mode === "apps" ? "CLIPBOARD" : "APPS") + "    ESC CLOSE"
-                color: Theme.inkMute
-                font.family: Theme.mono
-                font.pixelSize: 9
-                font.letterSpacing: 2
+                font.pixelSize: 13
             }
         }
     }

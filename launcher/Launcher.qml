@@ -160,8 +160,11 @@ PanelWindow {
             var s = score(entry, q)
             if (s < 0)
                 continue
-            var used = Math.min(launcher.counts[entry.id] || 0, 40)
-            out.push({ entry: entry, rank: s + used * (q === "" ? 10 : 3) })
+            // how often it was opened, on a log scale: the real order holds
+            // (296 opens > 214), yet while typing it never outweighs a better
+            // name match (at most ~90 against steps of 150+)
+            var used = Math.log(1 + (launcher.counts[entry.id] || 0))
+            out.push({ entry: entry, rank: s + used * (q === "" ? 60 : 15) })
         }
         out.sort(function(a, b) {
             return b.rank - a.rank || lower(a.entry.name).localeCompare(lower(b.entry.name))

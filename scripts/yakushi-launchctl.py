@@ -5,6 +5,8 @@ Commands:
     get                        Print the launcher settings as JSON.
     set animation <0..1000>    Opening / closing time in ms (0 = none);
                                config.json "launcher.animationMs".
+    import-rofi                Add rofi's launch counts (~/.cache/rofi3.druncache)
+                               once, so the old order carries over.
     used <desktop id>          Count one launch (apps you use often rise in
                                the list). Kept in ~/.local/state/yakushi/
                                launcher.json: counts only, nothing else.
@@ -71,9 +73,35 @@ DASH_E = {"alacritty", "ghostty", "xterm", "urxvt", "konsole", "xfce4-terminal",
 DASH_DASH = {"gnome-terminal", "kgx", "ptyxis"}
 
 
+def valid_id(app_id: str) -> bool:
+    return bool(app_id) and len(app_id) <= 255 and "/" not in app_id
+
+
 def used(app_id: str) -> None:
-    if not app_id or len(app_id) > 255 or "/" in app_id:
+    if not valid_id(app_id):
         raise SystemExit("bad app id")
+    add_counts({app_id: 1})
+
+
+def import_rofi() -> None:
+    """rofi's history: `<count> <id>.desktop` per line."""
+    found: dict[str, int] = {}
+    try:
+        text = (paths.CACHE_HOME / "rofi3.druncache").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        emit({"ok": False, "message": "No rofi history found."})
+        raise SystemExit(1)
+    for line in text.splitlines():
+        parts = line.strip().split(" ", 1)
+        if len(parts) == 2 and parts[0].isdigit():
+            app_id = parts[1].strip().removesuffix(".desktop")
+            if valid_id(app_id):
+                found[app_id] = found.get(app_id, 0) + int(parts[0])
+    add_counts(found)
+    emit({"ok": True, "imported": len(found), "message": f"Took over the launch counts of {len(found)} apps from rofi."})
+
+
+def add_counts(extra: dict[str, int]) -> None:
     paths.STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock = os.open(paths.STATE / ".launcher.lock", os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
     try:
@@ -86,7 +114,8 @@ def used(app_id: str) -> None:
         if not isinstance(counts, dict):
             counts = {}
         counts = {k: v for k, v in counts.items() if isinstance(k, str) and isinstance(v, int) and v > 0}
-        counts[app_id] = counts.get(app_id, 0) + 1
+        for app_id, n in extra.items():
+            counts[app_id] = counts.get(app_id, 0) + n
         # keep the file small: drop the least used
         if len(counts) > MAX_APPS:
             counts = dict(sorted(counts.items(), key=lambda kv: -kv[1])[:MAX_APPS])
@@ -138,12 +167,14 @@ def main() -> None:
         emit({"ok": True, **settings(config.section("launcher"))})
     elif len(args) == 3 and args[:2] == ["set", "animation"]:
         set_animation(args[2])
+    elif args == ["import-rofi"]:
+        import_rofi()
     elif len(args) == 2 and args[0] == "used":
         used(args[1])
     elif len(args) == 2 and args[0] == "terminal":
         terminal(args[1])
     else:
-        raise SystemExit("Usage: get | set animation <ms> | used <desktop id> | terminal <Exec line>")
+        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | terminal <Exec line>")
 
 
 if __name__ == "__main__":

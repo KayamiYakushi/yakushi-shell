@@ -32,6 +32,7 @@ install them.
 "yakushi volume up|down|mute" -- volume keys
 "yakushi bar toggle"
 "yakushi wallpaper"           -- SUPER + W
+"yakushi power"               -- SUPER + `  (the island's power menu)
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
 ```
 

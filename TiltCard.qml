@@ -70,16 +70,41 @@ Item {
 
     // Accent stroke along a cut corner, just outside it; while opening it
     // rides the edge of the band.
+    //
+    // It is as long as the part of that edge that lies on the card: leaving
+    // the middle it first stretches out to the whole width of the card,
+    // then, as the band opens toward the corners, that part gets shorter
+    // and the notch shrinks with it until it sits on its cut corner. Closing
+    // runs the same way back.
     component Notch: Rectangle {
         property real side: 1        // 1 = top-right, -1 = bottom-left
 
         readonly property real along: card.half + 4
         readonly property real across: card.reveal * (card.width - card.height) / (2 * Math.SQRT2)
 
-        width: card.cut * Math.SQRT2 + 10
+        // The edge is the line x - y = k (parallel to the cut corners); the
+        // part of it inside the card runs from x0 to x1.
+        readonly property real k: card.cx - card.cy + side * along * Math.SQRT2
+        readonly property real x0: Math.max(0, k)
+        readonly property real x1: Math.min(card.width, card.height + k)
+        readonly property real chord: Math.max(0, x1 - x0) * Math.SQRT2
+
+        // stretching out at first (the first third of the opening)
+        readonly property real grow: {
+            var t = Math.min(1, card.reveal / 0.33)
+            return t * t * (3 - 2 * t)
+        }
+        readonly property real rest: card.cut * Math.SQRT2 + 10
+        readonly property bool onCard: x1 > x0
+
+        // centred on that part of the edge (on the cut corner once open)
+        readonly property real midX: onCard ? (x0 + x1) / 2 : card.cx + side * (along + across) / Math.SQRT2
+        readonly property real midY: onCard ? midX - k : card.cy + side * (across - along) / Math.SQRT2
+
+        width: Math.max(rest, chord * grow)
         height: 2
-        x: card.cx + side * (along + across) / Math.SQRT2 - width / 2
-        y: card.cy + side * (across - along) / Math.SQRT2 - height / 2
+        x: midX - width / 2
+        y: midY - height / 2
         rotation: 45
         antialiasing: true
         color: Theme.accent

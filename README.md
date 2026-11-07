@@ -1,28 +1,80 @@
 # Yakushi Shell
 
-A Quickshell (QML) desktop shell for Hyprland — the island top bar, Settings,
-OSD, launcher, notifications, lock screen, wallpaper picker and screen-share
-picker from
-[yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles), growing
-into a single installable shell.
+A Quickshell (QML) desktop shell for Hyprland: the island top bar, Settings,
+launcher with clipboard history, notifications, volume pill, lock screen,
+wallpaper picker and screen-share picker, in one installable package. It
+grew out of [yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles).
 
-**Status:** early. Hyprland only, on purpose.
+**Status:** early, but used every day. Hyprland only, on purpose.
 
 ## Install
 
-As a package (system-wide, root-owned files; `/etc/pam.d/yakushi-lock` for
-the lock screen):
+You need Arch Linux (or an Arch-based system) and Hyprland 0.56 or newer
+with its Lua config (`~/.config/hypr/hyprland.lua`). Every package comes
+from the official repositories.
 
 ```sh
-cd packaging && makepkg -si   # builds what is committed in this checkout
-yakushi restart               # after an upgrade
+sudo pacman -S --needed git base-devel
+git clone https://github.com/KayamiYakushi/yakushi-shell.git
+cd yakushi-shell/packaging
+makepkg -si                 # builds the package; pacman brings what it needs
 ```
 
-Coming from the user install below? Once:
-`~/.local/share/yakushi-shell/install.sh --uninstall` (it stops the shell),
-then `yakushi start`.
+The extras most people want (wallpapers, clipboard history, media keys,
+screenshots, password prompts, screen sharing):
 
-Or for your user only, without root (handy while developing):
+```sh
+sudo pacman -S --needed awww cliphist wl-clipboard playerctl grim slurp \
+    hyprpolkitagent xdg-desktop-portal-hyprland imagemagick qt6-imageformats \
+    networkmanager pavucontrol brightnessctl hyprsunset cava
+```
+
+Then give Hyprland the config the shell expects, and log out and back in:
+
+```sh
+yakushi setup-hyprland      # asks first; shows what it will do
+```
+
+It moves your current `~/.config/hypr` aside as a whole (to
+`~/.config/hypr.before-yakushi-<date>`; nothing is changed or deleted) and
+puts the starter from [`hypr/`](hypr/) in its place, with the terminal,
+file manager, browser and keyboard layout this computer already has.
+`yakushi setup-hyprland --dry-run` only shows what it would do.
+
+**Keeping your own Hyprland config?** Add the lines from
+[Hyprland](#hyprland) below instead. The bar, launcher, lock, notifications
+and most of Settings work; the Settings pages that edit Hyprland itself
+(Keybinds, Monitors, Input, window look) need the starter's layout.
+
+**Update:** `git pull`, then `cd packaging && makepkg -si`, then `yakushi restart`.
+
+**Remove:** `sudo pacman -Rns yakushi-shell`. Your settings stay in
+`~/.config/yakushi`; to get your old Hyprland config back, delete
+`~/.config/hypr` and rename the `hypr.before-yakushi-*` folder.
+
+### First steps
+
+| Keys | |
+|---|---|
+| SUPER + Space | Apps (Tab: clipboard history) |
+| SUPER + I | Settings |
+| SUPER + Q / E / B | Terminal / files / browser |
+| SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |
+| SUPER + Tab | Lock |
+| SUPER + ` | Power menu |
+| SUPER + Escape | What is running, and why |
+| SUPER + CTRL + Escape | Restart a frozen bar or Settings |
+
+Every shortcut can be changed in Settings -> Keybinds. Put a square
+picture in Settings -> System to see yourself on the lock screen.
+
+The Settings -> Login Screen page needs the Yakushi SDDM theme, which lives
+in [yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles)
+(`sddm/`); without it the page just says so.
+
+### For development
+
+A user install without root, from your checkout:
 
 ```sh
 ./install.sh              # copies this checkout to ~/.local/share/yakushi-shell
@@ -31,11 +83,15 @@ yakushi restart           # load a new version into a running shell
 ./install.sh --uninstall  # your settings in ~/.config/yakushi are kept
 ```
 
-Only files tracked by git are installed, and the new copy is swapped in with
-one rename. Edits in the checkout never reach the running desktop until you
-install them.
+Only files tracked by git are installed, and the new copy is swapped in
+with one rename. Use one of the two installs, not both: coming from this
+one to the package, run `~/.local/share/yakushi-shell/install.sh
+--uninstall` once, then `yakushi start`.
 
 ## Hyprland
+
+What the shell needs from Hyprland (the starter in [`hypr/`](hypr/) has
+all of it):
 
 ```lua
 -- startup
@@ -74,7 +130,13 @@ Windows get the same cut corners from Hyprland itself:
 decoration = { rounding = 14, rounding_power = 1.0 }  -- power 1 = straight 45-degree cut
 ```
 
-`hypr/xdph.conf`: `custom_picker_binary = yakushi-share-picker`.
+Let a restarted lock take over (see [Lock screen](#lock-screen)):
+
+```lua
+misc = { allow_session_lock_restore = true }
+```
+
+`~/.config/hypr/xdph.conf`: `screencopy { custom_picker_binary = yakushi-share-picker }`.
 
 ## Lock screen
 
@@ -85,11 +147,7 @@ and only a password PAM accepts (the `login` stack, so faillock and any
 other module apply) ends the lock.
 
 - If the lock process dies, the screen stays locked and `yakushi lock`
-  starts it again. Let a new lock take over in Hyprland:
-
-  ```lua
-  misc = { allow_session_lock_restore = true }
-  ```
+  starts it again (with `misc.allow_session_lock_restore`, see above).
 
 - `yakushi lock preview` shows the same screen in a window and locks
   nothing: try the look and your password safely (Esc closes it).
@@ -144,7 +202,7 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
   "topbar":     { "seconds": true, "clock24": true, "opacity": 0.9, ... },
   "appearance": { "panelOpacity": 0.9, "accent": "#ff7a9d" },
   "terminal":   { "enabled": true, "opacity": 0.7, ... },
-  "wallpaper":  { "folder": "~/Pictures/Walls", "visibleCount": 10, ... },
+  "wallpaper":  { "folder": "~/Pictures/Wallpapers", "visibleCount": 10, ... },
   "lock":       { "idleMinutes": 10 }
 }
 ```
@@ -152,12 +210,14 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
 - Settings writes it through the helpers in `scripts/` (`yakushi_config.py`):
   atomically, under a lock, private to you (0600). The shell watches it, so
   a change applies at once with no polling and no restart.
-- On first start the old `~/.config/quickshell/*.local.json` settings and
-  profile picture are carried over (the old files are left alone).
+- Coming from the older Quickshell setup in yakushidotfiles? On first start
+  its `~/.config/quickshell/*.local.json` settings and profile picture are
+  carried over (the old files are left alone).
 - A broken file is kept as `config.json.broken-<time>` and the defaults are
   used; a file from a newer Yakushi is never overwritten.
 - `yakushi config init | path | get [section]`.
-- `wallpaper.folder` defaults to your XDG Documents folder.
+- `wallpaper.folder` defaults to `Pictures/Wallpapers` when it has pictures,
+  else your XDG Documents folder.
 
 ## Principles
 
@@ -180,3 +240,4 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
    ✅ launcher with clipboard history (replacing rofi); ✅ lock screen and auto lock
    (replacing hyprlock and hypridle)
 5. ✅ PKGBUILD (`packaging/`), next to the user install
+6. ✅ Ready for others: a starter Hyprland config and `yakushi setup-hyprland`

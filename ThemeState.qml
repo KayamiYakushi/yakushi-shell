@@ -16,7 +16,7 @@ Item {
     property bool applying: false
     property bool dirty: false
 
-    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-uistatectl.py"
+    readonly property string helper: Paths.script("yakushi-uistatectl.py")
 
     function hexOf(c) {
         function h(v) {

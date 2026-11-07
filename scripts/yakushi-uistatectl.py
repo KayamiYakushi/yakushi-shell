@@ -14,11 +14,11 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import Path
+
+import yakushi_paths as paths
 
 import yakushi_config as config
 
-CODE = Path(__file__).resolve().parent.parent     # the shell itself
 
 OPACITY_MIN = 0.40
 OPACITY_MAX = 1.00
@@ -76,7 +76,7 @@ def set_state(opacity_raw: str, accent: str) -> None:
     # themesync (best effort, does not block).
     try:
         subprocess.Popen(
-            ["python3", str(CODE / "scripts/yakushi-themesync.py")],
+            ["python3", str(paths.SCRIPTS / "yakushi-themesync.py")],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

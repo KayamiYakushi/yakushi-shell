@@ -9,14 +9,14 @@ Item {
     property var hostWindow: null
     clip: true
 
-    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string homeDir: Paths.home
     property string currentLayout: ""
     property real currentSensitivity: 0.0
     property string statusText: "Loading input settings..."
     property bool statusError: false
 
     function helperPath() {
-        return homeDir + "/.config/hypr/scripts/yakushi-inputctl.py"
+        return Paths.script("yakushi-inputctl.py")
     }
 
     function refreshState() {
@@ -66,7 +66,7 @@ Item {
     }
 
     // ---- mouse cursor themes (scripts/yakushi-cursorctl.py)
-    readonly property string cursorHelper: Quickshell.shellDir + "/scripts/yakushi-cursorctl.py"
+    readonly property string cursorHelper: Paths.script("yakushi-cursorctl.py")
     property var cursorThemes: []
     property string cursorTheme: ""
     property string cursorNote: ""

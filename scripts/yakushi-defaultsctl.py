@@ -33,6 +33,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yakushi_paths as paths
+
 
 def write_safely(path, text: str) -> None:
     """Write a config file in place (same file, so watchers and symlinks keep
@@ -68,15 +70,14 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-HOME = Path.home()
-CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or HOME / ".config")
+CONFIG = paths.CONFIG_HOME
 MIMEAPPS = CONFIG / "mimeapps.list"
 HYPR_CONF = CONFIG / "hypr/hyprland.lua"
 XDG_TERMINALS = CONFIG / "xdg-terminals.list"
 
 
 def app_dirs() -> list[Path]:
-    data_home = Path(os.environ.get("XDG_DATA_HOME") or HOME / ".local/share")
+    data_home = paths.DATA_HOME
     data_dirs = [Path(p) for p in (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if p]
     dirs = [data_home, data_home / "flatpak/exports/share", Path("/var/lib/flatpak/exports/share")] + data_dirs
     seen, out = set(), []
@@ -438,7 +439,7 @@ def set_default(key: str, app_id: str) -> None:
     if key == "terminal":
         set_xdg_terminal(app_id)
         # the terminal colours / blur follow the new terminal
-        termctl = Path(__file__).resolve().parent / "yakushi-termctl.py"
+        termctl = paths.SCRIPTS / "yakushi-termctl.py"
         if termctl.exists():
             subprocess.Popen(["python3", str(termctl), "sync"], stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)

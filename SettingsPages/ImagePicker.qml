@@ -43,7 +43,7 @@ Item {
     }
 
     function helperPath() {
-        return Quickshell.shellDir + "/scripts/yakushi-image-picker.py"
+        return Paths.script("yakushi-image-picker.py")
     }
 
     function openAt(path) {
@@ -313,9 +313,9 @@ Item {
             Repeater {
                 model: [
                     { name: "Home",      icon: "󰋜", path: picker.homeDir },
-                    { name: "Documents", icon: "󰈙", path: picker.homeDir + "/Documents" },
-                    { name: "Downloads", icon: "󰇚", path: picker.homeDir + "/Downloads" },
-                    { name: "Pictures",  icon: "󰋩", path: picker.homeDir + "/Pictures" }
+                    { name: "Documents", icon: "󰈙", path: Paths.documents },
+                    { name: "Downloads", icon: "󰇚", path: Paths.downloads },
+                    { name: "Pictures",  icon: "󰋩", path: Paths.pictures }
                 ]
 
                 delegate: Rectangle {

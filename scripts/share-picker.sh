@@ -1,6 +1,6 @@
 #!/bin/sh
 # Screen-share picker for xdg-desktop-portal-hyprland
-# (screencopy:custom_picker_binary in ~/.config/hypr/xdph.conf).
+# (screencopy:custom_picker_binary = yakushi-share-picker in hypr/xdph.conf).
 #
 # xdph reads the choice from our stdout. The Quickshell picker writes it to
 # a private file; it is printed from here once the picker has closed.
@@ -10,8 +10,10 @@ export QT_QPA_PLATFORMTHEME=qt6ct
 export QT_STYLE_OVERRIDE=Fusion
 export QT_QUICK_CONTROLS_STYLE=Fusion
 
-picker_qml="$(cd "$(dirname "$0")/.." && pwd)/share-picker-shell.qml"
-runtime_root="${XDG_RUNTIME_DIR:-/tmp/yakushi-$(id -u)}/yakushi"
+self="$(readlink -f -- "$0")" || exit 1
+picker_qml="$(cd -- "$(dirname -- "$self")/.." && pwd -P)/share-picker-shell.qml"
+case "${XDG_RUNTIME_DIR:-}" in /*) ;; *) echo "share-picker: XDG_RUNTIME_DIR is not set" >&2; exit 1 ;; esac
+runtime_root="$XDG_RUNTIME_DIR/yakushi"
 log_file="$runtime_root/share-picker.log"
 
 mkdir -p -m 700 "$runtime_root"

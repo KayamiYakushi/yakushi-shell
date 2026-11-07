@@ -14,8 +14,8 @@ import "topbar"
 //   qs -p <this dir> ipc call settings toggle
 //   qs -p <this dir> ipc call volumeOsd show
 //   qs -p <this dir> ipc call topbar toggle
-// scripts/yakushi-shell.sh starts the shell; the other scripts are thin
-// wrappers around these calls for keybinds.
+// bin/yakushi starts the shell and wraps these calls for keybinds
+// (yakushi settings, yakushi volume up, yakushi bar toggle, ...).
 ShellRoot {
     id: root
 
@@ -105,7 +105,7 @@ ShellRoot {
     // Loading it in here would keep ~60 MB after it closes; as a child it
     // hands every byte back when it quits.
     // ------------------------------------------------------------------
-    readonly property string settingsQml: Quickshell.shellDir + "/settings.qml"
+    readonly property string settingsQml: Paths.shell + "/settings.qml"
 
     Process {
         id: settings

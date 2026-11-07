@@ -18,7 +18,7 @@ Item {
     property string status: "Scanning installed apps..."
     property bool busy: false
 
-    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-defaultsctl.py"
+    readonly property string helper: Paths.script("yakushi-defaultsctl.py")
 
     readonly property var glyphs: ({
         terminal: 0xF018D, shell: 0xF07B7, files: 0xF024B, browser: 0xF059F, editor: 0xF0219,

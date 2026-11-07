@@ -49,7 +49,10 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+
+import yakushi_paths as paths
 
 import yakushi_config as config
 
@@ -88,8 +91,8 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-HOME = Path.home()
-CONFIG = HOME / ".config"
+HOME = paths.HOME
+CONFIG = paths.CONFIG_HOME
 HYPR_CONF = CONFIG / "hypr/hyprland.lua"
 
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -347,7 +350,10 @@ def set_kitty_opacity(value: float) -> None:
     value above covers new windows either way."""
     if shutil.which("kitten") is None:
         return
-    for sock in Path("/tmp").glob("kitty-*") if Path("/tmp").exists() else []:
+    # kitty's sockets live wherever your listen_on points; look in the two
+    # usual places, the temp folder ($TMPDIR) and the runtime folder.
+    places = [Path(tempfile.gettempdir()), paths.runtime().parent]
+    for sock in (s for place in places for s in place.glob("kitty*") if s.is_socket()):
         try:
             subprocess.run(["kitten", "@", "--to", f"unix:{sock}", "set-background-opacity",
                             "--all", f"{value:.2f}"], capture_output=True, timeout=3)
@@ -472,7 +478,8 @@ def remove_terminals() -> None:
 # ---------------------------------------------------------------------------
 
 HYPR_LOCAL = CONFIG / "hypr/terminal.local.lua"
-HYPR_INCLUDE = 'pcall(dofile, os.getenv("HOME") .. "/.config/hypr/terminal.local.lua")'
+HYPR_INCLUDE = ('pcall(dofile, (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config"))'
+                ' .. "/hypr/terminal.local.lua")')
 BLUR_DEFAULT_STRENGTH = 3     # = Hyprland's size 5, passes 1 (hyprland.lua default)
 
 

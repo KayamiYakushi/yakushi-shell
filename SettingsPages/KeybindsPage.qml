@@ -9,13 +9,13 @@ Item {
     property var hostWindow: null
     clip: true
 
-    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string homeDir: Paths.home
     property string statusText: "Loading keybinds..."
     property bool statusError: false
     property var allBinds: []
 
     function helperPath() {
-        return homeDir + "/.config/hypr/scripts/yakushi-keybindctl.py"
+        return Paths.script("yakushi-keybindctl.py")
     }
 
     function refresh() {

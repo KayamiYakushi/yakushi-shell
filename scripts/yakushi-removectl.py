@@ -58,9 +58,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-HOME = Path.home()
-TRASH = HOME / ".local/share/yakushi-trash"
+import yakushi_paths as paths
+
+HERE = paths.SCRIPTS
+HOME = paths.HOME
+TRASH = paths.TRASH
 NAME_RE = re.compile(r"^[A-Za-z0-9@._+-]+$")
 UNIT_RE = re.compile(r"^[A-Za-z0-9@._:+\-]+\.(service|socket|timer|path)$")
 FLATPAK = "flatpak:"
@@ -136,9 +138,23 @@ FLATPAK_PERSONAL = {
     "org.mozilla.Thunderbird": "your mail",
     "org.telegram.desktop": "your Telegram session",
 }
+XDG_BASES = (paths.CONFIG_HOME, paths.DATA_HOME, paths.STATE_HOME, paths.CACHE_HOME)
+
+
+def known_path(rel: str) -> Path:
+    """A KNOWN_DATA entry (written relative to a default home) where it really
+    is: .config/, .cache/, .local/share/ and .local/state/ follow the XDG
+    folders, as the programs themselves do."""
+    for prefix, base in ((".config/", paths.CONFIG_HOME), (".cache/", paths.CACHE_HOME),
+                         (".local/share/", paths.DATA_HOME), (".local/state/", paths.STATE_HOME)):
+        if rel.startswith(prefix):
+            return base / rel[len(prefix):]
+    return HOME / rel
+
+
 # folders Yakushi itself manages or writes to
 YAKUSHI_DIRS = {"hypr", "quickshell", "waybar", "rofi", "hyprpolkitagent", "qt6ct", "fish", "kitty", "yakushi",
-                "yakushi-trash", "gtk-3.0", "gtk-4.0", "systemd", "autostart", "applications", "icons", "fonts"}
+                "yakushi-trash", "yakushi-shell", "gtk-3.0", "gtk-4.0", "systemd", "autostart", "applications", "icons", "fonts"}
 GENERIC = {"python", "lib", "share", "config", "data", "cache", "bin", "gtk", "qt", "x11", "fonts", "icons", "themes",
            "sounds", "applications", "systemd", "dbus", "pulse", "pipewire", "mime", "user", "default", "common",
            "local", "state", "tmp", "log", "logs", "run", "env", "utils", "tools", "core", "base", "desktop"}
@@ -308,11 +324,13 @@ def leftovers(targets: list[str], files: list[str]) -> list[dict]:
     found: dict[str, dict] = {}
 
     def add(path: Path, note: str = "", checked: bool = True) -> None:
+        if not path.is_relative_to(HOME):     # only files in your home are offered
+            return
         rel = str(path.relative_to(HOME))
         if rel in found or not (path.exists() or path.is_symlink()):
             return
-        top = rel.split("/")
-        if len(top) > 1 and top[0] in (".config", ".local") and top[-1].lower() in YAKUSHI_DIRS:
+        # never Yakushi's own folders, wherever the XDG folders point
+        if path.name.lower() in YAKUSHI_DIRS and path.parent in XDG_BASES:
             return
         size, partial = folder_size(path)
         if rel in PERSONAL:
@@ -321,7 +339,7 @@ def leftovers(targets: list[str], files: list[str]) -> list[dict]:
 
     for t in targets:
         for rel in KNOWN_DATA.get(t, []):
-            add(HOME / rel)
+            add(known_path(rel))
 
     def matches(entry: str) -> bool:
         e = entry.lower().lstrip(".")
@@ -330,7 +348,7 @@ def leftovers(targets: list[str], files: list[str]) -> list[dict]:
                 return True
         return e in names
 
-    for base in (HOME / ".config", HOME / ".local/share", HOME / ".local/state", HOME / ".cache"):
+    for base in XDG_BASES:
         try:
             entries = list(os.scandir(base))
         except OSError:
@@ -346,7 +364,7 @@ def leftovers(targets: list[str], files: list[str]) -> list[dict]:
                 add(Path(entry.path))
     except OSError:
         pass
-    for folder in (HOME / ".config/autostart", HOME / ".local/share/applications", HOME / ".config/systemd/user"):
+    for folder in (paths.CONFIG_HOME / "autostart", paths.DATA_HOME / "applications", paths.CONFIG_HOME / "systemd/user"):
         try:
             entries = list(os.scandir(folder))
         except OSError:
@@ -364,8 +382,9 @@ def mentions(files: list[str]) -> list[str]:
         return []
     out = []
     pats = [re.compile(r'(^|[\s/"\'(])' + re.escape(b) + r'($|[\s"\')])') for b in bins]
-    for rel in (".config/hypr/hyprland.lua", ".config/hypr/keybinds.lua"):
-        lines = tasks.read(HOME / rel).splitlines()
+    for path in (paths.HYPR / "hyprland.lua", paths.HYPR / "keybinds.lua"):
+        rel = str(path.relative_to(HOME)) if path.is_relative_to(HOME) else str(path)
+        lines = tasks.read(path).splitlines()
         for i, line in enumerate(lines):
             code = line.split("--", 1)[0]
             if any(p.search(code) for p in pats):
@@ -412,7 +431,7 @@ def flatpak_apps() -> dict[str, dict]:
         if len(f) < 8 or not APP_ID_RE.match(f[0]):
             continue
         app_id, title, desc, version, branch, origin, inst, size = f[:8]
-        base = Path("/var/lib/flatpak") if inst == "system" else HOME / ".local/share/flatpak"
+        base = Path("/var/lib/flatpak") if inst == "system" else paths.DATA_HOME / "flatpak"
         try:
             installed = int((base / "app" / app_id / "current" / "active").stat().st_mtime)
         except OSError:
@@ -441,7 +460,7 @@ def flatpak_leftovers(app_id: str) -> list[dict]:
 
     personal = FLATPAK_PERSONAL.get(app_id, "")
     add(HOME / ".var/app" / app_id, personal or "its settings, logins and cache", not personal)
-    for folder in (HOME / ".config/autostart", HOME / ".local/share/applications"):
+    for folder in (paths.CONFIG_HOME / "autostart", paths.DATA_HOME / "applications"):
         add(folder / f"{app_id}.desktop", "starts it or shows it in the app list")
     return found
 

@@ -13,8 +13,7 @@ import QtQuick
 Singleton {
     id: config
 
-    readonly property string dir: (Quickshell.env("XDG_CONFIG_HOME")
-        || (Quickshell.env("HOME") || "") + "/.config") + "/yakushi"
+    readonly property string dir: Paths.config
     readonly property string path: dir + "/config.json"
     readonly property string profilePicture: dir + "/profile-picture"
 

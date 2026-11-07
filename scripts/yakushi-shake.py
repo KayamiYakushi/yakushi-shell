@@ -28,11 +28,12 @@ import time
 from collections import deque
 from pathlib import Path
 
-HOME = Path.home()
-HERE = Path(__file__).resolve().parent
-LOCAL = HOME / ".config/hypr/cursor.local.lua"
-INFO = HOME / ".cache/yakushi/cursors/shake.json"
-PIDFILE = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "yakushi" / "shake.pid"
+import yakushi_paths as paths
+
+HERE = paths.SCRIPTS
+LOCAL = paths.HYPR / "cursor.local.lua"
+INFO = paths.CACHE / "cursors/shake.json"
+PIDFILE = paths.runtime() / "shake.pid"
 HELPER = "Yakushi-Shake"
 
 WINDOW = 0.5          # seconds of history looked at
@@ -98,7 +99,7 @@ def helper_sizes(theme: str, base: int) -> list[int]:
     try:
         info = json.loads(INFO.read_text())
         if info.get("theme") == theme and info.get("base") == base and \
-                (HOME / ".local/share/icons" / HELPER / "cursors/default").exists():
+                (paths.DATA_HOME / "icons" / HELPER / "cursors/default").exists():
             return info["sizes"]
     except (OSError, ValueError):
         pass

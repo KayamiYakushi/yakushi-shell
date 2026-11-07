@@ -35,8 +35,9 @@ import sys
 import time
 from pathlib import Path
 
-HOME = Path.home()
-HISTORY = HOME / ".cache/yakushi/speedtest.json"
+import yakushi_paths as paths
+
+HISTORY = paths.CACHE / "speedtest.json"
 KEEP = 10                     # speed tests kept for the average
 TYPES = {"802-3-ethernet": "ethernet", "802-11-wireless": "wifi"}
 

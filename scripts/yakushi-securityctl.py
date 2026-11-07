@@ -48,10 +48,12 @@ import sys
 import time
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-HOME = Path.home()
-STATE = HOME / ".local/state/yakushi/security.json"
-IDLE_CONF = HOME / ".local/state/yakushi/hypridle.conf"   # its own file: yours stays yours
+import yakushi_paths as paths
+
+HERE = paths.SCRIPTS
+HOME = paths.HOME
+STATE = paths.STATE / "security.json"
+IDLE_CONF = paths.STATE / "hypridle.conf"   # its own file: yours stays yours
 DAY = 20 * 3600                     # "once a day", with some room
 
 sys.dont_write_bytecode = True
@@ -196,7 +198,7 @@ def check_updates() -> dict:
     if have("checkupdates"):
         # its copy of the package lists lives in ~/.cache, not in /tmp (which is
         # RAM): it stays small there, and the next check downloads only what changed
-        db = HOME / ".cache/yakushi/checkup-db"
+        db = paths.CACHE / "checkup-db"
         db.mkdir(parents=True, exist_ok=True)
         res = run(["checkupdates"], 180, env={**os.environ, "CHECKUPDATES_DB": str(db)})
         if res.returncode in (0, 2):            # 2 = no updates
@@ -225,13 +227,18 @@ def check_updates() -> dict:
 
 
 # ---- the guard ------------------------------------------------------------------------------
+def _home_form(path: Path) -> str:
+    """~/... for paths in your home (how the guard has always named them)."""
+    return "~/" + str(path.relative_to(HOME)) if path.is_relative_to(HOME) else str(path)
+
+
 WATCHED_FILES = [
-    "~/.config/fish/config.fish", "~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile",
+    _home_form(paths.CONFIG_HOME / "fish/config.fish"), "~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile",
     "~/.xprofile", "~/.pam_environment", "~/.ssh/authorized_keys", "~/.ssh/rc",
     "/etc/ld.so.preload", "/etc/environment", "/etc/hosts", "/etc/pacman.conf", "/etc/shells",
 ]
-WATCHED_DIRS = ["~/.config/fish/conf.d", "~/.config/environment.d", "~/.config/autostart",
-                "~/.config/systemd/user", "/etc/xdg/autostart", "/etc/profile.d", "/etc/cron.d"]
+WATCHED_DIRS = [*(_home_form(paths.CONFIG_HOME / d) for d in ("fish/conf.d", "environment.d", "autostart", "systemd/user")),
+                "/etc/xdg/autostart", "/etc/profile.d", "/etc/cron.d"]
 
 
 def digest(path: Path) -> str:
@@ -244,7 +251,7 @@ def digest(path: Path) -> str:
 def snapshot() -> dict[str, str]:
     """key -> fingerprint of everything the guard watches"""
     snap: dict[str, str] = {}
-    lua = read(HOME / ".config/hypr/hyprland.lua")
+    lua = read(paths.HYPR / "hyprland.lua")
     block = re.search(r"startup\s*=\s*\{(.*?)\n\}", lua, re.S)
     for line in (block.group(1) if block else "").splitlines():
         q = re.search(r'"([^"]+)"', line.split("--", 1)[0])

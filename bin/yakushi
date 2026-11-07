@@ -1,0 +1,181 @@
+#!/bin/sh
+# yakushi: the one command for the Yakushi shell.
+#
+#   yakushi start | stop | restart     The shell (top bar, volume pill, Settings).
+#   yakushi status                     Is it running? (exit 0 if so)
+#   yakushi login                      Everything a new session needs (run once
+#                                      from Hyprland's startup list).
+#   yakushi settings [page]            Toggle Settings, or open it on a page
+#                                      (e.g. tasks, network, topbar).
+#   yakushi volume up|down|mute        Change the volume and show the pill.
+#   yakushi bar show|hide|toggle       The top bar.
+#   yakushi power                      The top bar's power menu.
+#   yakushi wallpaper                  The wallpaper picker.
+#   yakushi share-picker               Screen-share picker (for xdg-desktop-portal-hyprland).
+#   yakushi unfreeze                   End every stuck Quickshell and start again.
+#   yakushi config init|path|get [s]   The settings file.
+#   yakushi ipc <target> <fn> [args]   Raw IPC call (starts the shell if needed).
+#
+# Nothing is a fixed path: the shell is found from where this file really
+# lives (through any symlink, e.g. ~/.local/bin/yakushi), and runtime files go
+# to $XDG_RUNTIME_DIR.
+
+set -u
+
+self="$(readlink -f -- "$0")" || exit 1
+root="$(cd -- "$(dirname -- "$self")/.." && pwd -P)" || exit 1
+scripts="$root/scripts"
+shell_qml="$root/shell.qml"
+settings_qml="$root/settings.qml"
+
+die() {
+    printf 'yakushi: %s\n' "$*" >&2
+    exit 1
+}
+
+# No /tmp fallback on purpose: a guessable folder there could be made by
+# another user first. systemd always sets XDG_RUNTIME_DIR.
+case "${XDG_RUNTIME_DIR:-}" in
+    /*) ;;
+    *) die "XDG_RUNTIME_DIR is not set; log in through a systemd session." ;;
+esac
+run="$XDG_RUNTIME_DIR/yakushi"
+mkdir -p -m 700 "$run" || die "cannot create $run"
+pid_file="$run/shell.pid"
+log_file="$run/shell.log"
+
+# ---------------------------------------------------------------------------
+# The shell process
+# ---------------------------------------------------------------------------
+
+# the shell's pid, only if that process really is this shell (a pid number
+# can be reused by another program after the shell has gone)
+shell_pid() {
+    [ -r "$pid_file" ] || return 1
+    pid="$(cat "$pid_file" 2>/dev/null)"
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    grep -qa -- "$shell_qml" "/proc/$pid/cmdline" 2>/dev/null && echo "$pid"
+}
+
+running() {
+    shell_pid >/dev/null
+}
+
+# Settings runs as a child of the shell. If the shell went away (stopped or
+# crashed) while Settings was open, close that leftover Settings too, so the
+# next SUPER + I always gets a fresh one.
+stop_settings() {
+    timeout 2 qs kill -p "$settings_qml" >/dev/null 2>&1
+}
+
+start() {
+    running && return 0
+    stop_settings
+    # Create the config (carrying over old settings) or upgrade it first, so
+    # the shell finds a current file to watch.
+    python3 "$scripts/yakushi-configctl.py" init >/dev/null 2>&1
+    setsid qs -n -p "$shell_qml" >"$log_file" 2>&1 </dev/null &
+    printf '%s\n' "$!" >"$pid_file"
+}
+
+stop() {
+    if pid="$(shell_pid)"; then
+        kill "$pid" 2>/dev/null
+        # wait up to 2 s for it to go, so a restart never runs two at once
+        i=0
+        while [ "$i" -lt 20 ] && kill -0 "$pid" 2>/dev/null; do
+            sleep 0.1
+            i=$((i + 1))
+        done
+        kill -9 "$pid" 2>/dev/null
+    fi
+    rm -f "$pid_file"
+    stop_settings
+}
+
+call() {
+    timeout 2 qs -p "$shell_qml" ipc call "$@" >/dev/null 2>&1
+}
+
+ipc() {
+    call "$@" && return 0
+    # not running (or not answering): start it and give it a moment to load
+    running || start
+    i=0
+    while [ "$i" -lt 30 ]; do
+        sleep 0.1
+        call "$@" && return 0
+        i=$((i + 1))
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Session start
+# ---------------------------------------------------------------------------
+
+login() {
+    # your cursor from the first second, and shake to find if it is on
+    python3 "$scripts/yakushi-cursorctl.py" login >/dev/null 2>&1 &
+    python3 "$scripts/yakushi-shake.py" --login >/dev/null 2>&1 &
+    # hyprsunset runs only while night light is on
+    python3 "$scripts/yakushi-nightlightctl.py" restore >/dev/null 2>&1 &
+    start
+    # one guard check a little later, gently, then it exits
+    ( sleep 8 && exec nice -n 10 ionice -c 3 python3 "$scripts/yakushi-securityctl.py" login ) \
+        >/dev/null 2>&1 &
+}
+
+unfreeze() {
+    # For when the bar, Settings or a pop-up stops answering: ends every
+    # Quickshell of yours (and rofi, if it is stuck too), then starts the
+    # shell again. Your windows and apps are not touched.
+    uid="$(id -u)"
+    for name in qs quickshell rofi; do
+        pkill -KILL -u "$uid" -x "$name" 2>/dev/null
+    done
+    rm -f "$pid_file"
+    sleep 0.3
+    start
+}
+
+usage() {
+    sed -n '2,/^$/s/^# \{0,1\}//p' "$self" >&2
+    exit 2
+}
+
+# ---------------------------------------------------------------------------
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+    start)    start ;;
+    stop)     stop ;;
+    restart)  stop; start ;;
+    status)   running ;;
+    login)    login ;;
+    settings)
+        if [ $# -gt 0 ]; then ipc settings open "$1"; else ipc settings toggle; fi ;;
+    volume)
+        case "${1:-}" in
+            up)   wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;   # never past 100 % (like the bar)
+            down) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+            mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+            show) ;;
+            *)    usage ;;
+        esac
+        ipc volumeOsd show ;;
+    bar)
+        case "${1:-}" in
+            show|hide|toggle) ipc topbar "$1" ;;
+            *) usage ;;
+        esac ;;
+    power)    ipc topbar power ;;
+    wallpaper) exec sh "$root/wallpicker/launch.sh" ;;
+    share-picker) exec sh "$scripts/share-picker.sh" ;;
+    unfreeze) unfreeze ;;
+    config)   exec python3 "$scripts/yakushi-configctl.py" "$@" ;;
+    ipc)      [ $# -ge 2 ] || usage; ipc "$@" ;;
+    *)        usage ;;
+esac

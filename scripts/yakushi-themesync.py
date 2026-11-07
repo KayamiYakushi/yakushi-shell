@@ -17,7 +17,8 @@ import json
 import os
 import re
 import subprocess
-from pathlib import Path
+
+import yakushi_paths as paths
 
 import yakushi_config as config
 
@@ -56,12 +57,11 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-HOME = Path.home()
-ROFI_ACCENT = HOME / ".config/rofi/accent.rasi"
-HYPRLOCK = HOME / ".config/hypr/hyprlock.conf"
+ROFI_ACCENT = paths.CONFIG_HOME / "rofi/accent.rasi"
+HYPRLOCK = paths.HYPR / "hyprlock.conf"
 HELPERS = (
-    HOME / ".config/hypr/scripts/yakushi-windowctl.py",
-    Path(__file__).resolve().parent / "yakushi-termctl.py",
+    paths.SCRIPTS / "yakushi-windowctl.py",
+    paths.SCRIPTS / "yakushi-termctl.py",
 )
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 

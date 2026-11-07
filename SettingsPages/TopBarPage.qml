@@ -13,8 +13,7 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string helper: Quickshell.shellDir
-        + "/scripts/yakushi-topbarctl.py"
+    readonly property string helper: Paths.script("yakushi-topbarctl.py")
 
     property bool loaded: false
     property bool seconds: true

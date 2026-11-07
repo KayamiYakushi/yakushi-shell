@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import "../"
 
 // RAM, CPU usage and temperatures for the top bar.
 //
@@ -120,7 +121,7 @@ Item {
         running: true
         command: [
             "python3",
-            Quickshell.shellDir + "/scripts/yakushi-topbarctl.py",
+            Paths.script("yakushi-topbarctl.py"),
             "sensors"
         ]
 

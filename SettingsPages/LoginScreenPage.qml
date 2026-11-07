@@ -8,13 +8,13 @@ Item {
 
 
     property var hostWindow: null
-    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string homeDir: Paths.home
     property url previewSource: ""
     property bool hasBackground: false
     property string statusMessage: ""
 
     function helperPath() {
-        return Quickshell.shellDir + "/scripts/yakushi-sddmctl.py"
+        return Paths.script("yakushi-sddmctl.py")
     }
 
     function loadState() {
@@ -126,7 +126,7 @@ Item {
 
         hostWindow.openImagePicker(
             homeDir,
-            homeDir + "/Pictures",
+            Paths.pictures,
             function(path) {
                 page.previewSource = "file://" + path.split("/").map(encodeURIComponent).join("/")
                 page.setBackground(path)

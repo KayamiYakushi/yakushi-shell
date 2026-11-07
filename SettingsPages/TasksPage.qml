@@ -23,7 +23,7 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-taskctl.py"
+    readonly property string helper: Paths.script("yakushi-taskctl.py")
 
     // ---- live data
     property real cpu: -1

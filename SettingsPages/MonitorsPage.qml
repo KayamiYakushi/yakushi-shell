@@ -15,7 +15,7 @@ Item {
     property var hostWindow: null
     clip: true
 
-    property string homeDir: Quickshell.env("HOME") || ""
+    property string homeDir: Paths.home
     property var displays: []
     property string openName: ""
     property int pickW: 0
@@ -44,11 +44,11 @@ Item {
     }
 
     function monitorctl() {
-        return homeDir + "/.config/hypr/scripts/yakushi-monitorctl.py"
+        return Paths.script("yakushi-monitorctl.py")
     }
 
     function nightctl() {
-        return homeDir + "/.config/hypr/scripts/yakushi-nightlightctl.py"
+        return Paths.script("yakushi-nightlightctl.py")
     }
 
     function displayNamed(name) {

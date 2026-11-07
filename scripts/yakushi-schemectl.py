@@ -26,6 +26,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yakushi_paths as paths
+
 
 def write_safely(path, text: str) -> None:
     """Write a config file in place (same file, so watchers and symlinks keep
@@ -61,13 +63,13 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-HOME = Path.home()
+HOME = paths.HOME
 SCHEMA = "org.gnome.desktop.interface"
 INI = {
-    3: HOME / ".config/gtk-3.0/settings.ini",
-    4: HOME / ".config/gtk-4.0/settings.ini",
+    3: paths.CONFIG_HOME / "gtk-3.0/settings.ini",
+    4: paths.CONFIG_HOME / "gtk-4.0/settings.ini",
 }
-THEME_DIRS = [HOME / ".themes", HOME / ".local/share/themes", Path("/usr/share/themes")]
+THEME_DIRS = [HOME / ".themes", paths.DATA_HOME / "themes", Path("/usr/share/themes")]
 
 
 def gsettings(*args: str) -> str | None:

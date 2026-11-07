@@ -42,7 +42,9 @@ import sys
 import time
 from pathlib import Path
 
-HOME = Path.home()
+import yakushi_paths as paths
+
+HOME = paths.HOME
 ME = os.getuid()
 PAGE = os.sysconf("SC_PAGE_SIZE")
 TICK = os.sysconf("SC_CLK_TCK")
@@ -153,7 +155,7 @@ def display_name(comm: str, argv: list[str]) -> str:
 # ---- .desktop names: "firefox" -> "Firefox" ---------------------------------------
 def desktop_names() -> dict[str, str]:
     data = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share").split(":")
-    dirs = [HOME / ".local/share/applications"] + [Path(d) / "applications" for d in data if d]
+    dirs = [paths.DATA_HOME / "applications"] + [Path(d) / "applications" for d in data if d]
     names: dict[str, str] = {}
     for d in reversed(dirs):                         # user entries win
         try:
@@ -324,7 +326,7 @@ def strip_version(dep: str) -> str:
     return re.split(r"[<>=:]", dep.strip(), maxsplit=1)[0].strip()
 
 
-CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or HOME / ".cache") / "yakushi"
+CACHE_DIR = paths.CACHE
 
 
 def db_key() -> str:
@@ -503,7 +505,7 @@ def dbus_name(exe: str) -> str:
     """the D-Bus name whose service file starts this program"""
     if not exe:
         return ""
-    for d in ("/usr/share/dbus-1/services", "/usr/share/dbus-1/system-services", str(HOME / ".local/share/dbus-1/services")):
+    for d in ("/usr/share/dbus-1/services", "/usr/share/dbus-1/system-services", str(paths.DATA_HOME / "dbus-1/services")):
         try:
             files = list(Path(d).glob("*.service"))
         except OSError:
@@ -527,14 +529,14 @@ def hypr_mentions(words: list[str]) -> tuple[str, str]:
         return any(p.search(line) for p in pats)
 
     start, bind = "", ""
-    lua = read(HOME / ".config/hypr/hyprland.lua")
+    lua = read(paths.HYPR / "hyprland.lua")
     block = re.search(r"startup\s*=\s*\{(.*?)\n\}", lua, re.S)
     for line in (block.group(1) if block else lua).splitlines():
         if '"' in line and hit(line.split("--", 1)[0]):
             quoted = re.search(r'"([^"]+)"', line)
             start = quoted.group(1) if quoted else line.strip().rstrip(",")
             break
-    keys = read(HOME / ".config/hypr/keybinds.lua").splitlines()
+    keys = read(paths.HYPR / "keybinds.lua").splitlines()
     for i, line in enumerate(keys):
         m = re.match(r'\s*yakushi_bind\("[^"]+",\s*"([^"]+)"', line)
         if m and hit(line):
@@ -656,7 +658,7 @@ def why(pid: int) -> dict:
             lines.append({"kind": "reason", "text": "Installed as a dependency, but nothing needs it any more (an orphan)."})
         if "base" in info["groups"] or pkg_name in ("systemd", "linux", "glibc", "dbus", "dbus-broker"):
             lines.append({"kind": "core", "text": "Part of the base system: Linux needs it."})
-    elif yakushi or (home_file and "/.config/" in target):
+    elif yakushi or (home_file and target.startswith(str(paths.CONFIG_HOME) + "/")):
         lines.append({"kind": "yakushi" if yakushi else "home",
                       "text": (f"{yakushi}: part of your Yakushi setup" if yakushi else "A script in your config folder")
                               + f" ({target.replace(str(HOME), '~')})."

@@ -22,8 +22,8 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string home: Quickshell.env("HOME") || ""
-    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-securityctl.py"
+    readonly property string home: Paths.home
+    readonly property string helper: Paths.script("yakushi-securityctl.py")
 
     property var st: null                // the last `status`
     readonly property var fw: st ? st.firewall : null

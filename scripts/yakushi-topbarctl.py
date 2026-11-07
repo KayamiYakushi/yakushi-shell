@@ -27,7 +27,6 @@ from pathlib import Path
 import yakushi_config as config
 
 
-
 MODULES = (
     "workspaces",
     "ram",

@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import QtQuick
+import "../"
 
 // Shared now-playing state plus the audio spectrum (cava) for the
 // visualizer. One instance serves every screen.
@@ -66,7 +67,7 @@ Item {
         running: media.spectrumWanted
         command: [
             "cava", "-p",
-            Quickshell.shellDir + "/topbar/cava.conf"
+            Paths.shell + "/topbar/cava.conf"
         ]
 
         stdout: SplitParser {

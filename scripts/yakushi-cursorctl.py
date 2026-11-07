@@ -42,6 +42,8 @@ import zipfile
 import zlib
 from pathlib import Path
 
+import yakushi_paths as paths
+
 
 def write_safely(path, text: str) -> None:
     """Write a config file in place (same file, so watchers and symlinks keep
@@ -77,13 +79,13 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-HOME = Path.home()
-HYPR = HOME / ".config/hypr"
+HOME = paths.HOME
+HYPR = paths.HYPR
 LOCAL = HYPR / "cursor.local.lua"
-CACHE = HOME / ".cache/yakushi/cursors"
+CACHE = paths.CACHE / "cursors"
 OWN = "Yakushi-Red"                      # shipped with Yakushi
-SHAKER = Path(__file__).resolve().parent / "yakushi-shake.py"
-SHAKE_PID = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "yakushi" / "shake.pid"
+SHAKER = paths.SCRIPTS / "yakushi-shake.py"
+SHAKE_PID = paths.runtime() / "shake.pid"
 ARROWS = ("left_ptr", "default", "arrow", "top_left_arrow")
 SHAKE_THEME = "Yakushi-Shake"                 # generated, never listed
 SHAKE_STEPS = (1.0, 1.25, 1.5, 1.8, 2.1, 2.4)
@@ -95,7 +97,7 @@ SHAKE_SHAPES = {                              # file -> names to look for / alia
 
 
 def icon_dirs() -> list[Path]:
-    dirs = [HOME / ".local/share/icons", HOME / ".icons"]
+    dirs = [paths.DATA_HOME / "icons", HOME / ".icons"]
     data = os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share")
     dirs += [Path(p) / "icons" for p in data.split(":") if p]
     seen, out = set(), []
@@ -308,7 +310,7 @@ def write_shake_theme() -> dict:
     tid, base = current(), size()
     sizes = sorted({max(8, round(base * f)) for f in SHAKE_STEPS})
     chain = theme_chain(tid)
-    folder = HOME / ".local/share/icons" / SHAKE_THEME
+    folder = paths.DATA_HOME / "icons" / SHAKE_THEME
     if folder.exists():
         shutil.rmtree(folder)
     (folder / "cursors").mkdir(parents=True)
@@ -474,7 +476,7 @@ def push_everywhere(tid: str, sz: int) -> bool:
     run("gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", tid)
     run("gsettings", "set", "org.gnome.desktop.interface", "cursor-size", str(sz))
     for v in (3, 4):
-        ini = HOME / f".config/gtk-{v}.0/settings.ini"
+        ini = paths.CONFIG_HOME / f"gtk-{v}.0/settings.ini"
         set_ini(ini, "gtk-cursor-theme-name", tid)
         set_ini(ini, "gtk-cursor-theme-size", str(sz))
     write_defaults(tid)
@@ -486,7 +488,7 @@ def write_defaults(tid: str) -> None:
     Electron app on X11) ignores XCURSOR_THEME and only looks at "default",
     and ~/.local/share/icons/default wins over ~/.icons/default - Plasma, for
     one, leaves a Breeze one there - so both point at your theme"""
-    for base in (HOME / ".local/share/icons", HOME / ".icons"):
+    for base in (paths.DATA_HOME / "icons", HOME / ".icons"):
         folder = base / "default"
         if folder.is_symlink():                  # a link to some other theme
             folder.unlink()

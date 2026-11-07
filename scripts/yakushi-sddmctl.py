@@ -19,6 +19,8 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import yakushi_paths as paths
 from urllib.parse import unquote, urlparse
 
 THEME_DIR = Path("/usr/share/sddm/themes/yakushi")
@@ -26,7 +28,7 @@ BACKGROUND = THEME_DIR / "background.png"
 ROOT_HELPER = Path("/usr/local/libexec/yakushi-sddmctl")
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_BYTES = 100 * 1024 * 1024
-HERE = Path(__file__).resolve().parent
+HERE = paths.SCRIPTS
 
 sys.dont_write_bytecode = True
 _spec = importlib.util.spec_from_file_location("yakushi_taskctl", HERE / "yakushi-taskctl.py")
@@ -66,7 +68,7 @@ def clean_png(src: Path) -> Path:
     magick = shutil.which("magick") or shutil.which("convert")
     if magick is None:
         stop("ImageMagick (magick) is not installed.")
-    folder = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/yakushi-{os.getuid()}") / "yakushi"
+    folder = paths.runtime()
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     out = folder / "sddm-background.png"
     out.unlink(missing_ok=True)

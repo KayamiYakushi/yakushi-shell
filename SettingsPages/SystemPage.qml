@@ -13,8 +13,8 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string home: Quickshell.env("HOME") || ""
-    readonly property string scripts: Quickshell.shellDir + "/scripts/"
+    readonly property string home: Paths.home
+    readonly property string scripts: Paths.scripts + "/"
 
     // ---- facts
     property var facts: ({ host: "...", os: "...", kernel: "...", user: "...", cpu: "...", storage: "..." })
@@ -35,7 +35,7 @@ Item {
     function pickPicture() {
         if (!hostWindow)
             return
-        hostWindow.openImagePicker(home, home + "/Pictures", function(path) {
+        hostWindow.openImagePicker(home, Paths.pictures, function(path) {
             savePicture.command = ["python3", page.scripts + "yakushi-profile-image.py", path]
             savePicture.running = true
         })

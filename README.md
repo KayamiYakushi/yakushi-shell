@@ -7,20 +7,42 @@ into a single installable shell.
 
 **Status:** early, Hyprland only.
 
-## Running
+## Install
 
 ```sh
-scripts/yakushi-shell.sh start                 # start the shell
-scripts/yakushi-shell.sh ipc settings toggle   # SUPER + I
-scripts/yakushi-shell.sh ipc settings open tasks
-scripts/volume-osd.sh up|down|mute             # volume keys
-scripts/yakushi-bar.sh toggle                  # show / hide the top bar
+./install.sh              # copies this checkout to ~/.local/share/yakushi-shell
+                          # and links `yakushi` into ~/.local/bin
+yakushi restart           # load a new version into a running shell
+./install.sh --uninstall  # your settings in ~/.config/yakushi are kept
 ```
 
-`toggle-settings.sh`, `volume-osd.sh` and `yakushi-bar.sh` are thin
-wrappers kept so existing keybinds keep working. The screen-share picker
-(`share-picker-shell.qml`) and the wallpaper picker stay separate
-processes for now.
+Only files tracked by git are installed, and the new copy is swapped in with
+one rename. Edits in the checkout never reach the running desktop until you
+install them.
+
+## Hyprland
+
+```lua
+-- startup
+"yakushi login",
+
+-- keybinds
+"yakushi settings"            -- SUPER + I
+"yakushi settings tasks"      -- SUPER + Escape
+"yakushi volume up|down|mute" -- volume keys
+"yakushi bar toggle"
+"yakushi wallpaper"           -- SUPER + W
+"yakushi unfreeze"            -- SUPER + CTRL + Escape
+```
+
+`hypr/xdph.conf`: `custom_picker_binary = yakushi-share-picker`.
+`hyprlock.conf` can show `~/.config/yakushi/profile-picture`.
+
+`yakushi` with no arguments lists every command. Nothing in the shell is a
+fixed path: user folders come from the XDG variables (and `user-dirs.dirs`,
+so they are right in any language), the shell finds its own files from
+where it runs, and runtime files go to `$XDG_RUNTIME_DIR` (there is no
+`/tmp` fallback, on purpose).
 
 ## Configuration
 
@@ -32,7 +54,8 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
   "version": 1,
   "topbar":     { "seconds": true, "clock24": true, "opacity": 0.9, ... },
   "appearance": { "panelOpacity": 0.9, "accent": "#ff7a9d" },
-  "terminal":   { "enabled": true, "opacity": 0.7, ... }
+  "terminal":   { "enabled": true, "opacity": 0.7, ... },
+  "wallpaper":  { "folder": "~/Pictures/Walls", "visibleCount": 10, ... }
 }
 ```
 
@@ -43,7 +66,8 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
   profile picture are carried over (the old files are left alone).
 - A broken file is kept as `config.json.broken-<time>` and the defaults are
   used; a file from a newer Yakushi is never overwritten.
-- `scripts/yakushi-configctl.py init | path | get [section]`.
+- `yakushi config init | path | get [section]`.
+- `wallpaper.folder` defaults to your XDG Documents folder.
 
 ## Principles
 
@@ -62,6 +86,5 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
    as the shell's child process so it frees all its memory when closed
 2. ✅ One versioned config (`~/.config/yakushi/config.json`) behind a `Config` singleton
 3. ✅ Code read-only, user state in `~/.config/yakushi` / `~/.local/state/yakushi`
-   (left: the wallpaper picker's cache still sits in `~/.cache/quickshell`)
 4. Own notifications, launcher, power menu and lock screen (replacing swaync, rofi, wlogout, hyprlock)
-5. Compositor abstraction (Niri later), PKGBUILD and a `yakushi` CLI
+5. Compositor abstraction (Niri later), PKGBUILD (the `yakushi` CLI and user install are done)

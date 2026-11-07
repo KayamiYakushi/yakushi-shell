@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import Qt.labs.folderlistmodel
@@ -17,8 +16,21 @@ import Qt.labs.folderlistmodel
 PanelWindow {
     id: picker
 
-    readonly property string home: Quickshell.env("HOME") || ""
     readonly property string here: Quickshell.shellDir
+
+    // Folders and look, worked out by index.py (from the config) and handed
+    // over by launch.sh.
+    readonly property var cfg: {
+        try {
+            return JSON.parse(Quickshell.env("YAKUSHI_WALLPAPER") || "{}")
+        } catch (e) {
+            return {}
+        }
+    }
+    readonly property string indexDir: cfg.index || ""
+    readonly property string thumbsDir: cfg.thumbs || ""
+    readonly property int visibleCount: cfg.visibleCount || 10
+    readonly property color frameColor: cfg.frameColor || "#80FFFFFF"
 
     // ---- look
     readonly property real middleScale: 0.8      // size of the centre tile
@@ -36,33 +48,13 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-    function expand(path) {
-        return String(path || "").replace(/^~(?=\/|$)/, home)
-    }
-
-    // settings.json next to this file
-    FileView {
-        path: picker.here + "/settings.json"
-        watchChanges: true
-        onFileChanged: reload()
-
-        JsonAdapter {
-            id: cfg
-
-            property string images_dir
-            property string thumbs_dir
-            property int visible_count: 10
-            property string frame_color: "#80FFFFFF"
-        }
-    }
-
     // Thumbnails are made in the background; missing ones retry below.
-    Component.onCompleted: Quickshell.execDetached(["sh", here + "/thumbs.sh", here])
+    Component.onCompleted: Quickshell.execDetached(["sh", here + "/thumbs.sh", indexDir, thumbsDir, String(cfg.thumbJobs || 4)])
 
     FolderListModel {
         id: files
 
-        folder: "file://" + picker.expand(cfg.images_dir)
+        folder: "file://" + picker.indexDir
         showDirs: false
         sortField: FolderListModel.Name
         nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.PNG", "*.JPG", "*.JPEG", "*.WEBP"]
@@ -99,7 +91,7 @@ PanelWindow {
         }
 
         // ---- geometry
-        readonly property real slot: width / Math.max(1, cfg.visible_count) - 10
+        readonly property real slot: width / Math.max(1, picker.visibleCount) - 10
         readonly property real half: width / 2
         readonly property real reach: Math.max(1, half / (slot + picker.gap))
         readonly property real wide: Math.min(picker.stripHeight * picker.middleScale * picker.wideAspect, width * 0.5)
@@ -238,7 +230,7 @@ PanelWindow {
 
                     textFormat: Text.PlainText
                     anchors.centerIn: parent
-                    color: cfg.frame_color
+                    color: picker.frameColor
                     font.pixelSize: 16
                 }
 
@@ -254,7 +246,7 @@ PanelWindow {
                     sourceSize.width: strip.wide
                     sourceSize.height: picker.stripHeight
                     // names can hold # % ? and spaces: encode them for the URL
-                    source: tile.seen ? "file://" + picker.expand(cfg.thumbs_dir) + encodeURIComponent(tile.fileName) : ""
+                    source: tile.seen ? "file://" + picker.thumbsDir + "/" + encodeURIComponent(tile.fileName) : ""
 
                     // the thumbnail may still be being made: try again, a
                     // while (a picture that cannot be read is given up on)
@@ -291,7 +283,7 @@ PanelWindow {
                     visible: strip.marked === tile.index
                     color: "transparent"
                     border.width: 2
-                    border.color: cfg.frame_color
+                    border.color: picker.frameColor
                 }
 
                 MouseArea {

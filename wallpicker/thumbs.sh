@@ -1,12 +1,13 @@
 #!/bin/sh
 # Make 500 px tall thumbnails for the wallpaper picker, a few at a time.
 # Only images without a thumbnail are processed, so later runs are quick.
-# usage: thumbs.sh <picker dir>
+# usage: thumbs.sh <index dir> <thumbs dir> <jobs>
 
-conf="$1/settings.json"
-images="$(jq -r '.images_dir' "$conf" | sed "s|^~|$HOME|")"
-thumbs="$(jq -r '.thumbs_dir' "$conf" | sed "s|^~|$HOME|")"
-jobs="$(jq -r '.thumb_jobs // 4' "$conf")"
+images="$1"
+thumbs="$2"
+jobs="$3"
+[ -d "$images" ] && [ -n "$thumbs" ] || { echo "usage: thumbs.sh <index dir> <thumbs dir> <jobs>" >&2; exit 2; }
+
 # never more at once than half the CPU cores (each one can take a few hundred
 # MB while it decodes a big photo), and gently: the desktop stays smooth
 cores="$(nproc 2>/dev/null || echo 2)"

@@ -6,7 +6,8 @@
       "version": 1,
       "topbar":     { ... },   owned by yakushi-topbarctl.py
       "appearance": { ... },   owned by yakushi-uistatectl.py
-      "terminal":   { ... }    owned by yakushi-termctl.py
+      "terminal":   { ... },   owned by yakushi-termctl.py
+      "wallpaper":  { ... }    read by wallpicker/index.py
     }
 
 Each section is validated by the helper that owns it; this module only keeps
@@ -36,18 +37,19 @@ import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
+
+import yakushi_paths as paths
 from typing import Callable, Iterator
 
 VERSION = 1
-SECTIONS = ("topbar", "appearance", "terminal")
+SECTIONS = ("topbar", "appearance", "terminal", "wallpaper")
 
-CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-DIR = CONFIG_HOME / "yakushi"
+DIR = paths.CONFIG
 FILE = DIR / "config.json"
 LOCK = DIR / ".config.lock"
 PROFILE_PICTURE = DIR / "profile-picture"
 
-LEGACY_DIR = CONFIG_HOME / "quickshell"
+LEGACY_DIR = paths.CONFIG_HOME / "quickshell"
 
 
 class NewerConfig(Exception):

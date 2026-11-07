@@ -8,7 +8,7 @@ Item {
 
 
     property var hostWindow: null
-    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string homeDir: Paths.home
     property real launcherOpacity: 0.8
     property string launcherStatus: ""
 
@@ -26,7 +26,7 @@ Item {
     ]
 
     function launcherHelperPath() {
-        return homeDir + "/.config/hypr/scripts/yakushi-appearancectl.py"
+        return Paths.script("yakushi-appearancectl.py")
     }
 
     function loadLauncherOpacity() {
@@ -62,14 +62,14 @@ Item {
         if (schemeJob.running || value === scheme)
             return
         scheme = value                  // the cards answer at once
-        schemeJob.command = ["python3", Quickshell.shellDir + "/scripts/yakushi-schemectl.py", "set", value]
+        schemeJob.command = ["python3", Paths.script("yakushi-schemectl.py"), "set", value]
         schemeJob.running = true
     }
 
     Process {
         id: schemeJob
 
-        command: ["python3", Quickshell.shellDir + "/scripts/yakushi-schemectl.py", "get"]
+        command: ["python3", Paths.script("yakushi-schemectl.py"), "get"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -159,7 +159,7 @@ Item {
     property var windowQueue: []
 
     function windowHelperPath() {
-        return homeDir + "/.config/hypr/scripts/yakushi-windowctl.py"
+        return Paths.script("yakushi-windowctl.py")
     }
 
     function loadWindow() {
@@ -342,7 +342,7 @@ Item {
     }
 
     function termHelperPath() {
-        return Quickshell.shellDir + "/scripts/yakushi-termctl.py"
+        return Paths.script("yakushi-termctl.py")
     }
 
     function describeTerm(data) {

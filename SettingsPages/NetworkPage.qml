@@ -16,7 +16,7 @@ Item {
 
     property var hostWindow: null
 
-    readonly property string helper: Quickshell.shellDir + "/scripts/yakushi-netctl.py"
+    readonly property string helper: Paths.script("yakushi-netctl.py")
 
     property bool radio: true
     property string wifiDevice: ""

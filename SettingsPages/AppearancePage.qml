@@ -9,8 +9,6 @@ Item {
 
     property var hostWindow: null
     readonly property string homeDir: Paths.home
-    property real launcherOpacity: 0.8
-    property string launcherStatus: ""
 
     property var presets: [
         { name: "MONO",    accent: "#ffffff" },
@@ -24,35 +22,6 @@ Item {
         { name: "VIOLET",  accent: "#9d7bff" },
         { name: "ORCHID",  accent: "#e070ff" }
     ]
-
-    function launcherHelperPath() {
-        return Paths.script("yakushi-appearancectl.py")
-    }
-
-    function loadLauncherOpacity() {
-        if (homeDir === "" || launcherGet.running)
-            return
-
-        launcherGet.command = [
-            "python3",
-            launcherHelperPath(),
-            "get"
-        ]
-        launcherGet.running = true
-    }
-
-    function saveLauncherOpacity(value) {
-        if (launcherSet.running)
-            return
-
-        launcherSet.command = [
-            "python3",
-            launcherHelperPath(),
-            "set",
-            value.toFixed(3)
-        ]
-        launcherSet.running = true
-    }
 
     // ---- apps light / dark (scripts/yakushi-schemectl.py)
     property string scheme: ""          // "dark" | "light", "" until known
@@ -87,59 +56,9 @@ Item {
     // first load
     Component.onCompleted: {
         schemeJob.running = true
-        page.loadLauncherOpacity()
         page.loadWindow()
         termGet.command = ["python3", page.termHelperPath(), "status"]
         termGet.running = true
-    }
-
-    Process {
-        id: launcherGet
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-
-                    if (data.ok) {
-                        page.launcherOpacity = data.opacity
-                        page.launcherStatus = ""
-                    } else {
-                        page.launcherStatus = data.message
-                    }
-                } catch (e) {
-                    page.launcherStatus = "Could not read app launcher opacity."
-                }
-            }
-        }
-    }
-
-    Process {
-        id: launcherSet
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-
-                    if (data.ok) {
-                        page.launcherOpacity = data.opacity
-                        page.launcherStatus = data.message
-                    } else {
-                        page.launcherStatus = data.message
-                    }
-                } catch (e) {
-                    page.launcherStatus = "Could not save app launcher opacity."
-                }
-            }
-        }
-    }
-
-    Timer {
-        id: launcherSaveDebounce
-        interval: 120
-        repeat: false
-        onTriggered: page.saveLauncherOpacity(page.launcherOpacity)
     }
 
     // ------------------------------------------------------------------
@@ -798,27 +717,6 @@ Item {
                 }
             }
 
-            Slider {
-                width: parent.width
-                label: "App launcher opacity  "
-                    + Math.round(page.launcherOpacity * 100)
-                    + "%"
-                icon: "󰀻"
-                tint: Theme.accent
-                value: page.launcherOpacity
-
-                onSliding: function(v) {
-                    page.launcherOpacity = v
-                    launcherSaveDebounce.restart()
-                }
-
-                onSettled: function(v) {
-                    page.launcherOpacity = v
-                    launcherSaveDebounce.stop()
-                    page.saveLauncherOpacity(v)
-                }
-            }
-
             Divider {}
 
             // ---------------- Windows ----------------
@@ -1278,7 +1176,7 @@ Item {
                 width: parent.width
                 text: page.termStatus !== ""
                     ? page.termStatus
-                    : "Background, palette, cursor and selection follow the accent; with fish, command colours do too. Blur is done by Hyprland, so it works with any terminal, and shows when opacity is below 100% (strength also applies to the launcher). The first time, open a new terminal window. Off restores everything."
+                    : "Background, palette, cursor and selection follow the accent; with fish, command colours do too. Blur is done by Hyprland, so it works with any terminal, and shows when opacity is below 100%. The first time, open a new terminal window. Off restores everything."
                 wrapMode: Text.WordWrap
                 color: Theme.inkMute
                 font.family: Theme.mono
@@ -1288,9 +1186,9 @@ Item {
 
             Text {
                 textFormat: Text.PlainText
-                visible: page.launcherStatus !== "" || page.windowStatus !== ""
+                visible: page.windowStatus !== ""
                 width: parent.width
-                text: page.windowStatus !== "" ? page.windowStatus : page.launcherStatus
+                text: page.windowStatus
                 color: Theme.inkSoft
                 font.family: Theme.mono
                 font.pixelSize: 9

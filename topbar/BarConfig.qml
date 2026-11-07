@@ -77,9 +77,13 @@ Item {
         }
     }
 
+    // the shell's own cards (launcher, notifications) follow Settings ->
+    // Appearance too: accent and panel opacity
     function applyAppearance(data) {
         if (typeof data.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(data.accent))
             Theme.accent = data.accent
+        if (typeof data.panelOpacity === "number")
+            Theme.glass = Math.max(0.40, Math.min(1.0, data.panelOpacity))
     }
 
     Component.onCompleted: {

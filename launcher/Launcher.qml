@@ -1,0 +1,520 @@
+import Quickshell
+import Quickshell.Io
+import Quickshell.Hyprland
+import Quickshell.Wayland
+import QtQuick
+import "../"
+
+// The launcher (SUPER + Space) and clipboard history (SUPER + V): one card in
+// the Settings shape, opening from its notches like Settings does.
+//
+//   type          filter
+//   Up / Down     move (also Ctrl+P / Ctrl+N, Page Up / Page Down)
+//   Enter         open the app / copy the entry
+//   Tab           apps <-> clipboard
+//   Esc           close (a click outside the card too)
+//
+// Apps: every desktop entry that wants to be shown, ranked by how well the
+// name matches (exact, start, word start, inside, then description,
+// keywords and a fuzzy match), with apps you open often a little higher.
+// Clipboard: cliphist's history, newest first; an entry is copied back by its
+// id, so its text never passes through a shell command.
+//
+// shell.qml loads this only while it is open.
+PanelWindow {
+    id: launcher
+
+    property string mode: "apps"         // "apps" | "clipboard"
+    property bool showing: false
+    property int selected: 0
+    property alias query: search.text
+
+    signal dismissed()      // fully closed (after the animation): the shell frees it
+
+    function focusedScreen() {
+        var name = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : ""
+        var list = Quickshell.screens
+        for (var i = 0; i < list.length; i++)
+            if (list[i].name === name)
+                return list[i]
+        return list.length > 0 ? list[0] : null
+    }
+
+    screen: focusedScreen()
+    Component.onCompleted: screen = focusedScreen()
+
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "yakushi-launcher"
+    WlrLayershell.keyboardFocus: showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    function open(which) {
+        closeTimer.stop()
+        mode = which === "clipboard" ? "clipboard" : "apps"
+        search.text = ""
+        selected = 0
+        if (mode === "clipboard")
+            clipList.running = true
+        else
+            countsFile.reload()
+        showing = true
+        search.forceActiveFocus()
+    }
+
+    function hide() {
+        if (!showing)
+            return
+        showing = false
+        closeTimer.restart()
+    }
+
+    function switchMode() {
+        open(mode === "apps" ? "clipboard" : "apps")
+    }
+
+    // the card closes back into its notches first
+    Timer {
+        id: closeTimer
+        interval: Theme.tSlow + 160
+        onTriggered: launcher.dismissed()
+    }
+
+    // ------------------------------------------------------------------
+    // Apps
+    // ------------------------------------------------------------------
+    property var counts: ({})
+
+    FileView {
+        id: countsFile
+
+        path: Paths.stateHome + "/yakushi/launcher.json"
+        printErrors: false
+        onLoaded: {
+            try {
+                var data = JSON.parse(text())
+                launcher.counts = data && data.counts ? data.counts : {}
+            } catch (e) {
+                launcher.counts = {}
+            }
+        }
+    }
+
+    function lower(value) {
+        return String(value || "").toLowerCase()
+    }
+
+    // how well `q` matches an entry; -1 = not at all
+    function score(entry, q) {
+        var name = lower(entry.name)
+        if (q === "")
+            return 0
+        if (name === q)
+            return 1000
+        if (name.indexOf(q) === 0)
+            return 800
+        if ((" " + name).indexOf(" " + q) >= 0 || name.indexOf("-" + q) >= 0)
+            return 600
+        if (name.indexOf(q) >= 0)
+            return 400
+        var extra = lower(entry.genericName) + " " + lower(entry.keywords) + " "
+            + lower(entry.comment) + " " + lower(entry.categories) + " " + lower(entry.execString)
+        if (extra.indexOf(q) >= 0)
+            return 250
+        // fuzzy: the letters of q in order, fewer gaps = better
+        var at = -1, gaps = 0
+        for (var i = 0; i < q.length; i++) {
+            var next = name.indexOf(q.charAt(i), at + 1)
+            if (next < 0)
+                return -1
+            if (at >= 0)
+                gaps += next - at - 1
+            at = next
+        }
+        // letters scattered all over the name are not a match
+        if (gaps > q.length * 2)
+            return -1
+        return Math.max(1, 150 - gaps * 5)
+    }
+
+    readonly property var apps: {
+        var q = lower(search.text).trim()
+        var list = DesktopEntries.applications.values
+        var out = []
+        for (var i = 0; i < list.length; i++) {
+            var entry = list[i]
+            if (entry.noDisplay)
+                continue
+            var s = score(entry, q)
+            if (s < 0)
+                continue
+            var used = Math.min(launcher.counts[entry.id] || 0, 40)
+            out.push({ entry: entry, rank: s + used * (q === "" ? 10 : 3) })
+        }
+        out.sort(function(a, b) {
+            return b.rank - a.rank || lower(a.entry.name).localeCompare(lower(b.entry.name))
+        })
+        return out.slice(0, 60)
+    }
+
+    function launch(entry) {
+        if (entry.runInTerminal)
+            Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "terminal", entry.execString])
+        else
+            entry.execute()
+        Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "used", entry.id])
+        hide()
+    }
+
+    // ------------------------------------------------------------------
+    // Clipboard
+    // ------------------------------------------------------------------
+    property var clips: []
+
+    Process {
+        id: clipList
+
+        command: ["cliphist", "list"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var out = []
+                var lines = text.split("\n")
+                for (var i = 0; i < lines.length && out.length < 400; i++) {
+                    var tab = lines[i].indexOf("\t")
+                    if (tab <= 0)
+                        continue
+                    var id = lines[i].slice(0, tab)
+                    if (!/^[0-9]+$/.test(id))
+                        continue
+                    out.push({ id: id, text: lines[i].slice(tab + 1) })
+                }
+                launcher.clips = out
+            }
+        }
+    }
+
+    readonly property var clipResults: {
+        var q = lower(search.text).trim()
+        if (q === "")
+            return clips
+        return clips.filter(function(c) { return lower(c.text).indexOf(q) >= 0 })
+    }
+
+    function copy(clip) {
+        // the id goes in as an argument, never as shell code
+        Quickshell.execDetached(["sh", "-c", "cliphist decode \"$1\" | wl-copy", "sh", clip.id])
+        hide()
+    }
+
+    // ------------------------------------------------------------------
+    readonly property int count: mode === "apps" ? apps.length : clipResults.length
+
+    onCountChanged: selected = Math.max(0, Math.min(selected, count - 1))
+
+    function move(step) {
+        if (count === 0)
+            return
+        selected = Math.max(0, Math.min(count - 1, selected + step))
+        results.positionViewAtIndex(selected, ListView.Contain)
+    }
+
+    function choose(index) {
+        if (index < 0 || index >= count)
+            return
+        if (mode === "apps")
+            launch(apps[index].entry)
+        else
+            copy(clipResults[index])
+    }
+
+    // black or white, whichever reads on the accent
+    readonly property color onAccent: 0.299 * Theme.accent.r + 0.587 * Theme.accent.g + 0.114 * Theme.accent.b > 0.55
+        ? "#0a0a0a" : "#f5f5f5"
+
+    // a click outside the card closes
+    MouseArea {
+        anchors.fill: parent
+        onClicked: launcher.hide()
+    }
+
+    TiltCard {
+        id: card
+
+        anchors.centerIn: parent
+        width: Math.min(640, launcher.width - 40)
+        height: Math.min(480, launcher.height - 40)
+        leanDegrees: 2
+        shown: launcher.showing
+
+        // clicks on the card stay on the card
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        // ---- header
+        Item {
+            id: header
+
+            width: parent.width
+            height: 46
+
+            Row {
+                x: 20
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 12
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: launcher.mode === "apps" ? "LAUNCH" : "CLIPBOARD"
+                    color: Theme.ink
+                    font.family: Theme.mono
+                    font.pixelSize: 14
+                    font.bold: true
+                    font.letterSpacing: 6
+                }
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: launcher.mode === "apps" ? "起動" : "履歴"
+                    color: Theme.inkSoft
+                    font.family: "Noto Sans CJK JP"
+                    font.pixelSize: 13
+                    font.letterSpacing: 3
+                }
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.right: parent.right
+                anchors.rightMargin: 28
+                anchors.verticalCenter: parent.verticalCenter
+                text: (launcher.count > 0 ? launcher.selected + 1 : 0) + " / " + launcher.count
+                color: Theme.accent
+                font.family: Theme.mono
+                font.pixelSize: 11
+                font.letterSpacing: 2
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: Theme.line
+            }
+        }
+
+        // ---- search
+        Rectangle {
+            id: field
+
+            x: 20
+            anchors.top: header.bottom
+            anchors.topMargin: 16
+            width: parent.width - 40
+            height: 38
+            color: Theme.tint(Theme.ink, 0.04)
+            border.width: 1
+            border.color: search.activeFocus ? Theme.accent : Theme.line
+
+            Text {
+                id: glyph
+
+                textFormat: Text.PlainText
+                x: 12
+                anchors.verticalCenter: parent.verticalCenter
+                text: String.fromCodePoint(launcher.mode === "apps" ? 0xF0349 : 0xF0147)
+                color: Theme.accent
+                font.family: Theme.glyphs
+                font.pixelSize: 15
+            }
+
+            TextInput {
+                id: search
+
+                anchors.left: glyph.right
+                anchors.leftMargin: 10
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                color: Theme.ink
+                selectionColor: Theme.tint(Theme.accent, 0.4)
+                font.family: Theme.mono
+                font.pixelSize: 13
+                clip: true
+                focus: true
+
+                onTextChanged: {
+                    launcher.selected = 0
+                    results.positionViewAtBeginning()
+                }
+
+                Keys.onPressed: function(event) {
+                    var ctrl = event.modifiers & Qt.ControlModifier
+                    if (event.key === Qt.Key_Escape) {
+                        launcher.hide()
+                    } else if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_N)) {
+                        launcher.move(1)
+                    } else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) {
+                        launcher.move(-1)
+                    } else if (event.key === Qt.Key_PageDown) {
+                        launcher.move(8)
+                    } else if (event.key === Qt.Key_PageUp) {
+                        launcher.move(-8)
+                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                        launcher.switchMode()
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        launcher.choose(launcher.selected)
+                    } else {
+                        return
+                    }
+                    event.accepted = true
+                }
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: search.text === ""
+                    text: launcher.mode === "apps" ? "Type to search apps…" : "Type to search the clipboard…"
+                    color: Theme.inkMute
+                    font: search.font
+                }
+            }
+        }
+
+        // ---- results
+        ListView {
+            id: results
+
+            x: 20
+            anchors.top: field.bottom
+            anchors.topMargin: 12
+            anchors.bottom: footer.top
+            anchors.bottomMargin: 8
+            width: parent.width - 40
+            clip: true
+            spacing: 2
+            boundsBehavior: Flickable.StopAtBounds
+            model: launcher.mode === "apps" ? launcher.apps : launcher.clipResults
+            currentIndex: launcher.selected
+
+            delegate: Rectangle {
+                id: row
+
+                required property var modelData
+                required property int index
+
+                readonly property bool here: index === launcher.selected
+                readonly property var entry: launcher.mode === "apps" ? modelData.entry : null
+
+                width: results.width
+                height: launcher.mode === "apps" ? 44 : 32
+                color: here ? Theme.accent : (rowMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent")
+
+                Image {
+                    id: icon
+
+                    visible: launcher.mode === "apps" && status === Image.Ready
+                    x: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    sourceSize: Qt.size(52, 52)
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    source: row.entry && row.entry.icon !== ""
+                        ? (row.entry.icon.charAt(0) === "/" ? "file://" + row.entry.icon : Quickshell.iconPath(row.entry.icon, true))
+                        : ""
+                }
+
+                Column {
+                    anchors.left: parent.left
+                    anchors.leftMargin: launcher.mode === "apps" ? 48 : 12
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+
+                    Text {
+                        textFormat: Text.PlainText
+                        width: parent.width
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: row.entry ? row.entry.name : String(row.modelData.text).replace(/\s+/g, " ")
+                        color: row.here ? launcher.onAccent : Theme.ink
+                        font.family: Theme.mono
+                        font.pixelSize: launcher.mode === "apps" ? 12 : 11
+                        font.bold: row.here && launcher.mode === "apps"
+                    }
+
+                    Text {
+                        textFormat: Text.PlainText
+                        width: parent.width
+                        visible: row.entry !== null && text !== ""
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: row.entry ? (row.entry.genericName || row.entry.comment || "") : ""
+                        color: row.here ? Theme.tint(launcher.onAccent, 0.7) : Theme.inkMute
+                        font.family: Theme.mono
+                        font.pixelSize: 9
+                        font.letterSpacing: 0.5
+                    }
+                }
+
+                MouseArea {
+                    id: rowMouse
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: launcher.choose(row.index)
+                }
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.centerIn: parent
+                visible: launcher.count === 0
+                text: launcher.mode === "apps" ? "No app matches." : (launcher.clips.length === 0 ? "The clipboard history is empty." : "Nothing matches.")
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 11
+            }
+        }
+
+        // ---- footer
+        Item {
+            id: footer
+
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 34
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.line
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                x: 20
+                anchors.verticalCenter: parent.verticalCenter
+                text: (launcher.mode === "apps" ? "↵ OPEN" : "↵ COPY") + "    ⇥ "
+                    + (launcher.mode === "apps" ? "CLIPBOARD" : "APPS") + "    ESC CLOSE"
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 9
+                font.letterSpacing: 2
+            }
+        }
+    }
+}

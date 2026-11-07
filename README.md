@@ -32,6 +32,8 @@ install them.
 "yakushi volume up|down|mute" -- volume keys
 "yakushi bar toggle"
 "yakushi wallpaper"           -- SUPER + W
+"yakushi launcher"            -- SUPER + Space
+"yakushi launcher clipboard"  -- SUPER + V
 "yakushi power"               -- SUPER + `  (the island's power menu)
 "yakushi notifications off"   -- or on | toggle | test
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
@@ -113,5 +115,5 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
 2. ✅ One versioned config (`~/.config/yakushi/config.json`) behind a `Config` singleton
 3. ✅ Code read-only, user state in `~/.config/yakushi` / `~/.local/state/yakushi`
 4. ✅ Power menu (the island's card) and ✅ notifications (built-in server, can be turned off completely);
-   next: launcher and lock screen (replacing rofi, hyprlock)
+   ✅ launcher with clipboard history (replacing rofi); next: lock screen (replacing hyprlock)
 5. Compositor abstraction (Niri later), PKGBUILD (the `yakushi` CLI and user install are done)

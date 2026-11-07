@@ -93,10 +93,9 @@ KERNEL_EXTRA = re.compile(r"^linux.*-(headers|docs)$")      # these may go
 
 # Yakushi uses these for one feature each: allowed, with a warning
 SOFT = {
-    "waybar": "the Waybar style of the top bar", "rofi": "the app launcher, clipboard and power menu",
     "kitty": "the default terminal (SUPER + Q)", "nautilus": "the default file manager (SUPER + E)",
     "firefox": "the default browser (SUPER + B)", "wl-clipboard": "copy and paste in scripts",
-    "cliphist": "clipboard history (SUPER + V)", "grim": "screenshots", "slurp": "area screenshots",
+    "cliphist": "clipboard history (SUPER + V)", "libnotify": "test notifications (Settings)", "grim": "screenshots", "slurp": "area screenshots",
     "brightnessctl": "screen brightness keys", "hyprsunset": "night light", "hyprlock": "the lock screen",
     "playerctl": "now playing in the top bar", "pavucontrol": "advanced sound settings", "cava": "the visualizer",
     "awww": "wallpapers", "jq": "a few scripts", "imagemagick": "picture previews", "bluez": "Bluetooth",
@@ -153,7 +152,7 @@ def known_path(rel: str) -> Path:
 
 
 # folders Yakushi itself manages or writes to
-YAKUSHI_DIRS = {"hypr", "quickshell", "waybar", "rofi", "hyprpolkitagent", "qt6ct", "fish", "kitty", "yakushi",
+YAKUSHI_DIRS = {"hypr", "quickshell", "hyprpolkitagent", "qt6ct", "fish", "kitty", "yakushi",
                 "yakushi-trash", "yakushi-shell", "gtk-3.0", "gtk-4.0", "systemd", "autostart", "applications", "icons", "fonts"}
 GENERIC = {"python", "lib", "share", "config", "data", "cache", "bin", "gtk", "qt", "x11", "fonts", "icons", "themes",
            "sounds", "applications", "systemd", "dbus", "pulse", "pipewire", "mime", "user", "default", "common",

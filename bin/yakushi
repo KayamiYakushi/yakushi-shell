@@ -9,6 +9,7 @@
 #                                      (e.g. tasks, network, topbar).
 #   yakushi volume up|down|mute        Change the volume and show the pill.
 #   yakushi bar show|hide|toggle       The top bar.
+#   yakushi launcher [clipboard]       The app launcher, or clipboard history.
 #   yakushi power                      The top bar's power menu.
 #   yakushi notifications on|off|toggle|test
 #                                      Show notifications or not (off: apps are
@@ -137,10 +138,10 @@ login() {
 
 unfreeze() {
     # For when the bar, Settings or a pop-up stops answering: ends every
-    # Quickshell of yours (and rofi, if it is stuck too), then starts the
-    # shell again. Your windows and apps are not touched.
+    # Quickshell of yours, then starts the shell again. Your windows and
+    # apps are not touched.
     uid="$(id -u)"
-    for name in qs quickshell rofi; do
+    for name in qs quickshell; do
         pkill -KILL -u "$uid" -x "$name" 2>/dev/null
     done
     rm -f "$pid_file"
@@ -180,6 +181,12 @@ case "$cmd" in
             show)   ipc topbar reveal ;;
             hide|toggle) ipc topbar "$1" ;;
             *) usage ;;
+        esac ;;
+    launcher)
+        case "${1:-}" in
+            "")        ipc launcher toggle ;;
+            clipboard) ipc launcher clipboard ;;
+            *)         usage ;;
         esac ;;
     power)    ipc topbar power ;;
     notifications)

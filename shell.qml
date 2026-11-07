@@ -4,9 +4,10 @@ import Quickshell.Services.Notifications
 import QtQuick
 import "topbar"
 import "notifications"
+import "launcher"
 
 // Yakushi Shell: the one entry point for the top bar, Settings, the volume
-// pill and notifications.
+// pill, notifications and the launcher.
 //
 // The bar and the notification server are always loaded. The volume pill
 // and the notification pop-ups are loaded only while they are on screen.
@@ -167,6 +168,45 @@ ShellRoot {
             volumeOsd.active = true
             volumeOsd.item.poke()
             volumeOsdUnload.restart()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Launcher (SUPER + Space) and clipboard history (SUPER + V): loaded on
+    // open, freed once it has closed
+    // ------------------------------------------------------------------
+    LazyLoader {
+        id: launcher
+
+        Launcher {
+            onDismissed: launcher.active = false
+        }
+    }
+
+    // the same key again closes it; the other key switches it over
+    function openLauncher(mode: string): void {
+        launcher.active = true
+        var card = launcher.item
+        if (card.showing && card.mode === mode)
+            card.hide()
+        else
+            card.open(mode)
+    }
+
+    IpcHandler {
+        target: "launcher"
+
+        function toggle(): void {
+            root.openLauncher("apps")
+        }
+
+        function clipboard(): void {
+            root.openLauncher("clipboard")
+        }
+
+        function hide(): void {
+            if (launcher.item)
+                launcher.item.hide()
         }
     }
 

@@ -4,7 +4,6 @@
 Called by yakushi-uistatectl.py whenever the accent changes (and safe to
 run by hand). Each step is independent and best effort:
 
-  * rofi       ~/.config/rofi/accent.rasi (power menu)
   * lock       $accent in ~/.config/hypr/hyprlock.conf
   * windows    border colour, when it follows the accent (yakushi-windowctl)
   * terminal   terminal + fish colours, when matching is on (yakushi-termctl)
@@ -57,7 +56,6 @@ def write_safely(path, text: str) -> None:
         raise
 
 
-ROFI_ACCENT = paths.CONFIG_HOME / "rofi/accent.rasi"
 HYPRLOCK = paths.HYPR / "hyprlock.conf"
 HELPERS = (
     paths.SCRIPTS / "yakushi-windowctl.py",
@@ -76,18 +74,6 @@ def accent() -> str:
     return "#ffffff"
 
 
-def write_rofi(colour: str) -> None:
-    if not ROFI_ACCENT.parent.is_dir():
-        return
-    write_safely(ROFI_ACCENT, 
-        "/* Written by Yakushi Settings (accent colour). */\n"
-        "* {\n"
-        f"    accent: {colour}ff;\n"
-        f"    accent-soft: {colour}2e;\n"
-        "}\n"
-    )
-
-
 def write_hyprlock(colour: str) -> None:
     try:
         text = HYPRLOCK.read_text()
@@ -100,7 +86,6 @@ def write_hyprlock(colour: str) -> None:
 
 def main() -> None:
     colour = accent()
-    write_rofi(colour)
     write_hyprlock(colour)
     for helper in HELPERS:
         if helper.exists():

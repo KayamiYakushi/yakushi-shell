@@ -65,21 +65,6 @@ local function float_centered()
     hl.dispatch(hl.dsp.window.move({ relative = false, x = box.x, y = box.y }))
 end
 
--- SUPER + O: window opacity 100 -> 90 -> 80 -> 70 % and round again, for
--- this session (the saved value is active/inactive_opacity in hyprland.lua).
-local OPACITY_STEPS = { 1.0, 0.9, 0.8, 0.7 }
-
-local function cycle_opacity()
-    local now = hl.get_config("decoration:active_opacity") or 1.0
-    local nxt = OPACITY_STEPS[1]
-    for i, v in ipairs(OPACITY_STEPS) do
-        if math.abs(v - now) < 0.01 then
-            nxt = OPACITY_STEPS[i % #OPACITY_STEPS + 1]
-        end
-    end
-    hl.config({ decoration = { active_opacity = nxt, inactive_opacity = nxt } })
-end
-
 -- Screen zoom in steps, between 1x and 1.5x.
 local function zoom_by(step)
     return function()
@@ -110,8 +95,6 @@ yakushi_bind("close", "SUPER + C", hl.dsp.window.close())
 yakushi_bind("fullscreen", "SUPER + F", hl.dsp.window.fullscreen({ mode = 0 }))
 -- YAKUSHI_BIND float|Windows|Toggle Floating
 yakushi_bind("float", "SUPER + V", float_centered)
--- YAKUSHI_BIND opacity|Windows|Window Opacity
-yakushi_bind("opacity", "SUPER + O", cycle_opacity)
 -- YAKUSHI_BIND mouse_move|Windows|Move Window With Mouse
 yakushi_bind("mouse_move", "SUPER + mouse:272", over_settings_or(hl.dsp.window.drag()), { mouse = true })
 -- YAKUSHI_BIND mouse_resize|Windows|Resize Window With Mouse

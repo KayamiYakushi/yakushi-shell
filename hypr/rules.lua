@@ -7,8 +7,8 @@ hl.layer_rule({ match = { namespace = "yakushi-launcher" }, blur = true, ignore_
 -- The same for the wallpaper picker card (SUPER + W).
 hl.layer_rule({ match = { namespace = "yakushi-wallpaper" }, blur = true, ignore_alpha = 0.15, no_anim = true })
 
--- Window opacity lives in hyprland.lua (decoration -> active/inactive_opacity,
--- SUPER + O), not in a catch-all rule: in a rule, `fullscreen` can also act
+-- Window opacity lives in hyprland.lua (decoration -> active/inactive_opacity),
+-- not in a catch-all rule: in a rule, `fullscreen` can also act
 -- as the "force fullscreen" effect.
 
 -- Apps may ask to open maximized (kitty does when it was closed that way).

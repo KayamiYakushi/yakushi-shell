@@ -66,8 +66,8 @@ hl.config({
     decoration = {
         rounding = 14,               -- Settings -> Appearance (size of the corner cut)
         rounding_power = 1.0,        -- 1 = straight 45-degree cut corners, the shell's shape
-        active_opacity = 1.0,        -- SUPER + O cycles it for the session
-        inactive_opacity = 1.0,      -- SUPER + O cycles it for the session
+        active_opacity = 1.0,        -- 1.0 = solid
+        inactive_opacity = 1.0,      -- 1.0 = solid
         fullscreen_opacity = 1.0,    -- fullscreen stays solid
         blur = { enabled = true, size = 5, passes = 1, vibrancy = 0.2 },
         shadow = { enabled = true, range = 8, render_power = 3 },

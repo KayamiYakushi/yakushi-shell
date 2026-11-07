@@ -870,15 +870,15 @@ def go_on(pid: int, start: int) -> dict:
 
 def stop_unit(unit: str, user: bool) -> dict:
     import subprocess
-    if not re.fullmatch(r"[\w@:.\-\\]+\.service", unit):
+    if not re.fullmatch(r"[\w@:\\][\w@:.\-\\]*\.service", unit):     # never a leading "-"
         return {"ok": False, "message": "Not a service name."}
     if not user:                                 # a system service: as root
-        result, err = as_root(["systemctl", "stop", unit])
+        result, err = as_root(["systemctl", "stop", "--", unit])
         if result == "ok":
             return {"ok": True, "message": f"Stopped {unit}. It may start again at the next boot or when something needs it."}
         return {"ok": False, "wrongPassword": result == "wrong",
                 "message": ROOT_MESSAGES.get(result, err or f"Could not stop {unit}.")}
-    cmd = ["systemctl", "--user", "stop", unit]
+    cmd = ["systemctl", "--user", "stop", "--", unit]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.TimeoutExpired):

@@ -63,8 +63,9 @@ import yakushi_paths as paths
 HERE = paths.SCRIPTS
 HOME = paths.HOME
 TRASH = paths.TRASH
-NAME_RE = re.compile(r"^[A-Za-z0-9@._+-]+$")
-UNIT_RE = re.compile(r"^[A-Za-z0-9@._:+\-]+\.(service|socket|timer|path)$")
+# never a leading "-" or ".": a name must not read as an option (pacman runs as root)
+NAME_RE = re.compile(r"^[A-Za-z0-9@_+][A-Za-z0-9@._+-]*$")
+UNIT_RE = re.compile(r"^[A-Za-z0-9@_:+][A-Za-z0-9@._:+\-]*\.(service|socket|timer|path)$")
 FLATPAK = "flatpak:"
 APP_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)+$")
 WORD_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -200,7 +201,7 @@ def pacman_plan(targets: list[str], cascade: bool) -> tuple[list[str], dict[str,
     """(packages that go, {package: [needed by]} when blocked, error)"""
     # (-n cannot go with --print; the list is the same without it)
     flags = "-Rscp" if cascade else "-Rsp"
-    res = run(["pacman", flags, "--print-format", "%n", *targets], 60, C_LOCALE)
+    res = run(["pacman", flags, "--print-format", "%n", "--", *targets], 60, C_LOCALE)
     if res.returncode == 0:
         return [l.strip() for l in res.stdout.splitlines() if l.strip() and not l.startswith(("::", "warning"))], {}, ""
     blocked: dict[str, list[str]] = {}
@@ -215,14 +216,14 @@ def pacman_plan(targets: list[str], cascade: bool) -> tuple[list[str], dict[str,
 
 
 def package_files(names: list[str]) -> list[str]:
-    res = run(["pacman", "-Qlq", *names], 60)
+    res = run(["pacman", "-Qlq", "--", *names], 60)
     return [l.strip() for l in res.stdout.splitlines() if l.strip()]
 
 
 def unit_state(unit: str, user: bool) -> tuple[bool, bool]:
     base = ["systemctl"] + (["--user"] if user else [])
-    enabled = run(base + ["is-enabled", unit], 10).stdout.strip() in ("enabled", "enabled-runtime", "linked")
-    active = run(base + ["is-active", unit], 10).stdout.strip() in ("active", "activating", "reloading")
+    enabled = run(base + ["is-enabled", "--", unit], 10).stdout.strip() in ("enabled", "enabled-runtime", "linked")
+    active = run(base + ["is-active", "--", unit], 10).stdout.strip() in ("active", "activating", "reloading")
     return enabled, active
 
 
@@ -687,8 +688,8 @@ def remove(request: dict) -> dict:
     gone, still, problems = [], [], []
     asked = False
     if names:
-        script = ('while [ $# -gt 0 ] && [ "$1" != "--" ]; do systemctl disable --now "$1" >/dev/null 2>&1; shift; done; shift; '
-                  'exec pacman ' + ("-Rnsc" if p["cascade"] else "-Rns") + ' --noconfirm "$@"')
+        script = ('while [ $# -gt 0 ] && [ "$1" != "--" ]; do systemctl disable --now -- "$1" >/dev/null 2>&1; shift; done; shift; '
+                  'exec pacman ' + ("-Rnsc" if p["cascade"] else "-Rns") + ' --noconfirm -- "$@"')
         result, err = tasks.as_root(["/bin/sh", "-c", script, "yakushi-remove", *sys_units, "--", *names], 900)
         if result in ("wrong", "cancel", "notallowed"):
             return {"ok": False, "wrongPassword": result == "wrong", "message": tasks.ROOT_MESSAGES[result]}
@@ -722,7 +723,7 @@ def remove(request: dict) -> dict:
     # 2. what kept running, your services
     end_processes(p["running"])
     for u in user_units:
-        run(["systemctl", "--user", "disable", "--now", u], 30)
+        run(["systemctl", "--user", "disable", "--now", "--", u], 30)
 
     # 3. your files -> the Yakushi trash, with a note on how to put it all back
     box = stamp_dir(re.sub(r"[^\w.@+-]", "_", (gone + [f["id"] for f in fp_gone])[0]))
@@ -842,7 +843,7 @@ def undo(box_id: str) -> dict:
             problems.append(f"could not restore {f['path']}")
     for u in m.get("unitsUser", []):
         if UNIT_RE.match(u):
-            run(["systemctl", "--user", "enable", "--now", u], 30)
+            run(["systemctl", "--user", "enable", "--now", "--", u], 30)
     steps = (1 if pkgs else 0) + len(m.get("flatpaks", []))
     if steps and failed_steps == steps and not restored:      # nothing came back: keep the box
         return {"ok": False, "message": "Could not put it back: " + "; ".join(problems)}

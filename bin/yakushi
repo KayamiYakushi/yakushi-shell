@@ -131,6 +131,12 @@ ipc() {
 # the bar cannot touch it.
 # ---------------------------------------------------------------------------
 
+# the package's own PAM service, when it is installed (else lock.qml uses "login")
+pam_service() {
+    [ -r /etc/pam.d/yakushi-lock ] && export YAKUSHI_PAM_SERVICE=yakushi-lock
+    return 0
+}
+
 lock() {
     # one lock at a time: a second `yakushi lock` (auto lock while already
     # locked, a key pressed twice) just returns
@@ -141,6 +147,7 @@ lock() {
     # locked; start it again so you get the password field back. A clean
     # unlock exits 0. A lock that cannot even load (exit 255) never locked
     # anything, so it is not retried for ever.
+    pam_service
     : >"$run/lock.log"
     tries=0
     while [ "$tries" -lt 5 ]; do
@@ -153,6 +160,7 @@ lock() {
 }
 
 lock_preview() {
+    pam_service
     YAKUSHI_LOCK_PREVIEW=1 exec qs -p "$lock_qml" >/dev/null 2>&1 </dev/null
 }
 

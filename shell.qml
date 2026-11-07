@@ -25,6 +25,10 @@ import "launcher"
 ShellRoot {
     id: root
 
+    // No live reload: an update (pacman replaces files one by one) must not
+    // load half-new files. `yakushi restart` loads a new version.
+    Component.onCompleted: Quickshell.watchFiles = false
+
     // ------------------------------------------------------------------
     // Top bar
     // ------------------------------------------------------------------

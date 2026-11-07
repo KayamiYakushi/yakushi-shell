@@ -6,9 +6,10 @@ import Quickshell.Services.Pam
 // Every screen's surface shows and edits this same text, so typing works on
 // whichever screen has the keyboard.
 //
-// The check goes through PAM ("login", like a text console), so the system's
-// own rules apply: wrong-password delay, faillock after repeated failures,
-// fingerprint or OTP modules if the system has them. Only PamResult.Success
+// The check goes through PAM: /etc/pam.d/yakushi-lock when the package put
+// it there (`yakushi lock` passes it on), else "login", like a text console.
+// Either way the system's own rules apply: wrong-password delay, faillock
+// after repeated failures, fingerprint or OTP modules if the system has them. Only PamResult.Success
 // unlocks; any error keeps the screen locked.
 //
 // The typed text is cleared the moment it has been handed to PAM.
@@ -56,7 +57,10 @@ Scope {
     PamContext {
         id: pam
 
-        config: "login"
+        config: {
+            var service = Quickshell.env("YAKUSHI_PAM_SERVICE") || ""
+            return /^[a-z0-9][a-z0-9_-]*$/.test(service) ? service : "login"
+        }
 
         // remembers whether this conversation already used the typed text
         property bool answered: false

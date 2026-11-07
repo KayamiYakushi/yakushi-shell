@@ -27,6 +27,9 @@ dest="$data_home/yakushi-shell"
 src="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
 
 if [ "${1:-}" = "--uninstall" ]; then
+    # stop the shell this copy runs, so the next `yakushi start` (e.g. the
+    # package's) never finds a second bar still up
+    [ -x "$dest/bin/yakushi" ] && "$dest/bin/yakushi" stop 2>/dev/null
     for link in "$bin_dir/yakushi" "$bin_dir/yakushi-share-picker"; do
         # only our own links
         case "$(readlink -- "$link" 2>/dev/null)" in "$dest"/*) rm -f -- "$link" ;; esac
@@ -43,6 +46,10 @@ git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$src is no
 for dep in qs python3 jq wpctl hyprctl timeout setsid; do
     command -v "$dep" >/dev/null || say "warning: '$dep' is not installed; part of the shell will not work."
 done
+
+if pacman -Qq yakushi-shell >/dev/null 2>&1; then
+    say "note: the yakushi-shell package is installed too; this copy in $bin_dir comes first on PATH."
+fi
 
 mkdir -p -- "$data_home" "$bin_dir"
 new="$(mktemp -d -- "$data_home/.yakushi-shell.new.XXXXXX")"

@@ -1,0 +1,4 @@
+#%PAM-1.0
+# Yakushi lock screen: the same checks as a console login (password,
+# faillock, and any other module the system adds to "login").
+auth        include     login

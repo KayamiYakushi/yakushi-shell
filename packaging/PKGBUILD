@@ -1,0 +1,84 @@
+# Yakushi Shell, built from this checkout (what is committed, like ./install.sh).
+#
+#   cd packaging && makepkg -si
+#
+# Every dependency is in the official repositories (core / extra). The source
+# is the local git repository, so building needs no network and no login;
+# for a fresh clone elsewhere, point `source` at the GitHub URL instead.
+
+pkgname=yakushi-shell
+pkgver=r0
+pkgrel=1
+pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
+arch=('any')
+url="https://github.com/KayamiYakushi/yakushi-shell"
+license=('MIT')
+depends=(
+    'quickshell'
+    'qt6-declarative'
+    'hyprland'
+    'python'
+    'jq'
+    'wireplumber'          # wpctl: volume keys
+    'util-linux'           # flock, setsid
+    'coreutils'            # timeout
+    'procps-ng'            # pgrep, pkill
+    'ttf-jetbrains-mono-nerd'
+    'noto-fonts-cjk'       # the Japanese labels
+)
+optdepends=(
+    'awww: wallpapers and the wallpaper picker'
+    'imagemagick: wallpaper picker thumbnails'
+    'cliphist: clipboard history (SUPER + V)'
+    'wl-clipboard: clipboard history'
+    'playerctl: media keys and now playing'
+    'xdg-desktop-portal-hyprland: the screen-share picker'
+    'qt6-imageformats: WebP wallpapers'
+    'networkmanager: Settings -> Network'
+    'bluez-utils: Settings -> Bluetooth'
+    'pavucontrol: advanced sound settings'
+    'cava: the top bar visualizer'
+    'brightnessctl: screen brightness keys'
+    'hyprsunset: night light'
+    'grim: screenshots'
+    'slurp: area screenshots'
+    'libnotify: test notifications from Settings'
+    'polkit: system changes from Settings'
+    'ufw: Settings -> Security firewall'
+    'arch-audit: Settings -> Security known holes'
+    'pacman-contrib: Settings -> Security update check'
+    'lm_sensors: temperatures in the top bar'
+    'pciutils: the GPU name in Settings -> System'
+)
+makedepends=('git')
+backup=('etc/pam.d/yakushi-lock')
+install=yakushi-shell.install
+source=("$pkgname::git+file://${startdir%/packaging}")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$pkgname"
+    printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+package() {
+    cd "$pkgname"
+    local share="$pkgdir/usr/share/$pkgname"
+
+    # the shell itself: committed files, without the packaging and the user installer
+    install -d "$share"
+    git archive --format=tar HEAD | tar -xf - -C "$share"
+    rm -rf "$share/packaging" "$share/install.sh" "$share/.gitignore"
+    printf '%s\n' "$pkgver" > "$share/VERSION"
+
+    # byte-compile the helpers now: /usr/share is read-only for the user
+    python -m compileall -q -d "/usr/share/$pkgname" "$share/scripts" "$share/wallpicker" >/dev/null
+
+    install -d "$pkgdir/usr/bin"
+    ln -s "/usr/share/$pkgname/bin/yakushi" "$pkgdir/usr/bin/yakushi"
+    ln -s "/usr/share/$pkgname/scripts/share-picker.sh" "$pkgdir/usr/bin/yakushi-share-picker"
+
+    install -Dm644 packaging/yakushi-lock.pam "$pkgdir/etc/pam.d/yakushi-lock"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

@@ -4,3 +4,7 @@
 __pycache__/
 *.pyc
 assets/system-profile
+packaging/src/
+packaging/pkg/
+packaging/yakushi-shell/
+*.pkg.tar.*

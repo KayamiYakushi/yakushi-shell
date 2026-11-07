@@ -1,0 +1,13 @@
+post_install() {
+    cat <<'MSG'
+==> Yakushi Shell is in /usr/share/yakushi-shell; the command is /usr/bin/yakushi.
+==> Coming from ./install.sh (a copy in ~/.local/share)? Switch over once:
+      ~/.local/share/yakushi-shell/install.sh --uninstall   (stops the shell, removes the copy)
+      yakushi start
+==> Your settings in ~/.config/yakushi are not touched.
+MSG
+}
+
+post_upgrade() {
+    echo "==> Run 'yakushi restart' to load the new version (the lock screen picks it up on its next start)."
+}

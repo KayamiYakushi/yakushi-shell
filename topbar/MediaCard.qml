@@ -193,17 +193,11 @@ Item {
 
             readonly property real ratio: Math.max(0, Math.min(1, card.position / Math.max(1, card.length)))
 
-            Rectangle {
+            SlantBar {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width
-                height: seekMouse.containsMouse ? 5 : 4
-                color: Theme.tint(Theme.ink, 0.14)
-
-                Rectangle {
-                    width: parent.width * track.ratio
-                    height: parent.height
-                    color: Theme.accent
-                }
+                height: seekMouse.containsMouse ? 6 : 5
+                value: track.ratio
             }
 
             MouseArea {

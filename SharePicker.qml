@@ -316,7 +316,7 @@ PanelWindow {
 
     Timer {
         id: quitTimer
-        interval: Theme.tMid + 80
+        interval: Theme.tSlow + 160      // the card closes back into its notches first
         onTriggered: Qt.quit()
     }
 
@@ -365,27 +365,6 @@ PanelWindow {
         id: saved
     }
 
-    component CornerMark: Item {
-        property bool atRight: false
-        property bool atBottom: false
-
-        width: 18
-        height: 18
-
-        Rectangle {
-            y: parent.atBottom ? parent.height - 2 : 0
-            width: parent.width
-            height: 2
-            color: Theme.accent
-        }
-
-        Rectangle {
-            x: parent.atRight ? parent.width - 2 : 0
-            width: 2
-            height: parent.height
-            color: Theme.accent
-        }
-    }
 
     // A source tile: live preview, number, name, details.
     component SourceTile: Item {
@@ -635,18 +614,11 @@ PanelWindow {
             tint: Theme.accent
         }
 
-        Rectangle {
+        // the card's shape, its corner marks and its opening are TiltCard's
+        Item {
             id: frame
 
             anchors.fill: parent
-            color: Theme.backdrop
-            border.width: 1
-            border.color: Theme.tint(Theme.ink, 0.12)
-
-            CornerMark { x: -4; y: -4 }
-            CornerMark { x: frame.width - width + 4; y: -4; atRight: true }
-            CornerMark { x: -4; y: frame.height - height + 4; atBottom: true }
-            CornerMark { x: frame.width - width + 4; y: frame.height - height + 4; atRight: true; atBottom: true }
 
             // ============ header strip ============
             Item {

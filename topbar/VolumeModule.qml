@@ -110,24 +110,23 @@ Item {
                 NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic }
             }
 
-            Rectangle {
+            SlantBar {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 64
-                height: 4
-                color: Theme.tint(Theme.ink, 0.14)
+                height: 5
+                value: v.level
+                fillColor: v.muted ? Theme.inkSoft : Theme.accent
 
-                Rectangle {
-                    width: parent.width * Math.min(1, v.level)
-                    height: parent.height
-                    color: v.muted ? Theme.inkSoft : Theme.accent
-                }
-
-                Rectangle {
+                // the handle: a short slanted tick
+                CutBox {
                     x: parent.width * Math.min(1, v.level) - width / 2
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 8
-                    height: 8
-                    color: Theme.ink
+                    width: 9
+                    height: 10
+                    cut: 5
+                    cutTopLeft: false
+                    cutBottomRight: false
+                    fill: Theme.ink
                 }
             }
 

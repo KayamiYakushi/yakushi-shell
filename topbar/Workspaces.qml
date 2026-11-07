@@ -2,7 +2,8 @@ import Quickshell.Hyprland
 import QtQuick
 import "../"
 
-// Workspace dots. The active one stretches into an accent-coloured pill.
+// Workspace marks: small slanted bars (the shell's cut diagonal). The
+// active one stretches into a long accent-coloured bar.
 // Click a dot to switch, scroll to step through.
 Item {
     id: ws
@@ -56,7 +57,7 @@ Item {
         id: dots
 
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 5
+        spacing: 4
 
         Repeater {
             model: ws.shown
@@ -69,24 +70,27 @@ Item {
                 readonly property bool active: wsId === ws.activeId
                 readonly property bool used: ws.occupied[wsId] === true
 
-                width: active ? 20 : 7
+                width: active ? 24 : 10
                 height: ws.barHeight
 
                 Behavior on width {
                     NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic }
                 }
 
-                Rectangle {
+                CutBox {
                     anchors.centerIn: parent
                     width: parent.width
                     height: dotMouse.containsMouse && !dot.active ? 9 : 7
-                    color: dot.active
+                    cut: height
+                    cutTopLeft: false
+                    cutBottomRight: false
+                    fill: dot.active
                         ? Theme.accent
                         : dot.used
                             ? Theme.tint(Theme.ink, dotMouse.containsMouse ? 0.85 : 0.55)
                             : Theme.tint(Theme.ink, dotMouse.containsMouse ? 0.45 : 0.18)
 
-                    Behavior on color {
+                    Behavior on fill {
                         ColorAnimation { duration: Theme.tFast }
                     }
 

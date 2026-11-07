@@ -3,6 +3,8 @@ import QtQuick.Shapes
 
 // A box with 45-degree cut corners: the shell's one outline shape (see
 // Theme.cut). Choose which corners are cut; the stroke stays inside the box.
+// With only the top-right and bottom-left corners cut and `cut` as large as
+// the height, it is a slanted bar (a parallelogram), as in SlantBar.
 Shape {
     id: box
 
@@ -16,7 +18,10 @@ Shape {
     property bool cutBottomRight: true
     property bool cutBottomLeft: true
 
-    readonly property real c: Math.max(0, Math.min(cut, width / 2, height / 2))
+    // two cuts on one edge share it; a lone cut may take the whole edge
+    readonly property real c: Math.max(0, Math.min(cut,
+        (cutTopLeft && cutTopRight) || (cutBottomLeft && cutBottomRight) ? width / 2 : width,
+        (cutTopLeft && cutBottomLeft) || (cutTopRight && cutBottomRight) ? height / 2 : height))
     readonly property real o: stroke.a > 0 ? strokeWidth / 2 : 0
     readonly property real tl: cutTopLeft ? c : 0
     readonly property real tr: cutTopRight ? c : 0

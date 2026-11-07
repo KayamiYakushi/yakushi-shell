@@ -44,6 +44,20 @@ so they are right in any language), the shell finds its own files from
 where it runs, and runtime files go to `$XDG_RUNTIME_DIR` (there is no
 `/tmp` fallback, on purpose).
 
+## Design
+
+One shape rule for every part of the shell:
+
+- Outlines (anything that stands on the screen by itself: the island, its
+  cards, pop-ups, the Settings card) get **45-degree cut corners**,
+  `Theme.cut` = 14 px (`Theme.cutLarge` = 18 px for the Settings card).
+- Inside a surface everything is square, or **slanted along the same
+  diagonal** (top-right and bottom-left cut): level bars, progress bars,
+  workspace marks (`SlantBar`, `CutBox`).
+- No rounded corners anywhere.
+- Settings opens from its two corner notches: they cross in the middle,
+  slide apart along the diagonal and land on the card's cut corners.
+
 ## Configuration
 
 Every setting lives in one file, `~/.config/yakushi/config.json`

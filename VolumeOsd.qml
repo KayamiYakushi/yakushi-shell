@@ -73,14 +73,21 @@ PanelWindow {
         }
 
         // speaker
-        Rectangle {
+        Item {
             id: dot
 
             x: 8
             y: (pill.height - height) / 2
             width: 32
             height: 32
-            color: Theme.tint(osd.tone, 0.18)
+
+            CutBox {
+                anchors.fill: parent
+                fill: Theme.tint(osd.tone, 0.18)
+                cut: Theme.cutSmall
+                cutTopLeft: false
+                cutBottomRight: false
+            }
 
             Text {
                 textFormat: Text.PlainText
@@ -95,20 +102,15 @@ PanelWindow {
         }
 
         // level bar
-        Rectangle {
+        SlantBar {
             x: dot.x + dot.width + 14
             y: (pill.height - height) / 2
             width: readout.x - x - 12
-            height: 6
-            color: "#1affffff"
+            height: 8
+            trackColor: "#1affffff"
+            value: osd.silent ? 0 : Math.min(1, osd.level)
 
-            Rectangle {
-                height: parent.height
-                width: osd.silent ? 0 : parent.width * Math.min(1, osd.level)
-                color: Theme.accent
-
-                Behavior on width { NumberAnimation { duration: 100 } }
-            }
+            Behavior on value { NumberAnimation { duration: 100 } }
         }
 
         Text {

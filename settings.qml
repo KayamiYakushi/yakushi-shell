@@ -38,7 +38,7 @@ ShellRoot {
 
     Timer {
         id: quitTimer
-        interval: 450
+        interval: Theme.tSlow + 160      // the card closes back into its notches first
         repeat: false
         onTriggered: Qt.quit()
     }

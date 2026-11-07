@@ -29,12 +29,37 @@ Item {
     property point pointer: Qt.point(0, 0)
 
     // 0 = just the two notches, 1 = the whole card
-    property real reveal: shown ? 1 : 0
+    property real reveal: 0
     readonly property bool opening: reveal < 0.999
 
-    Behavior on reveal {
-        NumberAnimation { duration: card.duration; easing.type: Easing.OutCubic }
+    // Closing is the opening played backwards: ease out on the way open
+    // (quick start, a soft landing on the corners), ease in on the way back
+    // (a soft start from the corners), so the notches stretch and shrink
+    // the same way in both directions.
+    NumberAnimation {
+        id: revealAnim
+
+        target: card
+        property: "reveal"
     }
+
+    function animateReveal() {
+        var to = shown ? 1 : 0
+        revealAnim.stop()
+        if (duration <= 0) {
+            reveal = to
+            return
+        }
+        revealAnim.from = reveal
+        revealAnim.to = to
+        // a reversal halfway takes only the time that part needs
+        revealAnim.duration = Math.max(1, Math.round(duration * Math.abs(to - reveal)))
+        revealAnim.easing.type = shown ? Easing.OutCubic : Easing.InCubic
+        revealAnim.start()
+    }
+
+    onShownChanged: animateReveal()
+    Component.onCompleted: reveal = shown ? 1 : 0
 
     property real tiltX: shown && !still ? -pointer.y * leanDegrees : 0
     property real tiltY: shown && !still ? pointer.x * leanDegrees : 0

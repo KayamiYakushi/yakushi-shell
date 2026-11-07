@@ -9,7 +9,7 @@
 pkgname=yakushi-shell
 pkgver=r43.bcba626
 pkgrel=1
-pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
+pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock and login screen)"
 arch=('any')
 url="https://github.com/KayamiYakushi/yakushi-shell"
 license=('MIT')
@@ -53,9 +53,10 @@ optdepends=(
     'pacman-contrib: Settings -> Security update check'
     'lm_sensors: temperatures in the top bar'
     'pciutils: the GPU name in Settings -> System'
+    'sddm: the Yakushi login screen (Settings -> Login Screen)'
 )
 makedepends=('git')
-backup=('etc/pam.d/yakushi-lock')
+backup=('etc/pam.d/yakushi-lock' 'usr/share/sddm/themes/yakushi/theme.conf')
 install=yakushi-shell.install
 source=("$pkgname::git+file://${startdir%/packaging}")
 sha256sums=('SKIP')
@@ -72,7 +73,7 @@ package() {
     # the shell itself: committed files, without the packaging and the user installer
     install -d "$share"
     git -c tar.umask=022 archive --format=tar HEAD | tar -xf - -C "$share"
-    rm -rf "$share/packaging" "$share/install.sh" "$share/.gitignore"
+    rm -rf "$share/packaging" "$share/install.sh" "$share/.gitignore" "$share/sddm"
     printf '%s\n' "$pkgver" > "$share/VERSION"
 
     # byte-compile the helpers now: /usr/share is read-only for the user
@@ -83,6 +84,13 @@ package() {
     ln -s "/usr/share/$pkgname/scripts/share-picker.sh" "$pkgdir/usr/bin/yakushi-share-picker"
 
     install -Dm644 packaging/yakushi-lock.pam "$pkgdir/etc/pam.d/yakushi-lock"
+
+    # the login screen (SDDM theme) and the small root helper Settings uses
+    # to put your background, accent, clock and picture into it
+    local theme="$pkgdir/usr/share/sddm/themes/yakushi"
+    install -Dm644 -t "$theme" sddm/yakushi/Main.qml sddm/yakushi/CutBox.qml \
+        sddm/yakushi/metadata.desktop sddm/yakushi/theme.conf
+    install -Dm755 scripts/yakushi-sddm-rootctl.py "$pkgdir/usr/lib/$pkgname/yakushi-sddmctl"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

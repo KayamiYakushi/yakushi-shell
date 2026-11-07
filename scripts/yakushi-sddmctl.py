@@ -1,31 +1,45 @@
 #!/usr/bin/env python3
-"""The login screen (SDDM) background, for Settings -> Login Screen.
+"""The login screen (SDDM), for Settings -> Login Screen.
 
     yakushi-sddmctl.py status
     yakushi-sddmctl.py set <image> [--password-stdin]
     yakushi-sddmctl.py reset [--password-stdin]
+    yakushi-sddmctl.py sync [--password-stdin]
 
-The picture you choose is turned into a clean PNG here, as you: an image
-from the internet is never opened as root. Only that PNG goes to the small
-root helper (/usr/local/libexec/yakushi-sddmctl), which checks it is a PNG
-and copies it into the theme. With --password-stdin your password is the
+set / reset: the background. sync: the shell's accent, 12/24 h clock and
+your profile picture, copied into the theme (the greeter runs as the sddm
+user and cannot read your home).
+
+Every picture is turned into a clean PNG here, as you: an image from the
+internet is never opened as root. Only that PNG goes to the small root
+helper (the package's /usr/lib/yakushi-shell/yakushi-sddmctl, else an older
+/usr/local/libexec/yakushi-sddmctl), which checks it is a PNG and copies it
+into the theme. With --password-stdin your password is the
 first line of stdin (Settings asks for it in the page) and goes to sudo
 through a pipe; without it pkexec asks.
 """
 import importlib.util
 import json
 import os
+import pwd
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import yakushi_config as config
 import yakushi_paths as paths
 from urllib.parse import unquote, urlparse
 
 THEME_DIR = Path("/usr/share/sddm/themes/yakushi")
 BACKGROUND = THEME_DIR / "background.png"
-ROOT_HELPER = Path("/usr/local/libexec/yakushi-sddmctl")
+AVATAR = THEME_DIR / "avatar.png"
+LOOK = THEME_DIR / "theme.conf.user"
+# the package's helper first; an older manual install knows only the background
+HELPERS = (Path("/usr/lib/yakushi-shell/yakushi-sddmctl"), Path("/usr/local/libexec/yakushi-sddmctl"))
+ROOT_HELPER = next((h for h in HELPERS if h.is_file()), HELPERS[0])
+CAN_SYNC = ROOT_HELPER == HELPERS[0] and ROOT_HELPER.is_file()
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_BYTES = 100 * 1024 * 1024
 HERE = paths.SCRIPTS
@@ -63,19 +77,19 @@ def run_root(*args):
     stop(tasks.ROOT_MESSAGES.get(result) or err or "Could not update SDDM.")
 
 
-def clean_png(src: Path) -> Path:
-    """the picture as a plain PNG, made without root (at most 4K, no metadata)"""
+def clean_png(src: Path, name="sddm-background.png", box="3840x3840") -> Path:
+    """the picture as a plain PNG, made without root (at most box, no metadata)"""
     magick = shutil.which("magick") or shutil.which("convert")
     if magick is None:
         stop("ImageMagick (magick) is not installed.")
     folder = paths.runtime()
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
-    out = folder / "sddm-background.png"
+    out = folder / name
     out.unlink(missing_ok=True)
     try:
         proc = subprocess.run(
             [magick, "-limit", "memory", "512MiB", "-limit", "map", "1GiB",
-             f"{src}[0]", "-auto-orient", "-strip", "-resize", "3840x3840>", f"PNG24:{out}"],
+             f"{src}[0]", "-auto-orient", "-strip", "-resize", f"{box}>", f"PNG24:{out}"],
             capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         stop("The picture took too long to convert.")
@@ -86,14 +100,39 @@ def clean_png(src: Path) -> Path:
     return out
 
 
+def look():
+    """what the theme has now: accent, clock24, avatar user ('' when unset)"""
+    found = {"accent": "", "clock24": False, "avatarUser": ""}
+    try:
+        text = LOOK.read_text(errors="replace")
+    except OSError:
+        return found
+    for line in text.splitlines():
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if key == "accent" and re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            found["accent"] = value
+        elif key == "clock24":
+            found["clock24"] = value == "true"
+        elif key == "avatarUser":
+            found["avatarUser"] = value
+    return found
+
+
 def status():
     installed = THEME_DIR.is_dir() and ROOT_HELPER.is_file()
     background = BACKGROUND.is_file()
+    current = look()
+    avatar = AVATAR.is_file() and current["avatarUser"] == pwd.getpwuid(os.getuid()).pw_name
     emit(
         True,
         installed=installed,
+        canSync=CAN_SYNC,
         background=background,
         preview=BACKGROUND.as_uri() if background else "",
+        accent=current["accent"],
+        clock24=current["clock24"],
+        avatar=AVATAR.as_uri() if avatar else "",
         message="Yakushi SDDM theme is ready." if installed else "Yakushi SDDM theme is not installed.",
     )
 
@@ -141,6 +180,31 @@ def main():
             background=False,
             preview="",
             message="Login background reset to the default dark Yakushi screen.",
+        )
+        return
+
+    if cmd == "sync" and len(args) == 1:
+        if not CAN_SYNC:
+            stop("The installed login theme is older: update the yakushi-shell package first.")
+        accent = config.section("appearance").get("accent")
+        if not isinstance(accent, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+            accent = "#ffffff"
+        clock = "24" if config.section("topbar").get("clock24") is True else "12"
+        user = pwd.getpwuid(os.getuid()).pw_name
+
+        picture = config.PROFILE_PICTURE
+        png = clean_png(picture, "sddm-avatar.png", "512x512") if picture.is_file() else None
+        try:
+            run_root("set-look", accent, clock, user, png or "-")
+        finally:
+            if png:
+                png.unlink(missing_ok=True)
+        emit(
+            True,
+            accent=accent,
+            clock24=clock == "24",
+            avatar=AVATAR.as_uri() if png else "",
+            message="The login screen now matches the shell. It shows on the next SDDM login.",
         )
         return
 

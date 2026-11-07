@@ -69,9 +69,14 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 Every shortcut can be changed in Settings -> Keybinds. Put a square
 picture in Settings -> System to see yourself on the lock screen.
 
-The Settings -> Login Screen page needs the Yakushi SDDM theme, which lives
-in [yakushidotfiles](https://github.com/KayamiYakushi/yakushidotfiles)
-(`sddm/`); without it the page just says so.
+The login screen is the lock screen's twin: the package installs it as the
+SDDM theme `yakushi` (`sddm/` here). Turn it on once with
+`printf '[Theme]\nCurrent=yakushi\n' | sudo tee /etc/sddm.conf.d/yakushi-theme.conf`,
+then press MATCH THE SHELL in Settings -> Login Screen: it copies your
+accent, 12/24 h clock and profile picture into the theme (the login screen
+runs as the `sddm` user and cannot read your home). The background is chosen
+on the same page. Try the theme without logging out:
+`sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/yakushi`.
 
 ### For development
 

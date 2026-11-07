@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import "../"
@@ -12,6 +13,15 @@ Item {
     property url previewSource: ""
     property bool hasBackground: false
     property string statusMessage: ""
+
+    // what the login screen shares with the shell, as it has it now
+    property bool canSync: false
+    property string loginAccent: ""        // "" = never matched (white)
+    property bool loginClock24: false
+    property url loginAvatar: ""
+    readonly property bool matched: loginAccent !== ""
+        && loginAccent.toLowerCase() === Theme.accent.toString().toLowerCase()
+        && loginClock24 === (Config.topbar.clock24 === true)
 
     function helperPath() {
         return Paths.script("yakushi-sddmctl.py")
@@ -44,7 +54,8 @@ Item {
     function runRoot(args, password) {
         lastArgs = args
         secret = password
-        statusMessage = args[0] === "set" ? "Preparing the picture..." : "Resetting..."
+        statusMessage = args[0] === "set" ? "Preparing the picture..."
+            : args[0] === "sync" ? "Matching the shell..." : "Resetting..."
         rootProc.stdinEnabled = true
         rootProc.command = ["python3", helperPath(), "--password-stdin"].concat(args)
         rootProc.running = true
@@ -56,6 +67,19 @@ Item {
 
     function resetBackground() {
         ask(["reset"])
+    }
+
+    function matchShell() {
+        ask(["sync"])
+    }
+
+    function readLook(data) {
+        if (data.accent !== undefined)
+            page.loginAccent = data.accent || ""
+        if (data.clock24 !== undefined)
+            page.loginClock24 = data.clock24 === true
+        if (data.avatar !== undefined)
+            page.loginAvatar = data.avatar || ""
     }
 
     // first load
@@ -71,6 +95,8 @@ Item {
                     var data = JSON.parse(text)
                     page.hasBackground = data.background === true
                     page.previewSource = data.preview || ""
+                    page.canSync = data.canSync === true
+                    page.readLook(data)
                     if (page.statusMessage === "")
                         page.statusMessage = data.message || ""
                 } catch (e) {
@@ -94,6 +120,27 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 var setting = page.lastArgs[0] === "set"
+                if (page.lastArgs[0] === "sync") {
+                    try {
+                        var look = JSON.parse(text)
+                        if (look.wrongPassword) {
+                            page.pendingArgs = page.lastArgs
+                            page.statusMessage = ""
+                            passwordAsk.error = "Wrong password. Try again."
+                            Qt.callLater(passwordAsk.open)
+                            return
+                        }
+                        page.statusMessage = look.message || (look.ok ? "Done." : "Could not match the shell.")
+                        if (look.ok) {
+                            page.readLook(look)
+                            return
+                        }
+                    } catch (e) {
+                        page.statusMessage = "Could not match the shell."
+                    }
+                    page.loadState()
+                    return
+                }
                 try {
                     var data = JSON.parse(text)
 
@@ -175,41 +222,170 @@ Item {
             }
 
             Image {
+                id: previewImage
+
                 anchors.fill: parent
                 source: page.previewSource
+                sourceSize.width: width
+                sourceSize.height: height
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: false
-                visible: source.toString() !== ""
+                visible: false
+            }
+
+            // blurred like the login itself (scaled down with the preview)
+            MultiEffect {
+                anchors.fill: parent
+                visible: page.previewSource.toString() !== "" && previewImage.status === Image.Ready
+                source: previewImage
+                blurEnabled: true
+                blur: 0.55
+                blurMax: 12
+                autoPaddingEnabled: false
             }
 
             Rectangle {
                 anchors.fill: parent
-                color: "#52000000"
+                color: "black"
+                opacity: 0.55
             }
 
-            Column {
-                anchors.left: parent.left
-                anchors.leftMargin: 26
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 24
-                spacing: 6
+            // a small copy of the login screen, as it is now: the clock,
+            // the picture in its cut outline, the field
+            Item {
+                id: mini
 
-                Text {
-                    textFormat: Text.PlainText
-                    text: "薬"
-                    color: "#ff003c"
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 34
-                    font.bold: true
+                anchors.fill: parent
+
+                readonly property color accent: page.loginAccent !== "" ? page.loginAccent : "#ffffff"
+                readonly property real k: height / 1080
+
+                Column {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: Math.round(mini.height * 0.12)
+                    spacing: 2
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: Qt.formatTime(new Date(), page.loginClock24 ? "HH:mm" : "h:mm")
+                        color: Theme.ink
+                        font.family: Theme.mono
+                        font.pixelSize: Math.round(96 * mini.k * 1.3)
+                        font.weight: Font.Light
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: Qt.locale().toString(new Date(), "dddd  ·  d MMMM")
+                        color: Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 8
+                    }
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: Math.round(mini.height * 0.08)
+                    spacing: 6
+
+                    Item {
+                        id: miniPicture
+
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 40
+                        height: 40
+
+                        readonly property bool has: miniPhoto.status === Image.Ready
+
+                        Image {
+                            id: miniPhoto
+
+                            anchors.fill: parent
+                            visible: false
+                            source: page.loginAvatar
+                            sourceSize.width: 80
+                            sourceSize.height: 80
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                        }
+
+                        CutBox {
+                            id: miniMask
+
+                            anchors.fill: parent
+                            visible: false
+                            layer.enabled: true
+                            cut: 6
+                            fill: "white"
+                        }
+
+                        MultiEffect {
+                            anchors.fill: parent
+                            visible: miniPicture.has
+                            source: miniPhoto
+                            maskEnabled: true
+                            maskSource: miniMask
+                            maskThresholdMin: 0.5
+                            maskSpreadAtMin: 1
+                        }
+
+                        CutBox {
+                            anchors.fill: parent
+                            visible: !miniPicture.has
+                            cut: 6
+                            fill: Theme.tint(Theme.card, 0.85)
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !miniPicture.has
+                            textFormat: Text.PlainText
+                            text: (Quickshell.env("USER") || "?").charAt(0).toUpperCase()
+                            color: Theme.inkSoft
+                            font.family: Theme.mono
+                            font.pixelSize: 16
+                        }
+
+                        CutBox {
+                            anchors.fill: parent
+                            cut: 6
+                            stroke: mini.accent
+                            strokeWidth: 1.5
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: Quickshell.env("USER") || ""
+                        color: Theme.ink
+                        font.family: Theme.mono
+                        font.pixelSize: 9
+                    }
+
+                    CutBox {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 124
+                        height: 20
+                        cut: 5
+                        fill: Qt.rgba(0, 0, 0, 0.5)
+                        stroke: mini.accent
+                        strokeWidth: 1
+                    }
                 }
 
                 Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 12
                     textFormat: Text.PlainText
-                    text: page.hasBackground
-                        ? "CUSTOM LOGIN BACKGROUND"
-                        : "DEFAULT DARK LOGIN"
-                    color: "#b0b0b0"
+                    text: page.hasBackground ? "CUSTOM BACKGROUND" : "PLAIN BLACK"
+                    color: Theme.inkSoft
                     font.family: Theme.mono
                     font.pixelSize: 9
                     font.letterSpacing: 1
@@ -271,6 +447,35 @@ Item {
                     onClicked: page.resetBackground()
                 }
             }
+
+            // accent, clock and picture from the shell (the greeter cannot read them itself)
+            Rectangle {
+                width: 170
+                height: 38
+                visible: page.canSync
+                color: matchMouse.containsMouse && !page.matched ? Theme.tint(Theme.accent, 0.10) : "transparent"
+                border.width: 1
+                border.color: page.matched ? Theme.line : Theme.accent
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.centerIn: parent
+                    text: "MATCH THE SHELL"
+                    color: page.matched ? Theme.inkSoft : Theme.ink
+                    font.family: Theme.mono
+                    font.pixelSize: 10
+                    font.letterSpacing: 1
+                }
+
+                MouseArea {
+                    id: matchMouse
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.matchShell()
+                }
+            }
         }
 
         PasswordRow {
@@ -279,8 +484,9 @@ Item {
             width: parent.width
             visible: page.pendingArgs.length > 0
             label: page.pendingArgs[0] === "reset" ? "Your password, to reset the login background"
-                                                    : "Your password, to change the login background"
-            action: page.pendingArgs[0] === "reset" ? "RESET" : "SET"
+                 : page.pendingArgs[0] === "sync" ? "Your password, to give the login screen the shell's look"
+                 : "Your password, to change the login background"
+            action: page.pendingArgs[0] === "reset" ? "RESET" : page.pendingArgs[0] === "sync" ? "MATCH" : "SET"
             onAccepted: function(password) {
                 var args = page.pendingArgs
                 page.pendingArgs = []
@@ -308,7 +514,7 @@ Item {
         Text {
             textFormat: Text.PlainText
             width: parent.width
-            text: "The picture is made into a clean PNG as you (never opened as root), then copied into the system SDDM theme with your password. Your file stays untouched."
+            text: "Pictures are made into clean PNGs as you (never opened as root), then copied into the system SDDM theme with your password. Your files stay untouched. MATCH THE SHELL copies your accent, 12/24 h clock and profile picture: the login screen cannot read your home."
             color: Theme.inkMute
             font.family: Theme.mono
             font.pixelSize: 9

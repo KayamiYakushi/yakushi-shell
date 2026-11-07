@@ -8,9 +8,13 @@ post_install() {
       ~/.local/share/yakushi-shell/install.sh --uninstall   (stops the shell, removes the copy)
       yakushi start
 ==> Your settings in ~/.config/yakushi are not touched.
+==> The login screen is the SDDM theme "yakushi". To use it, once:
+      printf '[Theme]\nCurrent=yakushi\n' | sudo tee /etc/sddm.conf.d/yakushi-theme.conf
+    then Settings -> Login Screen -> MATCH THE SHELL.
 MSG
 }
 
 post_upgrade() {
     echo "==> Run 'yakushi restart' to load the new version (the lock screen picks it up on its next start)."
+    echo "==> The login screen (SDDM) changes on the next login; Settings -> Login Screen -> MATCH THE SHELL copies your accent, clock and picture into it."
 }

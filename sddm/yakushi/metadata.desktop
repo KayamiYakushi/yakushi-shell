@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=Yakushi
+Description=The Yakushi Shell login screen: the lock screen's twin
+Author=KayamiYakushi
+License=MIT
+Type=sddm-theme
+Version=2.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=yakushi
+Theme-API=2.0
+QtVersion=6

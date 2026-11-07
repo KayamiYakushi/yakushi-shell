@@ -76,8 +76,9 @@ ShellRoot {
     IpcHandler {
         target: "topbar"
 
-        // Settings pings this after saving, so changes apply at once even
-        // if the file watcher missed an atomic replace.
+        // Read the config again by hand (it is watched, so this is only
+        // needed after editing config.json in an editor that confuses
+        // inotify).
         function reload(): void {
             barConfig.reload()
         }

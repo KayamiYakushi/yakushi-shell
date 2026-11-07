@@ -11,61 +11,22 @@ Commands:
                               order        comma-separated module ids
                               module.<id>  on | off
     sensors                 Print the CPU/GPU temperature files as JSON.
-    init                    Write the defaults if no settings file exists.
+    init                    Create the config file if it is missing.
 
-Settings live in ~/.config/quickshell/yakushi-topbar.local.json
-(machine-local, git-ignored). The island bar watches that file with inotify,
-so changes apply instantly without polling or restarts.
+Settings live in the "topbar" section of ~/.config/yakushi/config.json
+(see yakushi_config.py). The shell watches that file with inotify and is
+pinged over IPC after a save, so changes apply instantly without polling.
 Runs only when called: no daemon, no timers.
 """
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
-
-def write_safely(path, text: str) -> None:
-    """Write a config file in place (same file, so watchers and symlinks keep
-    working), but only after a trial copy proved the disk has room for it: on
-    a full disk the old file stays whole instead of ending up empty."""
-    real = os.path.realpath(path)
-    data = text.encode()
-    trial = os.path.join(os.path.dirname(real), "." + os.path.basename(real) + ".yakushi-new")
-    try:
-        with open(trial, "wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-    finally:
-        try:
-            os.unlink(trial)
-        except OSError:
-            pass
-    try:
-        with open(real, "rb") as f:
-            old = f.read()
-    except FileNotFoundError:
-        old = None
-    try:
-        with open(real, "r+b" if old is not None else "wb") as f:
-            f.write(data)
-            f.truncate()
-    except OSError:
-        if old is not None:                      # put the old one back
-            with open(real, "r+b") as f:
-                f.write(old)
-                f.truncate()
-        raise
+import yakushi_config as config
 
 
-HOME = Path.home()
-DIR = HOME / ".config/quickshell"
-STATE = DIR / "yakushi-topbar.local.json"
-SHELL_QML = Path(__file__).resolve().parent.parent / "shell.qml"
 
 MODULES = (
     "workspaces",
@@ -154,16 +115,9 @@ def clean_order(items) -> list[str]:
     return order
 
 
-def load() -> dict:
+def sanitize(saved: dict) -> dict:
+    """The saved section, with defaults filled in and bad values dropped."""
     state = json.loads(json.dumps(DEFAULTS))
-
-    try:
-        saved = json.loads(STATE.read_text())
-    except (OSError, ValueError):
-        return state
-
-    if not isinstance(saved, dict):
-        return state
 
     for key in ("seconds", "clock24"):
         if isinstance(saved.get(key), bool):
@@ -188,37 +142,8 @@ def load() -> dict:
     return state
 
 
-def save(state: dict) -> None:
-    DIR.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(state, indent=2) + "\n"
-
-    fd, tmp = tempfile.mkstemp(dir=str(DIR), prefix=".topbar-")
-    try:
-        with os.fdopen(fd, "w") as handle:
-            handle.write(payload)
-        os.replace(tmp, STATE)
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-
-    ping_island()
-
-
-def ping_island() -> None:
-    """Tell a running island bar to re-read its settings (best effort)."""
-    try:
-        subprocess.Popen(
-            ["qs", "-p", str(SHELL_QML), "ipc", "call", "topbar", "reload"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except OSError:
-        pass
+def load() -> dict:
+    return sanitize(config.section("topbar"))
 
 
 # ---------------------------------------------------------------------------
@@ -230,48 +155,53 @@ def get() -> None:
 
 
 def set_value(key: str, raw: str) -> None:
-    state = load()
     message = ""
 
-    if key == "seconds":
-        state["seconds"] = on_off(raw)
-        save(state)
-        message = "Seconds " + ("on." if state["seconds"] else "off.")
+    def change(saved: dict) -> dict:
+        nonlocal message
+        state = sanitize(saved)
 
-    elif key == "clock24":
-        state["clock24"] = on_off(raw)
-        save(state)
-        message = ("24-hour" if state["clock24"] else "12-hour") + " clock."
+        if key == "seconds":
+            state["seconds"] = on_off(raw)
+            message = "Seconds " + ("on." if state["seconds"] else "off.")
 
-    elif key == "opacity":
-        try:
-            value = clamp(float(raw))
-        except ValueError:
-            fail("Invalid opacity.")
-            return
-        state["opacity"] = round(value, 3)
-        save(state)
-        message = f"Top bar opacity {round(value * 100)}%."
+        elif key == "clock24":
+            state["clock24"] = on_off(raw)
+            message = ("24-hour" if state["clock24"] else "12-hour") + " clock."
 
-    elif key == "visualizer":
-        if raw not in VISUALIZER_MODES:
-            fail("Visualizer must be hover, always or off.")
-        state["visualizer"] = raw
-        save(state)
+        elif key == "opacity":
+            try:
+                value = clamp(float(raw))
+            except ValueError:
+                fail("Invalid opacity.")
+                return
+            state["opacity"] = round(value, 3)
+            message = f"Top bar opacity {round(value * 100)}%."
 
-    elif key == "order":
-        if raw == "default":
-            state["order"] = list(DEFAULT_ORDER)
+        elif key == "visualizer":
+            if raw not in VISUALIZER_MODES:
+                fail("Visualizer must be hover, always or off.")
+            state["visualizer"] = raw
+
+        elif key == "order":
+            if raw == "default":
+                state["order"] = list(DEFAULT_ORDER)
+            else:
+                state["order"] = clean_order(raw.split(","))
+
+        elif key.startswith("module.") and key[7:] in MODULES:
+            state["modules"][key[7:]] = on_off(raw)
+
         else:
-            state["order"] = clean_order(raw.split(","))
-        save(state)
+            fail(f"Unknown setting: {key}")
 
-    elif key.startswith("module.") and key[7:] in MODULES:
-        state["modules"][key[7:]] = on_off(raw)
-        save(state)
+        return state
 
-    else:
-        fail(f"Unknown setting: {key}")
+    try:
+        state = config.update("topbar", change)
+    except config.NewerConfig as error:
+        fail(str(error))
+        return
 
     emit({"ok": True, **state, "message": message})
 
@@ -328,8 +258,7 @@ def main() -> None:
     elif args == ["sensors"]:
         sensors()
     elif args == ["init"]:
-        if not STATE.exists():
-            save(load())
+        config.load()
         emit({"ok": True})
     else:
         fail("Usage: get | set <key> <value> | sensors | init")

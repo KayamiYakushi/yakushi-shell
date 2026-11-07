@@ -51,6 +51,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yakushi_config as config
+
 
 def write_safely(path, text: str) -> None:
     """Write a config file in place (same file, so watchers and symlinks keep
@@ -88,8 +90,6 @@ def write_safely(path, text: str) -> None:
 
 HOME = Path.home()
 CONFIG = HOME / ".config"
-STATE = CONFIG / "quickshell/yakushi-term.local.json"
-UI_STATE = CONFIG / "quickshell/yakushi-ui.local.json"
 HYPR_CONF = CONFIG / "hypr/hyprland.lua"
 
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -115,22 +115,19 @@ def emit(obj: dict) -> None:
 # State
 # ---------------------------------------------------------------------------
 
+# The "terminal" section of ~/.config/yakushi/config.json (yakushi_config.py).
+
 def load_state() -> dict:
-    try:
-        data = json.loads(STATE.read_text())
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return config.section("terminal")
 
 
 def save_state(state: dict) -> None:
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps(state, indent=2) + "\n")
+    config.replace("terminal", state)
 
 
 def accent() -> str:
     try:
-        value = json.loads(UI_STATE.read_text()).get("accent")
+        value = config.section("appearance").get("accent")
         if isinstance(value, str) and HEX.match(value):
             return value.lower()
     except (OSError, ValueError, AttributeError):
@@ -832,4 +829,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except config.NewerConfig as error:
+        emit({"ok": False, "message": str(error)})
+        raise SystemExit(1)

@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 
@@ -24,20 +23,6 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "yakushi-osd"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-
-    // follow the accent picked in Settings -> Appearance
-    FileView {
-        path: (Quickshell.env("HOME") || "") + "/.config/quickshell/yakushi-ui.local.json"
-        printErrors: false
-        onLoaded: {
-            try {
-                var hex = JSON.parse(text()).accent
-                if (/^#[0-9a-fA-F]{6}$/.test(hex))
-                    Theme.accent = hex
-            } catch (e) {
-            }
-        }
-    }
 
     PwObjectTracker {
         objects: [Pipewire.defaultAudioSink]

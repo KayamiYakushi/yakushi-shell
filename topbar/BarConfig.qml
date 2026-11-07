@@ -1,18 +1,14 @@
-import Quickshell
-import Quickshell.Io
 import QtQuick
 import "../"
 
-// Top bar settings, read from ~/.config/quickshell/yakushi-topbar.local.json
-// (written by Settings -> Top Bar). The file is watched with inotify and
-// Settings also pings the bar over IPC, so changes apply instantly with no
-// polling. The accent colour follows Settings -> Appearance the same way.
+// Top bar settings: the "topbar" section of the config (Config.topbar,
+// written by Settings -> Top Bar), checked and filled in with defaults.
+// The accent colour follows Config.appearance. Both apply the moment the
+// config file changes (inotify); nothing polls and nothing needs a ping.
 Item {
     id: cfg
 
     visible: false
-
-    readonly property string home: Quickshell.env("HOME") || ""
 
     property bool seconds: true
     property bool clock24: true
@@ -38,30 +34,10 @@ Item {
     })
 
     function reload() {
-        stateFile.reload()
-        uiFile.reload()
+        Config.reload()
     }
 
-    function apply(raw) {
-        var data
-
-        try {
-            data = JSON.parse(raw)
-        } catch (e) {
-            // Caught the file mid-write: read it again shortly (a few times
-            // only: a broken file must not keep the bar busy forever).
-            if (retries < 5) {
-                retries += 1
-                retry.restart()
-            }
-            return
-        }
-        retries = 0
-
-        if (!data || typeof data !== "object")
-            return
-
-
+    function apply(data) {
         if (typeof data.seconds === "boolean")
             seconds = data.seconds
 
@@ -101,47 +77,25 @@ Item {
         }
     }
 
-    function applyUi(raw) {
-        try {
-            var data = JSON.parse(raw)
+    function applyAppearance(data) {
+        if (typeof data.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(data.accent))
+            Theme.accent = data.accent
+    }
 
-            if (typeof data.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(data.accent))
-                Theme.accent = data.accent
-        } catch (e) {
+    Component.onCompleted: {
+        apply(Config.topbar)
+        applyAppearance(Config.appearance)
+    }
+
+    Connections {
+        target: Config
+
+        function onTopbarChanged() {
+            cfg.apply(Config.topbar)
         }
-    }
 
-    property int retries: 0
-
-    Timer {
-        id: retry
-        interval: 150
-        repeat: false
-        onTriggered: stateFile.reload()
-    }
-
-    FileView {
-        id: stateFile
-
-        path: cfg.home + "/.config/quickshell/yakushi-topbar.local.json"
-        watchChanges: true
-        printErrors: false
-
-        onFileChanged: {
-            cfg.retries = 0
-            reload()
+        function onAppearanceChanged() {
+            cfg.applyAppearance(Config.appearance)
         }
-        onLoaded: cfg.apply(text())
-    }
-
-    FileView {
-        id: uiFile
-
-        path: cfg.home + "/.config/quickshell/yakushi-ui.local.json"
-        watchChanges: true
-        printErrors: false
-
-        onFileChanged: reload()
-        onLoaded: cfg.applyUi(text())
     }
 }

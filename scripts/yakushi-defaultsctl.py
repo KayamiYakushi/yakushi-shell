@@ -438,7 +438,7 @@ def set_default(key: str, app_id: str) -> None:
     if key == "terminal":
         set_xdg_terminal(app_id)
         # the terminal colours / blur follow the new terminal
-        termctl = CONFIG / "quickshell/scripts/yakushi-termctl.py"
+        termctl = Path(__file__).resolve().parent / "yakushi-termctl.py"
         if termctl.exists():
             subprocess.Popen(["python3", str(termctl), "sync"], stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)

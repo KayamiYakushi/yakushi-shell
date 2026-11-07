@@ -4,10 +4,10 @@ import Quickshell.Io
 
 // Persists the Settings look (panel opacity + accent colour).
 //
-// Settings is a short-lived process, so these values used to reset to their
-// defaults every time it was reopened. This loads them once at start-up and
-// saves them (debounced) whenever they change. Nothing runs in the
-// background: one tiny helper call per change burst, none while idle.
+// Settings is a short-lived process, so these values would reset to their
+// defaults every time it was reopened. This takes them from Config once at
+// start-up and saves them (debounced) whenever they change. Nothing runs in
+// the background: one tiny helper call per change burst, none while idle.
 Item {
     id: state
 
@@ -60,9 +60,24 @@ Item {
         saveProc.running = true
     }
 
-    Component.onCompleted: {
-        loadProc.command = ["python3", helper, "get"]
-        loadProc.running = true
+    // Load once only: later saves must not pull a slider back mid-drag.
+    property bool started: false
+
+    function start() {
+        if (started || !Config.loaded)
+            return
+        started = true
+        apply(Config.appearance)
+    }
+
+    Component.onCompleted: start()
+
+    Connections {
+        target: Config
+
+        function onLoadedChanged() {
+            state.start()
+        }
     }
 
     Connections {
@@ -83,22 +98,6 @@ Item {
         interval: 250
         repeat: false
         onTriggered: state.flush()
-    }
-
-    Process {
-        id: loadProc
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var data = JSON.parse(text)
-
-                    if (data.ok)
-                        state.apply(data)
-                } catch (e) {
-                }
-            }
-        }
     }
 
     Process {

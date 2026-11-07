@@ -27,9 +27,9 @@ Item {
     property real gpuUse: -1
     property string vram: ""
 
-    // ---- picture (assets/system-profile, chosen with the in-card picker)
+    // ---- picture (Config.profilePicture, chosen with the in-card picker)
     property int pictureRev: 0
-    readonly property url picture: "file://" + home + "/.config/quickshell/assets/system-profile"
+    readonly property url picture: "file://" + Config.profilePicture
         + (pictureRev > 0 ? "?v=" + pictureRev : "")
 
     function pickPicture() {

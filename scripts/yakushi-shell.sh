@@ -40,9 +40,9 @@ stop_settings() {
 start() {
     running && return 0
     stop_settings
-    # First run: write the bar defaults so the bar has a file to watch.
-    [ -e "$HOME/.config/quickshell/yakushi-topbar.local.json" ] ||
-        python3 "$root/scripts/yakushi-topbarctl.py" init >/dev/null 2>&1
+    # Create the config (carrying over old settings) or upgrade it first, so
+    # the shell finds a current file to watch.
+    python3 "$root/scripts/yakushi-configctl.py" init >/dev/null 2>&1
     setsid qs -n -p "$shell_qml" >"$log_file" 2>&1 </dev/null &
     printf '%s\n' "$!" >"$pid_file"
 }

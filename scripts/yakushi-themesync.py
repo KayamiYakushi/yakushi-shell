@@ -19,6 +19,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import yakushi_config as config
+
 
 def write_safely(path, text: str) -> None:
     """Write a config file in place (same file, so watchers and symlinks keep
@@ -55,7 +57,6 @@ def write_safely(path, text: str) -> None:
 
 
 HOME = Path.home()
-UI_STATE = HOME / ".config/quickshell/yakushi-ui.local.json"
 ROFI_ACCENT = HOME / ".config/rofi/accent.rasi"
 HYPRLOCK = HOME / ".config/hypr/hyprlock.conf"
 HELPERS = (
@@ -67,7 +68,7 @@ HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 def accent() -> str:
     try:
-        value = json.loads(UI_STATE.read_text()).get("accent")
+        value = config.section("appearance").get("accent")
         if isinstance(value, str) and HEX.match(value):
             return value.lower()
     except (OSError, ValueError, AttributeError):

@@ -22,6 +22,29 @@ wrappers kept so existing keybinds keep working. The screen-share picker
 (`share-picker-shell.qml`) and the wallpaper picker stay separate
 processes for now.
 
+## Configuration
+
+Every setting lives in one file, `~/.config/yakushi/config.json`
+(`$XDG_CONFIG_HOME` is honoured), next to `profile-picture`:
+
+```json
+{
+  "version": 1,
+  "topbar":     { "seconds": true, "clock24": true, "opacity": 0.9, ... },
+  "appearance": { "panelOpacity": 0.9, "accent": "#ff7a9d" },
+  "terminal":   { "enabled": true, "opacity": 0.7, ... }
+}
+```
+
+- Settings writes it through the helpers in `scripts/` (`yakushi_config.py`):
+  atomically, under a lock, private to you (0600). The shell watches it, so
+  a change applies at once with no polling and no restart.
+- On first start the old `~/.config/quickshell/*.local.json` settings and
+  profile picture are carried over (the old files are left alone).
+- A broken file is kept as `config.json.broken-<time>` and the defaults are
+  used; a file from a newer Yakushi is never overwritten.
+- `scripts/yakushi-configctl.py init | path | get [section]`.
+
 ## Principles
 
 1. **Arch official repositories only.** Every dependency comes from `core`,
@@ -37,7 +60,8 @@ processes for now.
 
 1. ✅ Single entry point (`shell.qml`) with one IPC surface — Settings runs
    as the shell's child process so it frees all its memory when closed
-2. One versioned config (`~/.config/yakushi/config.json`) behind a `Config` singleton
-3. Code read-only, user state in `~/.config/yakushi` / `~/.local/state/yakushi`
+2. ✅ One versioned config (`~/.config/yakushi/config.json`) behind a `Config` singleton
+3. ✅ Code read-only, user state in `~/.config/yakushi` / `~/.local/state/yakushi`
+   (left: the wallpaper picker's cache still sits in `~/.cache/quickshell`)
 4. Own notifications, launcher, power menu and lock screen (replacing swaync, rofi, wlogout, hyprlock)
 5. Compositor abstraction (Niri later), PKGBUILD and a `yakushi` CLI

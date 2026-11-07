@@ -140,7 +140,7 @@ def your_terminal() -> list[str]:
     raise SystemExit("no terminal found (hyprland.lua `terminal = ...` or $TERMINAL)")
 
 
-def terminal(exec_line: str) -> None:
+def terminal(exec_line: str, wait: bool = False) -> None:
     # Desktop entry field codes (%f, %U, ...) mean nothing without files.
     argv = [a for a in shlex.split(exec_line) if not re.fullmatch(r"%[fFuUdDnNickvm]", a)]
     if not argv:
@@ -157,6 +157,10 @@ def terminal(exec_line: str) -> None:
         cmd = term + argv
     if shutil.which(cmd[0]) is None:
         raise SystemExit(f"terminal not found: {cmd[0]}")
+    if wait:                                   # until the window closes (Settings -> Security)
+        subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, start_new_session=True)
+        return
     subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, start_new_session=True)
 
@@ -171,10 +175,10 @@ def main() -> None:
         import_rofi()
     elif len(args) == 2 and args[0] == "used":
         used(args[1])
-    elif len(args) == 2 and args[0] == "terminal":
-        terminal(args[1])
+    elif len(args) in (2, 3) and args[0] == "terminal" and args[2:] in ([], ["--wait"]):
+        terminal(args[1], wait=len(args) == 3)
     else:
-        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | terminal <Exec line>")
+        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | terminal <Exec line> [--wait]")
 
 
 if __name__ == "__main__":

@@ -256,11 +256,11 @@ Item {
         }
     }
 
-    // when pacman needs a decision from you: the same update in a terminal
+    // when pacman needs a decision from you: the same update in your terminal
     Process {
         id: terminal
-        command: ["kitty", "--title", "Yakushi · system update", "sh", "-c",
-                  "sudo pacman -Syu; echo; printf 'Done. Press Enter to close.'; read x"]
+        command: ["python3", Paths.script("yakushi-launchctl.py"), "terminal",
+                  "sh -c 'sudo pacman -Syu; echo; printf \"Done. Press Enter to close.\"; read x'", "--wait"]
         onExited: page.run(["updates"], "", "Checking again for updates…")
     }
 

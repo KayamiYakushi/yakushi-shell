@@ -542,6 +542,7 @@ PanelWindow {
             height: 102
             open: win.powerOpen
             onCloseRequested: win.powerOpen = false
+            onActivity: if (!win.powerTouched) powerIdle.restart()
             onRun: function(args) { win.run(args) }
         }
     }

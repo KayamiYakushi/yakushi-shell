@@ -16,6 +16,7 @@ Item {
 
     signal run(var args)
     signal closeRequested()
+    signal activity()        // a key was used: the menu is not idle
 
     readonly property var actions: [
         { key: "lock",     label: "Lock",      glyph: 0xF033E, confirm: false,
@@ -107,6 +108,7 @@ Item {
                 return
             }
             event.accepted = true
+            card.activity()
         }
     }
 
@@ -118,17 +120,34 @@ Item {
         anchors.right: parent.right
         height: 16
 
-        Text {
-            textFormat: Text.PlainText
+        Row {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: card.armedIndex >= 0
-                ? "Click again to " + card.actions[card.armedIndex].label.toLowerCase()
-                : "POWER"
-            color: card.armedIndex >= 0 ? Theme.alert : Theme.inkSoft
-            font.family: Theme.mono
-            font.pixelSize: card.armedIndex >= 0 ? 10 : 9
-            font.letterSpacing: card.armedIndex >= 0 ? 0.5 : 2
+            spacing: 8
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                text: card.armedIndex >= 0
+                    ? "Click again to " + card.actions[card.armedIndex].label.toLowerCase()
+                    : "POWER"
+                color: card.armedIndex >= 0 ? Theme.alert : Theme.inkSoft
+                font.family: Theme.mono
+                font.pixelSize: card.armedIndex >= 0 ? 10 : 9
+                font.letterSpacing: card.armedIndex >= 0 ? 0.5 : 2
+            }
+
+            // the same pairing as Settings' header (SETTINGS 設定)
+            Text {
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                visible: card.armedIndex < 0
+                text: "電源"
+                color: Theme.inkMute
+                font.family: "Noto Sans CJK JP"
+                font.pixelSize: 9
+                font.letterSpacing: 2
+            }
         }
 
         Text {

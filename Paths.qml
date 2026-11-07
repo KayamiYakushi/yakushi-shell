@@ -30,6 +30,10 @@ Singleton {
     readonly property string shell: Quickshell.shellDir
     readonly property string scripts: shell + "/scripts"
 
+    // Put in front of any program the shell starts for you (apps, terminal,
+    // Settings): the shell's own renderer setting is not passed on.
+    readonly property var cleanEnv: ["env", "-u", "QT_QUICK_BACKEND", "-u", "YAKUSHI_SHELL_RENDERER"]
+
     function script(name) {
         return scripts + "/" + name
     }

@@ -39,6 +39,13 @@ shell_qml="$root/shell.qml"
 settings_qml="$root/settings.qml"
 lock_qml="$root/lock.qml"
 
+# The shell may run with a renderer of its own (see start). That is for the
+# shell process alone: anything it starts through this script (the lock,
+# the sleep guard, ...) gets the system's normal renderer back.
+if [ -n "${YAKUSHI_SHELL_RENDERER:-}" ]; then
+    unset QT_QUICK_BACKEND YAKUSHI_SHELL_RENDERER
+fi
+
 die() {
     printf 'yakushi: %s\n' "$*" >&2
     exit 1
@@ -85,7 +92,16 @@ start() {
     # Create the config (carrying over old settings) or upgrade it first, so
     # the shell finds a current file to watch.
     python3 "$scripts/yakushi-configctl.py" init >/dev/null 2>&1
-    setsid qs -n -p "$shell_qml" >"$log_file" 2>&1 </dev/null &
+    # Renderer: "gpu" (default) or "software" (draws on the CPU: ~50 MB less
+    # memory, animations cost CPU). YAKUSHI_RENDERER=software yakushi restart
+    # tries it until the next login.
+    case "${YAKUSHI_RENDERER:-gpu}" in
+        software)
+            setsid env -u YAKUSHI_RENDERER QT_QUICK_BACKEND=software YAKUSHI_SHELL_RENDERER=software \
+                qs -n -p "$shell_qml" >"$log_file" 2>&1 </dev/null & ;;
+        *)
+            setsid env -u YAKUSHI_RENDERER qs -n -p "$shell_qml" >"$log_file" 2>&1 </dev/null & ;;
+    esac
     printf '%s\n' "$!" >"$pid_file"
 }
 

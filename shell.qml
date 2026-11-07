@@ -121,7 +121,7 @@ ShellRoot {
     Process {
         id: settings
 
-        command: ["qs", "-n", "-p", root.settingsQml]
+        command: Paths.cleanEnv.concat(["qs", "-n", "-p", root.settingsQml])
     }
 
     function settingsCall(fn: string, page: string): void {

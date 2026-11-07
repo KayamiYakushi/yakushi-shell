@@ -257,7 +257,7 @@ PanelWindow {
         id: card
 
         anchors.centerIn: parent
-        width: Math.min(500, launcher.width - 40)
+        width: Math.min(460, launcher.width - 40)
         height: Math.min(490, launcher.height - 40)
         leanDegrees: 2
         duration: launcher.animation

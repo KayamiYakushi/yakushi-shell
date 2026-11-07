@@ -102,6 +102,10 @@ stop() {
     fi
     rm -f "$pid_file"
     stop_settings
+    # the sleep guard ends with the shell by itself; this also ends one left
+    # over from a shell that had no such link (it would keep the guard lock)
+    pkill -TERM -u "$(id -u)" -f '^bash [^ ]*/scripts/yakushi-sleepguard\.sh ' 2>/dev/null
+    return 0
 }
 
 call() {
@@ -258,7 +262,9 @@ case "$cmd" in
             *)       usage ;;
         esac ;;
     suspend)  suspend_session ;;
-    sleep-guard) exec bash "$scripts/yakushi-sleepguard.sh" "$self" ;;   # started by the shell
+    # started by the shell; the kernel ends it (TERM) when the shell process
+    # dies, however it dies, so an old guard never outlives its shell
+    sleep-guard) exec setpriv --pdeathsig TERM bash "$scripts/yakushi-sleepguard.sh" "$self" ;;
     notifications)
         case "${1:-}" in
             on|off) exec python3 "$scripts/yakushi-notifyctl.py" set enabled "$1" ;;

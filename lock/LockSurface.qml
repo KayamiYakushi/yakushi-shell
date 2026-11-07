@@ -273,6 +273,7 @@ Item {
 
                     // no copy, cut or paste out of (or into) the field
                     Keys.onPressed: function(event) {
+                        surface.context.keyPressed()
                         if (event.matches(StandardKey.Copy) || event.matches(StandardKey.Cut)
                                 || event.matches(StandardKey.Paste) || event.matches(StandardKey.SelectAll))
                             event.accepted = true
@@ -299,14 +300,50 @@ Item {
                     font.letterSpacing: 1
                 }
 
+                // Caps Lock on: a quiet tag at the field's right end
+                Row {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6
+                    opacity: surface.context.capsLock && !surface.context.busy ? 1 : 0
+                    visible: opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.tFast }
+                    }
+
+                    CutBox {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 5
+                        height: 12
+                        fill: Theme.accent
+                        cut: 5
+                        cutTopLeft: false
+                        cutBottomRight: false
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: "CAPS"
+                        color: Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 12
+                        font.letterSpacing: 2
+                    }
+                }
+
                 // one slanted mark per character (at most what fits)
+                // (fewer, a little left, while the CAPS tag is shown)
                 Row {
                     anchors.centerIn: parent
+                    anchors.horizontalCenterOffset: surface.context.capsLock ? -32 : 0
                     spacing: 5
                     visible: !surface.context.busy
 
                     Repeater {
-                        model: Math.min(surface.context.text.length, 24)
+                        model: Math.min(surface.context.text.length, surface.context.capsLock ? 18 : 24)
 
                         CutBox {
                             width: 7

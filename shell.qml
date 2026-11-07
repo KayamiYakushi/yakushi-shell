@@ -301,4 +301,14 @@ ShellRoot {
                 Quickshell.execDetached([Paths.shell + "/bin/yakushi", "lock"])
         }
     }
+
+    // Lock before sleep: the lid, a `systemctl suspend` typed anywhere or
+    // hibernate all wake up locked. A small guard (scripts/
+    // yakushi-sleepguard.sh) holds a logind delay inhibitor and locks when
+    // logind announces the sleep; it waits on D-Bus, nothing polls. It
+    // lives and ends with the shell.
+    Process {
+        running: true
+        command: [Paths.shell + "/bin/yakushi", "sleep-guard"]
+    }
 }

@@ -7,7 +7,7 @@
 # for a fresh clone elsewhere, point `source` at the GitHub URL instead.
 
 pkgname=yakushi-shell
-pkgver=r28.dab47df
+pkgver=r30.77c2b41
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock screen)"
 arch=('any')
@@ -23,6 +23,9 @@ depends=(
     'util-linux'           # flock, setsid
     'coreutils'            # timeout
     'procps-ng'            # pgrep, pkill
+    'bash'                 # the sleep guard
+    'glib2'                # gdbus: the sleep guard hears logind
+    'systemd'              # systemd-inhibit: the sleep guard's delay inhibitor
     'ttf-jetbrains-mono-nerd'
     'noto-fonts-cjk'       # the Japanese labels
 )

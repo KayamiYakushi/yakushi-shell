@@ -95,13 +95,19 @@ other module apply) ends the lock.
   nothing: try the look and your password safely (Esc closes it).
 - `yakushi suspend` locks, waits until every screen is covered, then sleeps
   (Power -> Suspend uses it).
+- Lock before sleep: the lid, a `systemctl suspend` typed anywhere or
+  hibernate also wake up locked. While the shell runs, a small guard holds
+  a logind delay inhibitor (`systemd-inhibit --list` shows "Yakushi"),
+  locks when logind announces the sleep, and lets go once every screen is
+  covered. It waits on D-Bus (gdbus), nothing polls.
 - Auto lock: Settings -> Security (config `lock.idleMinutes`, 0 = off, 10
   when never set). The shell asks the compositor for idle time, so nothing
   polls, and a playing video keeps the screen open. hypridle is not needed.
 - It shows the wallpaper each screen has (dimmed), the clock, your
   `~/.config/yakushi/profile-picture` and name, and the song that is
   playing. The typed text is shown only as marks and cleared as soon as it
-  has gone to PAM.
+  has gone to PAM. A quiet CAPS tag shows in the field while Caps Lock is
+  on (read from the keyboards' LEDs in /sys after a key press).
 
 `yakushi` with no arguments lists every command. Nothing in the shell is a
 fixed path: user folders come from the XDG variables (and `user-dirs.dirs`,

@@ -154,8 +154,8 @@ var INDEX = [
         it: "modalità scura modalità chiara tema", ru: "тёмная тема светлая тема тёмный режим",
         pl: "tryb ciemny tryb jasny motyw" } },
     { page: "Appearance", find: ["Match app colours"], title: "App colours (GTK, Files)", keys: {
-        en: "app colours colors gtk nautilus files file manager theme match",
-        tr: "uygulama renkleri renk dosya yöneticisi tema uyum", de: "app farben dateimanager",
+        en: "app colours colors gtk nautilus files file manager theme match folder icons accent",
+        tr: "uygulama renkleri renk dosya yöneticisi tema uyum klasör simgeleri ikonlar", de: "app farben dateimanager ordner symbole",
         es: "colores de aplicaciones gestor de archivos", fr: "couleurs des applications gestionnaire de fichiers",
         pt: "cores dos aplicativos gerenciador de arquivos", it: "colori delle app file manager",
         ru: "цвета приложений файловый менеджер", pl: "kolory aplikacji menedżer plików" } },

@@ -123,9 +123,51 @@ def firewall() -> dict:
 LOCAL = re.compile(r"^(127\.|\[?::1\]?|localhost|\[?::ffff:127\.)")
 
 
+# systemd puts every service and app in a cgroup of its own, and the kernel tells
+# anyone which cgroup a socket belongs to - so we can name the owner of a port
+# even when it runs as another user (ss -p only sees your own processes)
+SERVICE_CG = re.compile(r"/system\.slice/(?:[^/]+\.slice/)*([^/]+?)(?:@[^/]*)?\.(?:service|socket)$")
+USER_CG = re.compile(r"/user@\d+\.service/(.+)$")
+FLATPAK_CG = re.compile(r"/app-flatpak-([A-Za-z0-9_.\-]+?)-\d+\.scope$")
+APP_CG = re.compile(r"/app-(?:[^-/]+-)?([^/]+?)(?:@[^/]*)?(?:-[0-9a-f]{6,}|-\d+)?\.(?:scope|service)$")
+UNIT_CG = re.compile(r"/([^/]+?)(?:@[^/]*)?\.service$")
+
+
+def owner(cgroup: str, program: str, uid: str) -> tuple[str, str]:
+    """(stable id, how to name it) of whoever holds a socket"""
+    m = FLATPAK_CG.search(cgroup)
+    if m:
+        app = m.group(1)
+        return "flatpak:" + app, f"{app.rsplit('.', 1)[-1]} (Flatpak app {app})"
+    m = SERVICE_CG.search(cgroup)
+    if m:
+        return "service:" + m.group(1), f"{m.group(1)} (system service)"
+    if USER_CG.search(cgroup):
+        if program:
+            return program, program
+        m = APP_CG.search(cgroup)
+        if m:
+            return "app:" + m.group(1), f"{m.group(1)} (app)"
+        m = UNIT_CG.search(cgroup)
+        if m:
+            return "user-service:" + m.group(1), f"{m.group(1)} (your service)"
+    if program:
+        return program, program
+    if uid:
+        try:
+            import pwd
+            name = pwd.getpwuid(int(uid)).pw_name
+            return "", f"a program of the user {name}"
+        except (KeyError, ValueError):
+            pass
+    return "", ""
+
+
 def listening() -> list[dict]:
     """sockets open to the network (not only to this computer)"""
-    res = run(["ss", "-tulnpH"], 10)
+    res = run(["ss", "-tulnpeH", "--cgroup"], 10)
+    if res.returncode != 0:                     # an ss without --cgroup
+        res = run(["ss", "-tulnpeH"], 10)
     out = []
     for line in res.stdout.splitlines():
         p = line.split()
@@ -137,11 +179,16 @@ def listening() -> list[dict]:
         if LOCAL.match(addr):
             continue
         prog = re.search(r'users:\(\("([^"]+)",pid=(\d+)', line)
+        cg = re.search(r"\bcgroup:(\S+)", line)
+        uid = re.search(r"\buid:(\d+)", line)
+        who, name = owner(cg.group(1) if cg else "", prog.group(1) if prog else "", uid.group(1) if uid else "")
         key = f"{proto}:{port}"
-        if any(o["key"] == key for o in out):
+        if any(o["key"] == key and o["owner"] == who for o in out):
             continue
         out.append({"key": key, "proto": proto, "port": port, "address": addr or "*",
-                    "program": prog.group(1) if prog else "", "pid": int(prog.group(2)) if prog else 0})
+                    "owner": who, "program": name,
+                    "oldKey": prog.group(1) if prog else "",      # how builds before 2026-11-08 named it
+                    "pid": int(prog.group(2)) if prog else 0})
     return sorted(out, key=lambda o: (o["proto"], int(o["port"]) if o["port"].isdigit() else 0))
 
 
@@ -250,6 +297,9 @@ def digest(path: Path) -> str:
         return ""
 
 
+NAMES: dict[str, str] = {}          # port key -> who, for the messages of this run
+
+
 def snapshot() -> dict[str, str]:
     """key -> fingerprint of everything the guard watches"""
     snap: dict[str, str] = {}
@@ -287,12 +337,13 @@ def snapshot() -> dict[str, str]:
         except OSError:
             pass
     for sock in listening():
-        # by program when we can see it (apps pick new port numbers now and then),
-        # else by port (system services keep theirs)
+        # by owner when we can tell (apps pick new port numbers now and then),
+        # else by port; the value says which ports, for the message only
+        k = f"port:{sock['proto']}:{sock['owner']}" if sock["owner"] else "port:" + sock["key"]
+        ports = set(snap.get(k, "").split(",")) - {""} | {sock["port"]}
+        snap[k] = ",".join(sorted(ports, key=lambda x: int(x) if x.isdigit() else 0))
         if sock["program"]:
-            snap[f"port:{sock['proto']}:{sock['program']}"] = "1"
-        else:
-            snap["port:" + sock["key"]] = "1"
+            NAMES[k] = sock["program"]
     return snap
 
 
@@ -310,8 +361,14 @@ def describe(key: str, kind: str, value: str = "") -> str:
         return f"{verb}: members of the {rest} group (they can use sudo): {value or 'none'}"
     if what == "port":
         proto, _, which = rest.partition(":")
-        where = f"port {which}" if which.isdigit() else which
-        return f"{verb}: listens to your network ({proto}): {where}"
+        ports = [x for x in value.split(",") if x.isdigit()] if value != "1" else []
+        if which.isdigit():
+            ports = ports or [which]
+        who = NAMES.get(key) or ("" if which.isdigit() else which.split(":", 1)[-1])
+        where = ("port " if len(ports) == 1 else "ports ") + ", ".join(ports) if ports else ""
+        if kind == "gone":
+            return f"{verb}: {who or 'something'} no longer listens to your network ({proto})" + (f": {where}" if where else "")
+        return f"{verb}: {who or 'unknown program'} listens to your network ({proto})" + (f": {where}" if where else "")
     if what == "file":
         return f"{verb}: {rest}"
     return f"{verb}: {key}"
@@ -353,6 +410,23 @@ def journal_since(since: int) -> dict:
     return out
 
 
+def migrate_ports(data: dict, base: dict) -> None:
+    """Older builds named a port by its number, or by the program when ss could see it.
+    Rename what is still open to the owner's name; old numbers that are closed now
+    are dropped (a closed port is no danger). Things not in the baseline stay new."""
+    socks = listening()
+    for sock in socks:
+        old = f"port:{sock['proto']}:{sock['oldKey'] or sock['port']}"
+        if old in base and sock["owner"]:
+            base.pop(old)
+            base[f"port:{sock['proto']}:{sock['owner']}"] = sock["port"]
+    for k in [k for k in base if k.startswith("port:") and k.split(":", 2)[2].isdigit()]:
+        if not any(f"port:{s['key']}" == k and not s["owner"] for s in socks):
+            base.pop(k)
+    data["baseline"] = base
+    data["portKeys"] = 2
+
+
 def guard(data: dict) -> dict:
     """compare with the baseline; the first run takes the baseline"""
     now = int(time.time())
@@ -360,15 +434,18 @@ def guard(data: dict) -> dict:
     base = data.get("baseline")
     if not isinstance(base, dict):
         data["baseline"] = snap
+        data["portKeys"] = 2
         data["changes"] = []
         data["guardTime"] = now
         data["events"] = {"readable": True, "failed": [], "sudo": [], "ssh": [], "since": now}
         return {"first": True, "changes": []}
+    if data.get("portKeys") != 2:
+        migrate_ports(data, base)
     changes = []
     for k, v in snap.items():
         if k not in base:
             changes.append({"key": k, "kind": "new", "text": describe(k, "new", v)})
-        elif base[k] != v:
+        elif base[k] != v and not k.startswith("port:"):    # new port numbers of a known owner are fine
             changes.append({"key": k, "kind": "changed", "text": describe(k, "changed", v)})
     for k, v in base.items():
         if k not in snap:

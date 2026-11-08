@@ -19,7 +19,11 @@ What it writes, only while colours are on:
     ~/.config/gtk-4.0/yakushi.css, ~/.config/gtk-3.0/yakushi.css
     and one @import line, between yakushi markers, at the top of gtk.css
     in both folders. Whatever else you keep in gtk.css is left alone; off
-    removes exactly what was added. Open apps pick it up when reopened
+    removes exactly what was added.
+    ~/.local/share/icons/Yakushi-Folders: Adwaita's folder icons in the
+    accent colour (Adwaita draws them blue, and CSS cannot reach into an
+    icon), everything else inherited from Adwaita; made the GTK icon theme
+    (gsettings) while colours are on. Off puts the earlier icon theme back. Open apps pick it up when reopened
 (`reopen` does that for Files).
 
 Settings live in the "apps" section of ~/.config/yakushi/config.json.
@@ -34,6 +38,9 @@ import shutil
 import subprocess
 import sys
 import time
+
+import colorsys
+from pathlib import Path
 
 import yakushi_config as config
 import yakushi_paths as paths
@@ -145,6 +152,9 @@ def gtk4_css(acc: str, opacity: float) -> str:
         "scrollbar_outline_color": "rgba(0, 0, 0, 0.5)",
     }
     out = [HEADER]
+    # libadwaita 1.6 and newer draw with CSS variables and fill the accent in
+    # from the system setting; the named colours are for older apps only
+    out += [":root {"] + [f"  --{name.replace('_', '-')}: {value};" for name, value in colours.items()] + ["}", ""]
     out += [f"@define-color {name} {value};" for name, value in colours.items()]
 
     if opacity < 1.0:
@@ -244,6 +254,101 @@ def set_import(folder, wanted: bool) -> None:
     write_atomic(gtk_css, updated)
 
 
+# ---------------------------------------------------------------------------
+# Folder icons in the accent colour
+# ---------------------------------------------------------------------------
+
+ICON_THEME = "Yakushi-Folders"
+ICON_DIR = paths.DATA_HOME / "icons" / ICON_THEME
+ICON_SOURCE = Path("/usr/share/icons/Adwaita/scalable")
+PREVIOUS_ICONS = paths.STATE / "gtk-icon-theme.previous"
+# the icons Adwaita draws as blue folders
+FOLDER_ICONS = (("places", "folder*.svg"), ("places", "user-home.svg"), ("places", "user-desktop.svg"),
+                ("mimetypes", "inode-directory.svg"))
+SVG_HEX = re.compile(r"#([0-9a-fA-F]{6})\b")
+
+
+def tint(svg: str, acc: str) -> str:
+    """Every blue of the icon turned to the accent's hue; light and shade stay as drawn,
+    so the folder keeps its depth. A grey accent gives grey folders."""
+    ar, ag, ab = (int(acc[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    ah, _al, asat = colorsys.rgb_to_hls(ar, ag, ab)
+
+    def swap(m: re.Match) -> str:
+        r, g, b = (int(m.group(1)[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        h, l, sat = colorsys.rgb_to_hls(r, g, b)
+        if not (0.50 <= h <= 0.70 and sat >= 0.25):      # not one of the blues
+            return m.group(0)
+        nr, ng, nb = colorsys.hls_to_rgb(ah, l, sat * min(1.0, asat / 0.6))
+        return "#%02x%02x%02x" % (round(nr * 255), round(ng * 255), round(nb * 255))
+    return SVG_HEX.sub(swap, svg)
+
+
+def gsettings(*args: str) -> str:
+    try:
+        out = subprocess.run(["gsettings", *args], capture_output=True, text=True, timeout=5)
+        return out.stdout.strip().strip("'") if out.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def write_icons(acc: str) -> None:
+    tmp = ICON_DIR.with_name(ICON_THEME + ".yakushi-new")
+    shutil.rmtree(tmp, ignore_errors=True)
+    dirs = []
+    for context, pattern in FOLDER_ICONS:
+        (tmp / context).mkdir(parents=True, exist_ok=True)
+        if context not in dirs:
+            dirs.append(context)
+        for icon in sorted((ICON_SOURCE / context).glob(pattern)):
+            (tmp / context / icon.name).write_text(tint(icon.read_text(encoding="utf-8"), acc), encoding="utf-8")
+    index = ["[Icon Theme]", f"Name={ICON_THEME}",
+             "Comment=Adwaita, with folders in the Yakushi accent (Settings -> Appearance -> Apps)",
+             "Inherits=Adwaita,AdwaitaLegacy,hicolor", "Hidden=true",
+             "Directories=" + ",".join(dirs), ""]
+    for context in dirs:
+        index += [f"[{context}]", f"Context={context.capitalize()}", "Size=128",
+                  "MinSize=8", "MaxSize=512", "Type=Scalable", ""]
+    (tmp / "index.theme").write_text("\n".join(index), encoding="utf-8")
+    (tmp / "accent").write_text(acc + "\n", encoding="utf-8")
+    shutil.rmtree(ICON_DIR, ignore_errors=True)
+    tmp.rename(ICON_DIR)
+
+
+def set_icons(acc: str, wanted: bool) -> None:
+    current = gsettings("get", "org.gnome.desktop.interface", "icon-theme")
+    if wanted:
+        if not ICON_SOURCE.is_dir():
+            return                              # no Adwaita: nothing to tint
+        try:
+            same = (ICON_DIR / "accent").read_text(encoding="utf-8").strip() == acc
+        except OSError:
+            same = False
+        if same and current == ICON_THEME:
+            return                              # e.g. only the opacity moved
+        write_icons(acc)
+        if current and current != ICON_THEME:
+            PREVIOUS_ICONS.parent.mkdir(parents=True, exist_ok=True)
+            write_atomic(PREVIOUS_ICONS, current + "\n")
+            gsettings("set", "org.gnome.desktop.interface", "icon-theme", ICON_THEME)
+        elif current == ICON_THEME:
+            # the same name again: GTK only reloads a theme when the name changes
+            gsettings("set", "org.gnome.desktop.interface", "icon-theme", "Adwaita")
+            gsettings("set", "org.gnome.desktop.interface", "icon-theme", ICON_THEME)
+    else:
+        if current == ICON_THEME:
+            try:
+                previous = PREVIOUS_ICONS.read_text(encoding="utf-8").strip() or "Adwaita"
+            except OSError:
+                previous = "Adwaita"
+            gsettings("set", "org.gnome.desktop.interface", "icon-theme", previous)
+        shutil.rmtree(ICON_DIR, ignore_errors=True)
+        try:
+            PREVIOUS_ICONS.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def apply(state: dict) -> None:
     acc = accent()
     for folder, build in zip(GTK_DIRS, (gtk4_css, gtk3_css)):
@@ -258,6 +363,7 @@ def apply(state: dict) -> None:
                 own.unlink()
             except FileNotFoundError:
                 pass
+    set_icons(acc, state["colours"])
 
 
 def files_running() -> bool:

@@ -55,8 +55,8 @@ PanelWindow {
     WlrLayershell.namespace: "yakushi-launcher"
     WlrLayershell.keyboardFocus: showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // Clipboard history can be turned off (Settings -> Appearance ->
-    // Launcher): then there is no clipboard side at all.
+    // Clipboard history can be turned off (Settings -> Default
+    // Apps): then there is no clipboard side at all.
     readonly property bool clipboardOn: Config.launcher.clipboard !== false
 
     function open(which) {

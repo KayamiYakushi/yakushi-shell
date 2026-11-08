@@ -57,7 +57,7 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | Keys | |
 |---|---|
 | SUPER + Space | Apps (Tab: clipboard history) |
-| SUPER + SHIFT + V | Clipboard history (can be turned off in Settings -> Appearance) |
+| SUPER + SHIFT + V | Clipboard history (can be turned off in Settings -> Default Apps) |
 | SUPER + I | Settings |
 | SUPER + Q / E / B | Terminal / files / browser |
 | SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |

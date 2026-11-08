@@ -198,7 +198,7 @@ login() {
     # your cursor from the first second, and shake to find if it is on
     python3 "$scripts/yakushi-cursorctl.py" login >/dev/null 2>&1 &
     python3 "$scripts/yakushi-shake.py" --login >/dev/null 2>&1 &
-    # clipboard history records only while it is on (Settings -> Appearance)
+    # clipboard history records only while it is on (Settings -> Default Apps)
     python3 "$scripts/yakushi-launchctl.py" clipboard login >/dev/null 2>&1 &
     # hyprsunset runs only while night light is on
     python3 "$scripts/yakushi-nightlightctl.py" restore >/dev/null 2>&1 &

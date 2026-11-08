@@ -67,7 +67,10 @@ trap 'exit 0' TERM INT HUP
 # If D-Bus goes away the monitor ends; try again a few times, then give up
 # (the shell's next start brings the guard back).
 for attempt in 1 2 3 4 5; do
-    exec 7< <(exec gdbus monitor --system --dest org.freedesktop.login1 \
+    # pdeathsig: the monitor ends with us even when we are killed outright
+    # (it only notices a missing reader at the next sleep; until then an
+    # orphan would linger, one per shell restart)
+    exec 7< <(exec setpriv --pdeathsig TERM gdbus monitor --system --dest org.freedesktop.login1 \
         --object-path /org/freedesktop/login1 2>/dev/null 6>&- 8>&-)
     monitor_pid=$!
     hold

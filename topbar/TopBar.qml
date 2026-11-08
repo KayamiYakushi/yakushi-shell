@@ -11,7 +11,8 @@ import "../"
 // the edge by 45-degree shoulders, with cut lower corners (Theme.cut).
 // Modules are laid out in the order chosen in Settings -> Top Bar.
 // Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, the system
-// clock); only SystemStats ticks, every 2 seconds.
+// clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
+// seconds are shown).
 PanelWindow {
     id: win
 

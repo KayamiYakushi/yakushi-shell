@@ -5,15 +5,44 @@ import "../"
 
 // RAM, CPU usage and temperatures for the top bar.
 //
-// Cost: one 2-second timer that re-reads a few small kernel files
-// (/proc/stat, /proc/meminfo, two hwmon inputs). No processes are spawned
-// after start-up, and anything whose module is switched off is not read.
+// Cost: every 2 seconds a few small kernel files are re-read (/proc/stat,
+// /proc/meminfo, two hwmon inputs). No processes are spawned after start-up,
+// and anything whose module is switched off is not read.
+//
+// While the bar shows seconds, the reads ride on the clock's tick (every
+// other second) and are read right then (tiny files, no thread hop): the
+// new numbers land in the frame the clock draws anyway, instead of waking
+// the bar for frames of their own.
 Item {
     id: stats
 
     visible: false
 
     required property var config
+    // the bar's SystemClock: its seconds tick drives the reads when it has one
+    property var clock: null
+    readonly property bool onClockTick: clock !== null && clock.precision === SystemClock.Seconds
+    readonly property bool wantAny: wantCpu || wantRam || wantCpuTemp || wantGpuTemp
+
+    function read() {
+        if (wantCpu)
+            procStat.reload()
+        if (wantRam)
+            memInfo.reload()
+        if (wantCpuTemp)
+            cpuTempFile.reload()
+        if (wantGpuTemp)
+            gpuTempFile.reload()
+    }
+
+    Connections {
+        target: stats.onClockTick && stats.wantAny ? stats.clock : null
+
+        function onSecondsChanged() {
+            if (stats.clock.seconds % 2 === 0)
+                stats.read()
+        }
+    }
 
     readonly property bool wantCpu: config.modules.cpu
     readonly property bool wantRam: config.modules.ram
@@ -41,18 +70,9 @@ Item {
         interval: 2000
         repeat: true
         triggeredOnStart: true
-        running: stats.wantCpu || stats.wantRam || stats.wantCpuTemp || stats.wantGpuTemp
+        running: stats.wantAny && !stats.onClockTick
 
-        onTriggered: {
-            if (stats.wantCpu)
-                procStat.reload()
-            if (stats.wantRam)
-                memInfo.reload()
-            if (stats.wantCpuTemp)
-                cpuTempFile.reload()
-            if (stats.wantGpuTemp)
-                gpuTempFile.reload()
-        }
+        onTriggered: stats.read()
     }
 
     FileView {
@@ -60,6 +80,7 @@ Item {
 
         path: "/proc/stat"
         printErrors: false
+        blockLoading: true
 
         onLoaded: {
             // first line: "cpu  user nice system idle iowait irq softirq steal ..."
@@ -85,6 +106,7 @@ Item {
 
         path: "/proc/meminfo"
         printErrors: false
+        blockLoading: true
 
         onLoaded: {
             var t = text()
@@ -105,6 +127,7 @@ Item {
 
         path: stats.cpuTempPath
         printErrors: false
+        blockLoading: true
         onLoaded: stats.cpuTemp = stats.readTemp(text())
     }
 
@@ -113,6 +136,7 @@ Item {
 
         path: stats.gpuTempPath
         printErrors: false
+        blockLoading: true
         onLoaded: stats.gpuTemp = stats.readTemp(text())
     }
 

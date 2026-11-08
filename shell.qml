@@ -39,6 +39,7 @@ ShellRoot {
     SystemStats {
         id: barStats
         config: barConfig
+        clock: barClock
     }
 
     MediaState {

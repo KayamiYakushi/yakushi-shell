@@ -31,7 +31,7 @@ Item {
     property var trashInfo: ({ count: 0, size: 0 })
 
     // ---- what you look at
-    property string view: "search"       // search | plan | removed
+    property string view: "search"       // search | plan | removed | clean
     property string query: ""
     property string scope: "apps"        // apps | mine | unused | all
     property string order: "name"        // name | size | newest
@@ -223,6 +223,13 @@ Item {
         note = ""
         plan = null
         runPlan()
+    }
+
+    function openClean() {
+        pending = ""
+        view = "clean"
+        note = ""
+        armed = ""
     }
 
     function openRemoved() {
@@ -688,9 +695,9 @@ Item {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             current: panel.view
-            options: [["search", "INSTALLED"], ["removed", "REMOVED BEFORE"]]
+            options: [["search", "INSTALLED"], ["removed", "REMOVED BEFORE"], ["clean", "CLEAN UP"]]
             counts: panel.history.length ? { removed: panel.history.length } : ({})
-            onChose: key => key === "search" ? panel.openSearch() : panel.openRemoved()
+            onChose: key => key === "search" ? panel.openSearch() : key === "removed" ? panel.openRemoved() : panel.openClean()
         }
     }
 
@@ -698,6 +705,7 @@ Item {
     Item {
         id: foot
 
+        visible: panel.view !== "clean"
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -1748,6 +1756,20 @@ Item {
     // ==================================================================
     // removed before: the Yakushi trash, with UNDO
     // ==================================================================
+    CleanupPanel {
+        visible: panel.view === "clean"
+        anchors.top: head.bottom
+        anchors.topMargin: 22
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+
+        onCleaned: {
+            trashJob.command = ["python3", panel.helper, "removed"]     // the count on top
+            trashJob.running = true
+        }
+    }
+
     Item {
         id: removedView
 

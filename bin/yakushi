@@ -50,6 +50,14 @@ die() {
     exit 1
 }
 
+# Quickshell allocates through jemalloc, which by default keeps four arenas
+# per CPU and hands freed memory back late: one arena, freed pages returned
+# after a second, measured ~60 % less memory for the same CPU time. Every
+# qs started from here (and Settings, started by the shell) gets it; the
+# launcher removes it again for the apps it opens. A MALLOC_CONF of your
+# own is left alone.
+export MALLOC_CONF="${MALLOC_CONF:-narenas:1,dirty_decay_ms:1000,muzzy_decay_ms:0}"
+
 # No /tmp fallback on purpose: a guessable folder there could be made by
 # another user first. systemd always sets XDG_RUNTIME_DIR.
 case "${XDG_RUNTIME_DIR:-}" in

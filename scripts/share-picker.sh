@@ -23,7 +23,9 @@ trap 'rm -f "$out"' EXIT INT TERM
 # open on the monitor that has the focus
 focused="$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused) | .name' 2>/dev/null)"
 
+# MALLOC_CONF: the allocator setting bin/yakushi gives every Quickshell window
 YAKUSHI_PICK_OUT="$out" YAKUSHI_PICK_SCREEN="$focused" \
+    MALLOC_CONF="${MALLOC_CONF:-narenas:1,dirty_decay_ms:1000,muzzy_decay_ms:0}" \
     qs -n -p "$picker_qml" </dev/null >"$log_file" 2>&1
 
 choice="$(head -n 1 "$out")"

@@ -177,11 +177,23 @@ PanelWindow {
         return out.slice(0, 60)
     }
 
+    // Apps start without the shell's allocator setting (bin/yakushi sets
+    // MALLOC_CONF for Quickshell only); otherwise as entry.execute() would.
+    Process {
+        id: appStarter
+
+        environment: ({ MALLOC_CONF: null })
+    }
+
     function launch(entry) {
-        if (entry.runInTerminal)
-            Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "terminal", entry.execString])
-        else
-            entry.execute()
+        if (entry.runInTerminal) {
+            appStarter.command = ["python3", Paths.script("yakushi-launchctl.py"), "terminal", entry.execString]
+            appStarter.workingDirectory = ""
+        } else {
+            appStarter.command = entry.command
+            appStarter.workingDirectory = entry.workingDirectory
+        }
+        appStarter.startDetached()
         Quickshell.execDetached(["python3", Paths.script("yakushi-launchctl.py"), "used", entry.id])
         hide()
     }

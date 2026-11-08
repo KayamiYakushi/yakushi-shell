@@ -127,6 +127,7 @@ Item {
         page.loadWindow()
         termGet.command = ["python3", page.termHelperPath(), "status"]
         termGet.running = true
+        appsGet.running = true
     }
 
     // ------------------------------------------------------------------
@@ -389,6 +390,84 @@ Item {
                     page.describeTerm(data)
                 } catch (e) {
                     page.termStatus = "Could not change terminal colours."
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GTK apps: colours, file manager opacity (yakushi-gtkctl.py)
+    // ------------------------------------------------------------------
+    property bool appsLoaded: false
+    property bool appsColours: false
+    property real filesOpacity: 1.0
+    property string appsStatus: ""
+
+    function readApps(data) {
+        if (typeof data.colours === "boolean")
+            appsColours = data.colours
+        if (typeof data.filesOpacity === "number")
+            filesOpacity = data.filesOpacity
+    }
+
+    function setAppsColours(on) {
+        if (appsSet.running)
+            return
+        appsColours = on
+        appsSet.command = ["python3", Paths.script("yakushi-gtkctl.py"), "set", "colours", on ? "on" : "off"]
+        appsSet.running = true
+    }
+
+    function saveFilesOpacity() {
+        if (appsSet.running) {
+            filesOpacityDebounce.restart()      // after the save that is running
+            return
+        }
+        appsSet.command = ["python3", Paths.script("yakushi-gtkctl.py"), "set", "opacity", filesOpacity.toFixed(2)]
+        appsSet.running = true
+    }
+
+    Timer {
+        id: filesOpacityDebounce
+        interval: 200
+        onTriggered: page.saveFilesOpacity()
+    }
+
+    Process {
+        id: appsGet
+
+        command: ["python3", Paths.script("yakushi-gtkctl.py"), "get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var data = JSON.parse(text)
+                    if (data.ok) {
+                        page.readApps(data)
+                        page.appsLoaded = true
+                    } else {
+                        page.appsStatus = data.message || ""
+                    }
+                } catch (e) {
+                    page.appsStatus = "Could not read the app settings."
+                }
+            }
+        }
+    }
+
+    Process {
+        id: appsSet
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var data = JSON.parse(text)
+                    page.appsStatus = data.message || ""
+                    if (data.ok)
+                        page.readApps(data)
+                    else
+                        appsGet.running = true
+                } catch (e) {
+                    page.appsStatus = "Could not save the app settings."
                 }
             }
         }
@@ -1328,6 +1407,53 @@ Item {
                 text: page.termStatus !== ""
                     ? page.termStatus
                     : "Background, palette, cursor and selection follow the accent; with fish, command colours do too. Blur is done by Hyprland, so it works with any terminal, and shows when opacity is below 100%. The first time, open a new terminal window. Off restores everything."
+                wrapMode: Text.WordWrap
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 9
+                elide: Text.ElideRight
+            }
+
+            Divider {}
+
+            // ---------------- Apps ----------------
+            SectionLabel { text: "APPS" }
+
+            ToggleRow {
+                width: parent.width
+                icon: String.fromCodePoint(0xF024B)
+                label: "Match app colours"
+                checked: page.appsColours
+                available: page.appsLoaded && !appsSet.running
+                onToggled: page.setAppsColours(!page.appsColours)
+            }
+
+            Slider {
+                width: parent.width
+                visible: page.appsColours
+                label: "File manager opacity  " + Math.round(page.filesOpacity * 100) + "%"
+                icon: "◐"
+                tint: Theme.accent
+                value: (page.filesOpacity - 0.30) / 0.70
+
+                onSliding: function(v) {
+                    page.filesOpacity = 0.30 + v * 0.70
+                    filesOpacityDebounce.restart()
+                }
+
+                onSettled: function(v) {
+                    page.filesOpacity = 0.30 + v * 0.70
+                    filesOpacityDebounce.stop()
+                    page.saveFilesOpacity()
+                }
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: page.appsStatus !== ""
+                    ? page.appsStatus
+                    : "GTK apps (Files, Celluloid, Meld...) take the shell's surfaces and accent. The opacity is for the file manager only (Files, Nemo, Thunar): its background lets the wallpaper through, text and icons stay solid. Reopen an app to see a change. Off brings back plain Adwaita dark."
                 wrapMode: Text.WordWrap
                 color: Theme.inkMute
                 font.family: Theme.mono

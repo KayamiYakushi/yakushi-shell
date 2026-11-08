@@ -185,11 +185,14 @@ yakushi_bind("unfreeze", "SUPER + CTRL + Escape", hl.dsp.exec_cmd("yakushi unfre
 -- Tools ---------------------------------------------------------------------
 -- YAKUSHI_BIND clipboard|Utilities|Clipboard History
 yakushi_bind("clipboard", "SUPER + SHIFT + V", hl.dsp.exec_cmd("yakushi launcher clipboard"))
--- YAKUSHI_BIND screenshot_full|Screenshots|Full Screenshot
-yakushi_bind("screenshot_full", "SUPER + Delete", hl.dsp.exec_cmd([[mkdir -p "$HOME/Pictures" && grim "$HOME/Pictures/$(date +%s).png"]]))
--- (Esc while choosing the area cancels it: no empty file is left behind)
--- YAKUSHI_BIND screenshot_area|Screenshots|Area Screenshot + Clipboard
-yakushi_bind("screenshot_area", "SUPER + SHIFT + S", hl.dsp.exec_cmd([[area="$(slurp)" && mkdir -p "$HOME/Pictures" && grim -g "$area" - | tee "$HOME/Pictures/$(date +%s).png" | wl-copy]]))
+-- Screenshots go to the clipboard; to Pictures/Screenshots as well only
+-- while Settings -> Screenshots says so. Esc cancels an area.
+-- YAKUSHI_BIND screenshot_full|Screenshots|Screen Screenshot
+yakushi_bind("screenshot_full", "SUPER + Delete", hl.dsp.exec_cmd("yakushi screenshot screen"))
+-- YAKUSHI_BIND screenshot_area|Screenshots|Area Screenshot
+yakushi_bind("screenshot_area", "SUPER + SHIFT + S", hl.dsp.exec_cmd("yakushi screenshot area"))
+-- YAKUSHI_BIND screenshot_window|Screenshots|Window Screenshot
+yakushi_bind("screenshot_window", "SUPER + CTRL + S", hl.dsp.exec_cmd("yakushi screenshot window"))
 -- YAKUSHI_BIND keyboard_layout|Input|Switch Keyboard Layout
 yakushi_bind("keyboard_layout", "SUPER + X", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 

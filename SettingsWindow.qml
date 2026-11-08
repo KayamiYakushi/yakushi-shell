@@ -108,6 +108,7 @@ PanelWindow {
         { name: "Appearance",   jp: "外観",           file: "AppearancePage",  glyph: "󰏘" },
         { name: "Top Bar",      jp: "トップバー",     file: "TopBarPage",      glyph: String.fromCodePoint(0xF1513) },
         { name: "Notifications", jp: "通知",          file: "NotificationsPage", glyph: String.fromCodePoint(0xF009A) },
+        { name: "Screenshots",  jp: "スクショ",       file: "ScreenshotsPage", glyph: String.fromCodePoint(0xF0100) },
         { name: "Login Screen", jp: "ログイン画面",   file: "LoginScreenPage", glyph: "󰌾" },
         { name: "Keybinds",     jp: "キー設定",       file: "KeybindsPage",    glyph: "󰌌" },
         { name: "Default Apps", jp: "既定アプリ",     file: "DefaultAppsPage", glyph: String.fromCodePoint(0xF003B) },

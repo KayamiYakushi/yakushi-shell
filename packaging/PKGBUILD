@@ -33,7 +33,7 @@ optdepends=(
     'awww: wallpapers and the wallpaper picker'
     'imagemagick: wallpaper picker thumbnails'
     'cliphist: clipboard history (SUPER + V)'
-    'wl-clipboard: clipboard history'
+    'wl-clipboard: clipboard history and screenshots'
     'playerctl: media keys and now playing'
     'xdg-desktop-portal-hyprland: the screen-share picker'
     'qt6-imageformats: WebP wallpapers'

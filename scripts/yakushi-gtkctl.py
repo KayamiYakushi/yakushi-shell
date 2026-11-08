@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""GTK apps in the shell's colours, for Settings -> Appearance -> Apps.
+
+Commands:
+    get                     Print the settings as JSON.
+    set colours on|off      GTK 3 / GTK 4 (libadwaita) apps use the shell's
+                            surfaces, ink and accent. Off: plain Adwaita dark.
+    set opacity <0.30..1>   File manager background opacity (Files/Nautilus,
+                            Nemo, Thunar). Only the background: text and icons
+                            stay solid; Hyprland blurs what shows through.
+    sync                    Write the files again (after the accent changed;
+                            called by yakushi-themesync.py).
+
+What it writes, only while colours are on:
+    ~/.config/gtk-4.0/yakushi.css, ~/.config/gtk-3.0/yakushi.css
+    and one @import line, between yakushi markers, at the top of gtk.css
+    in both folders. Whatever else you keep in gtk.css is left alone; off
+    removes exactly what was added. Open apps pick it up when reopened.
+
+Settings live in the "apps" section of ~/.config/yakushi/config.json.
+Runs only when called: no daemon, no timers.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+
+import yakushi_config as config
+import yakushi_paths as paths
+
+DEFAULTS = {"colours": False, "filesOpacity": 1.0}
+OPACITY_MIN, OPACITY_MAX = 0.30, 1.0
+
+GTK_DIRS = (paths.CONFIG_HOME / "gtk-4.0", paths.CONFIG_HOME / "gtk-3.0")
+BEGIN = "/* yakushi:begin (Settings -> Appearance -> Apps; do not edit between the markers) */"
+END = "/* yakushi:end */"
+IMPORT = '@import url("yakushi.css");'
+BLOCK_RE = re.compile(r"/\* yakushi:begin.*?/\* yakushi:end \*/\n?", re.S)
+HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+# the shell's own tokens (Theme.qml)
+SURFACE = "#060606"
+CARD = "#0e0e0e"
+GROOVE = "#171717"
+LINE = "#1f1f1f"
+INK = "#ffffff"
+ALERT = "#ff2e4d"
+GOOD = "#2ee6a0"
+WARN = "#ffc857"
+
+# window classes of the GTK file managers the opacity applies to
+FILE_MANAGERS_GTK4 = (".nautilus-window",)
+FILE_MANAGERS_GTK3 = (".nemo-window", ".thunar")
+
+
+def emit(obj: dict) -> None:
+    print(json.dumps(obj), flush=True)
+
+
+def fail(message: str) -> None:
+    emit({"ok": False, "message": message})
+    raise SystemExit(1)
+
+
+def sanitize(saved: dict) -> dict:
+    state = dict(DEFAULTS)
+    if isinstance(saved.get("colours"), bool):
+        state["colours"] = saved["colours"]
+    value = saved.get("filesOpacity")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        state["filesOpacity"] = round(max(OPACITY_MIN, min(OPACITY_MAX, float(value))), 2)
+    return state
+
+
+def accent() -> str:
+    try:
+        value = config.section("appearance").get("accent")
+        if isinstance(value, str) and HEX.match(value):
+            return value.lower()
+    except (OSError, ValueError, AttributeError):
+        pass
+    return "#ffffff"
+
+
+def readable_on(colour: str) -> str:
+    """Black or white, whichever reads better on `colour` (WCAG luminance)."""
+    def channel(c: int) -> float:
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (int(colour[i:i + 2], 16) for i in (1, 3, 5))
+    lum = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    return "#000000" if lum > 0.179 else "#ffffff"
+
+
+def rgba(colour: str, alpha: float) -> str:
+    r, g, b = (int(colour[i:i + 2], 16) for i in (1, 3, 5))
+    return f"rgba({r}, {g}, {b}, {alpha:.2f})"
+
+
+# ---------------------------------------------------------------------------
+# The stylesheets
+# ---------------------------------------------------------------------------
+
+HEADER = """/* Yakushi colours, written by yakushi-gtkctl.py
+   (Settings -> Appearance -> Apps). Rewritten on every change: edits here
+   do not last. Put your own rules in gtk.css instead. */
+"""
+
+
+def gtk4_css(acc: str, opacity: float) -> str:
+    fg = readable_on(acc)
+    colours = {
+        "accent_color": acc, "accent_bg_color": acc, "accent_fg_color": fg,
+        "destructive_color": ALERT, "destructive_bg_color": ALERT, "destructive_fg_color": "#ffffff",
+        "success_color": GOOD, "success_bg_color": GOOD, "success_fg_color": "#000000",
+        "warning_color": WARN, "warning_bg_color": WARN, "warning_fg_color": "#000000",
+        "error_color": ALERT, "error_bg_color": ALERT, "error_fg_color": "#ffffff",
+        "window_bg_color": SURFACE, "window_fg_color": INK,
+        "view_bg_color": SURFACE, "view_fg_color": INK,
+        "headerbar_bg_color": SURFACE, "headerbar_fg_color": INK,
+        "headerbar_border_color": LINE, "headerbar_backdrop_color": SURFACE,
+        "headerbar_shade_color": "rgba(0, 0, 0, 0.36)",
+        "sidebar_bg_color": CARD, "sidebar_fg_color": INK,
+        "sidebar_backdrop_color": CARD, "sidebar_border_color": LINE,
+        "sidebar_shade_color": "rgba(0, 0, 0, 0.36)",
+        "secondary_sidebar_bg_color": CARD, "secondary_sidebar_fg_color": INK,
+        "secondary_sidebar_backdrop_color": CARD, "secondary_sidebar_border_color": LINE,
+        "secondary_sidebar_shade_color": "rgba(0, 0, 0, 0.36)",
+        "card_bg_color": CARD, "card_fg_color": INK, "card_shade_color": "rgba(0, 0, 0, 0.36)",
+        "dialog_bg_color": CARD, "dialog_fg_color": INK,
+        "popover_bg_color": CARD, "popover_fg_color": INK, "popover_shade_color": "rgba(0, 0, 0, 0.36)",
+        "thumbnail_bg_color": GROOVE, "thumbnail_fg_color": INK,
+        "overview_bg_color": CARD, "overview_fg_color": INK,
+        "shade_color": "rgba(0, 0, 0, 0.36)",
+        "scrollbar_outline_color": "rgba(0, 0, 0, 0.5)",
+    }
+    out = [HEADER]
+    out += [f"@define-color {name} {value};" for name, value in colours.items()]
+
+    if opacity < 1.0:
+        # Custom properties are inherited, so these reach every part of the
+        # file manager window and nothing outside it. Only the window itself
+        # is tinted; the layers on top of it are made clear, or their alphas
+        # would add up. Popovers and dialogs keep their solid colours.
+        sel = ", ".join(f"window{c}" for c in FILE_MANAGERS_GTK4)
+        out += ["", f"{sel} {{",
+                f"  --window-bg-color: {rgba(SURFACE, opacity)};",
+                "  --view-bg-color: transparent;",
+                "  --headerbar-bg-color: transparent;",
+                "  --headerbar-backdrop-color: transparent;",
+                f"  --sidebar-bg-color: {rgba('#ffffff', 0.03)};",
+                f"  --sidebar-backdrop-color: {rgba('#ffffff', 0.03)};",
+                "  background-color: var(--window-bg-color);",
+                "}"]
+    return "\n".join(out) + "\n"
+
+
+def gtk3_css(acc: str, opacity: float) -> str:
+    fg = readable_on(acc)
+    colours = {
+        "theme_bg_color": SURFACE, "theme_fg_color": INK,
+        "theme_base_color": SURFACE, "theme_text_color": INK,
+        "theme_selected_bg_color": acc, "theme_selected_fg_color": fg,
+        "insensitive_bg_color": CARD, "insensitive_fg_color": "#707070",
+        "insensitive_base_color": CARD,
+        "theme_unfocused_bg_color": SURFACE, "theme_unfocused_fg_color": INK,
+        "theme_unfocused_base_color": SURFACE, "theme_unfocused_text_color": INK,
+        "theme_unfocused_selected_bg_color": acc, "theme_unfocused_selected_fg_color": fg,
+        "borders": LINE, "unfocused_borders": LINE,
+        "warning_color": WARN, "error_color": ALERT, "success_color": GOOD,
+        # the libadwaita names too, for GTK 3 themes that follow them
+        "accent_color": acc, "accent_bg_color": acc, "accent_fg_color": fg,
+        "window_bg_color": SURFACE, "window_fg_color": INK,
+        "view_bg_color": SURFACE, "view_fg_color": INK,
+        "headerbar_bg_color": SURFACE, "headerbar_fg_color": INK,
+        "sidebar_bg_color": CARD, "popover_bg_color": CARD,
+        "card_bg_color": CARD, "dialog_bg_color": CARD,
+    }
+    out = [HEADER]
+    out += [f"@define-color {name} {value};" for name, value in colours.items()]
+
+    if opacity < 1.0:
+        tint = rgba(SURFACE, opacity)
+        win = ", ".join(f"window{c}" for c in FILE_MANAGERS_GTK3)
+        inner = ", ".join(f"{c} {part}" for c in FILE_MANAGERS_GTK3
+                          for part in (".view", "treeview", "iconview", "scrolledwindow", "viewport",
+                                       ".sidebar", "placessidebar", "headerbar", "toolbar",
+                                       "statusbar", "paned"))
+        out += ["", f"{win} {{ background-color: {tint}; }}",
+                f"{inner} {{ background-color: transparent; }}"]
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Writing
+# ---------------------------------------------------------------------------
+
+def write_atomic(path, text: str) -> None:
+    """Temp file + fsync + rename; through a symlink to its real file."""
+    real = os.path.realpath(path)
+    tmp = f"{real}.yakushi-new"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_CLOEXEC, 0o644)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, real)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def set_import(folder, wanted: bool) -> None:
+    gtk_css = folder / "gtk.css"
+    try:
+        text = gtk_css.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        text = ""
+    rest = BLOCK_RE.sub("", text)
+    updated = (f"{BEGIN}\n{IMPORT}\n{END}\n" + rest) if wanted else rest
+    if updated == text:
+        return
+    if not updated.strip() and not wanted:
+        try:
+            gtk_css.unlink()                    # it held only our line
+        except FileNotFoundError:
+            pass
+        return
+    folder.mkdir(parents=True, exist_ok=True)
+    write_atomic(gtk_css, updated)
+
+
+def apply(state: dict) -> None:
+    acc = accent()
+    for folder, build in zip(GTK_DIRS, (gtk4_css, gtk3_css)):
+        own = folder / "yakushi.css"
+        if state["colours"]:
+            folder.mkdir(parents=True, exist_ok=True)
+            write_atomic(own, build(acc, state["filesOpacity"]))
+            set_import(folder, True)
+        else:
+            set_import(folder, False)
+            try:
+                own.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def save(change) -> dict:
+    def edit(saved: dict) -> dict:
+        state = sanitize(saved)
+        change(state)
+        return state
+
+    try:
+        return config.update("apps", edit)
+    except config.NewerConfig as error:
+        fail(str(error))
+        return {}
+
+
+def main() -> None:
+    args = sys.argv[1:]
+
+    try:
+        if args == ["get"]:
+            emit({"ok": True, **sanitize(config.section("apps"))})
+
+        elif len(args) == 3 and args[:2] == ["set", "colours"]:
+            if args[2] not in ("on", "off"):
+                fail("Use on or off.")
+            value = args[2] == "on"
+            state = save(lambda s: s.update(colours=value))
+            apply(state)
+            emit({"ok": True, **state,
+                  "message": "GTK apps use the shell's colours. Reopen open apps to see it."
+                  if value else "GTK apps are back to plain Adwaita dark."})
+
+        elif len(args) == 3 and args[:2] == ["set", "opacity"]:
+            try:
+                value = round(max(OPACITY_MIN, min(OPACITY_MAX, float(args[2]))), 2)
+            except ValueError:
+                fail("Opacity must be a number between 0.30 and 1.")
+                return
+            state = save(lambda s: s.update(filesOpacity=value))
+            apply(state)
+            emit({"ok": True, **state, "message": f"File manager opacity {round(value * 100)}%."})
+
+        elif args == ["sync"]:
+            state = sanitize(config.section("apps"))
+            if state["colours"]:
+                apply(state)
+            emit({"ok": True, **state})
+
+        else:
+            fail("Usage: get | set colours on|off | set opacity <0.30..1> | sync")
+    except OSError as error:
+        fail(f"Could not write the GTK files: {error.strerror or error}")
+
+
+if __name__ == "__main__":
+    main()

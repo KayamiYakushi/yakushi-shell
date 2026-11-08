@@ -21,6 +21,9 @@
 #                                      Show notifications or not (off: apps are
 #                                      still answered at once, nothing is shown).
 #   yakushi wallpaper                  The wallpaper picker.
+#   yakushi screenshot area|window|screen
+#                                      To the clipboard; also to Pictures/Screenshots
+#                                      only while Settings -> Screenshots says so.
 #   yakushi share-picker               Screen-share picker (for xdg-desktop-portal-hyprland).
 #   yakushi setup-hyprland             Put the starter Hyprland config in ~/.config/hypr
 #                                      (yours is moved aside, never deleted).
@@ -276,6 +279,11 @@ case "$cmd" in
             *) usage ;;
         esac ;;
     wallpaper) exec sh "$root/wallpicker/launch.sh" ;;
+    screenshot)
+        case "${1:-}" in
+            area|window|screen) exec python3 "$scripts/yakushi-screenshot.py" take "$1" ;;
+            *) usage ;;
+        esac ;;
     share-picker) exec sh "$scripts/share-picker.sh" ;;
     setup-hyprland) exec python3 "$scripts/yakushi-setup-hyprland.py" "$@" ;;
     unfreeze) unfreeze ;;

@@ -61,6 +61,7 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | SUPER + I | Settings |
 | SUPER + Q / E / B | Terminal / files / browser |
 | SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |
+| SUPER + SHIFT + S | Screenshot of an area (CTRL instead of SHIFT: the window; SUPER + Delete: the screen). Clipboard only, unless Settings -> Screenshots saves them too |
 | SUPER + Tab | Lock |
 | SUPER + ` | Power menu |
 | SUPER + Escape | What is running, and why |
@@ -209,7 +210,9 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
   "appearance": { "panelOpacity": 0.9, "accent": "#ff7a9d" },
   "terminal":   { "enabled": true, "opacity": 0.7, ... },
   "wallpaper":  { "folder": "~/Pictures/Wallpapers", "visibleCount": 10, ... },
-  "lock":       { "idleMinutes": 10 }
+  "lock":       { "idleMinutes": 10 },
+  "screenshots": { "save": false },
+  "apps":       { "colours": true, "filesOpacity": 0.85 }
 }
 ```
 

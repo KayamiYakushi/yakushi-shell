@@ -8,6 +8,7 @@ run by hand). Each step is independent and best effort:
                there; Yakushi's own lock reads the accent itself)
   * windows    border colour, when it follows the accent (yakushi-windowctl)
   * terminal   terminal + fish colours, when matching is on (yakushi-termctl)
+  * gtk apps   GTK 3/4 colours, when matching is on (yakushi-gtkctl)
 
 Runs once and exits: no daemon, no timers.
 """
@@ -61,6 +62,7 @@ HYPRLOCK = paths.HYPR / "hyprlock.conf"
 HELPERS = (
     paths.SCRIPTS / "yakushi-windowctl.py",
     paths.SCRIPTS / "yakushi-termctl.py",
+    paths.SCRIPTS / "yakushi-gtkctl.py",
 )
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 

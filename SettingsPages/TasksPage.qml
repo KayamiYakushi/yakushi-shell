@@ -609,8 +609,11 @@ Item {
         Text {
             textFormat: Text.PlainText
             visible: tile.foot !== ""
-            x: 18
+            // both edges anchored, else a long name grows past the tile
+            anchors.left: parent.left
+            anchors.leftMargin: 18
             anchors.right: parent.right
+            horizontalAlignment: Text.AlignRight
             anchors.rightMargin: 14
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 14

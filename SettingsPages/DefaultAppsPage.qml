@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Default Apps: pick the terminal, login shell, file manager,
+// Settings -> Programs -> Default Apps: pick the terminal, login shell, file manager,
 // browser, editor, viewers and mail client from what is installed.
 // scripts/yakushi-defaultsctl.py does the scanning and the writing; this page
 // runs it once when opened and once per choice.

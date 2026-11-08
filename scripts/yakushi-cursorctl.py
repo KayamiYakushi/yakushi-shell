@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mouse cursor themes for Settings -> Input -> Cursor.
+"""Mouse cursor themes for Settings -> Input -> Keyboard & Mouse -> Cursor.
 
     yakushi-cursorctl.py list        installed themes + what is in use (JSON)
     yakushi-cursorctl.py set <id>    use theme <id> (its folder name)
@@ -455,7 +455,7 @@ def write_local(theme: dict | None, tid: str, sz: int, shake: bool, stay: float 
     stay = hold() if stay is None else stay
     hypr_kind = bool(theme and theme["kind"] == "hyprcursor")
     lines = [
-        "-- Mouse cursor, written by Settings -> Input -> Cursor (yakushi-cursorctl.py).",
+        "-- Mouse cursor, written by Settings -> Input -> Keyboard & Mouse -> Cursor (yakushi-cursorctl.py).",
         f"-- shake: {'on' if shake else 'off'}",
         f"-- shake-hold: {stay:.2f}",
         f'hl.env("XCURSOR_THEME", "{tid}")',

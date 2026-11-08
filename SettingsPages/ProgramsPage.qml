@@ -679,21 +679,25 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 36
+        // the views go under the heading when both do not fit on one line
+        readonly property bool stacked: heading.needed + views.width + 18 > width
+        height: stacked ? 36 + 12 + views.height : 36
 
         PageTitle {
+            id: heading
+
             anchors.left: parent.left
-            anchors.right: views.left
-            anchors.rightMargin: 18
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: head.stacked ? parent.right : views.left
+            anchors.rightMargin: head.stacked ? 0 : 18
+            y: (36 - height) / 2
             title: "PROGRAMS"
         }
 
         Segmented {
             id: views
 
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            x: head.stacked ? 0 : head.width - width
+            y: head.stacked ? 36 + 12 : 0
             current: panel.view
             options: [["search", "INSTALLED"], ["removed", "REMOVED BEFORE"], ["clean", "CLEAN UP"]]
             counts: panel.history.length ? { removed: panel.history.length } : ({})

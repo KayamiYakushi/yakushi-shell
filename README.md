@@ -57,11 +57,11 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | Keys | |
 |---|---|
 | SUPER + Space | Apps (Tab: clipboard history) |
-| SUPER + SHIFT + V | Clipboard history (can be turned off in Settings -> Default Apps) |
+| SUPER + SHIFT + V | Clipboard history (can be turned off in Settings -> Programs -> Default Apps) |
 | SUPER + I | Settings |
 | SUPER + Q / E / B | Terminal / files / browser |
 | SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |
-| SUPER + SHIFT + S | Screenshot of an area (CTRL instead of SHIFT: the window; SUPER + Delete: the screen). Clipboard only, unless Settings -> Default Apps saves them too |
+| SUPER + SHIFT + S | Screenshot of an area (CTRL instead of SHIFT: the window; SUPER + Delete: the screen). Clipboard only, unless Settings -> Programs -> Default Apps saves them too |
 | SUPER + Tab | Lock |
 | SUPER + ` | Power menu |
 | SUPER + Escape | What is running, and why |
@@ -73,13 +73,13 @@ değiştir"), and Enter takes you to the setting and lights it up. Settings ->
 Programs -> CLEAN UP finds leftovers of removed programs, old backups,
 broken links, caches and old packages; your files go to an undo-able trash.
 
-Every shortcut can be changed in Settings -> Keybinds. Put a square
+Every shortcut can be changed in Settings -> Input -> Keybinds. Put a square
 picture in Settings -> System to see yourself on the lock screen.
 
 The login screen is the lock screen's twin: the package installs it as the
 SDDM theme `yakushi` (`sddm/` here). Turn it on once with
 `printf '[Theme]\nCurrent=yakushi\n' | sudo tee /etc/sddm.conf.d/yakushi-theme.conf`,
-then press MATCH THE SHELL in Settings -> Login Screen: it copies your
+then press MATCH THE SHELL in Settings -> Desktop -> Login Screen: it copies your
 accent, 12/24 h clock and profile picture into the theme (the login screen
 runs as the `sddm` user and cannot read your home). The background is chosen
 on the same page. Try the theme without logging out:

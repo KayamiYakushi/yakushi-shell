@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Default applications for Settings -> Default Apps.
+"""Default applications for Settings -> Programs -> Default Apps.
 
 Commands:
     scan                  Installed apps per category + the current choice (JSON).

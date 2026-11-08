@@ -15,7 +15,7 @@ symlink, only the link moves; what it points to stays as it is). To go
 back, delete the new folder and rename the old one.
 
 The terminal, file manager, browser and keyboard layout are taken from what
-this computer has; Settings -> Default Apps / Input change them later.
+this computer has; Settings -> Programs -> Default Apps / Input change them later.
 Standard library only.
 """
 from __future__ import annotations
@@ -149,7 +149,7 @@ def main() -> None:
     say(f"  file manager:  {values['FILE_MANAGER']}")
     say(f"  browser:       {values['BROWSER']}")
     say(f"  keyboard:      {values['KB_LAYOUT']}")
-    say("  (Settings -> Default Apps / Input change these later)")
+    say("  (Settings -> Programs -> Default Apps / Input change these later)")
 
     if dry:
         say("\n--dry-run: nothing was changed.")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Shake to find: the cursor grows while you shake the mouse.
 
-    yakushi-shake.py           run (Settings -> Input -> Cursor starts it)
+    yakushi-shake.py           run (Settings -> Input -> Keyboard & Mouse -> Cursor starts it)
     yakushi-shake.py --login   run only if shake to find is switched on
 
 Reads the cursor position from Hyprland's own socket (no hyprctl processes,

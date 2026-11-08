@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Default Apps -> Clipboard history (under Screenshots)
+// Settings -> Programs -> Default Apps -> Clipboard history (under Screenshots)
 //
 // Off: nothing you copy is recorded and the old history is deleted.
 // Saved by scripts/yakushi-launchctl.py ("launcher.clipboard"), which also

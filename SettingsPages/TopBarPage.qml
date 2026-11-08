@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Top Bar
+// Settings -> Desktop -> Top Bar
 //
 // Chooses which modules the island shows and in what order, the
 // clock format and the bar opacity. Every change is saved by

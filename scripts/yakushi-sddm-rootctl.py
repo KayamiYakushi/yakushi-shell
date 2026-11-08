@@ -105,7 +105,7 @@ elif cmd == "set-look":
         owner = user
 
     look = (
-        "# Written by Yakushi Settings -> Login Screen -> MATCH THE SHELL.\n"
+        "# Written by Yakushi Settings -> Desktop -> Login Screen -> MATCH THE SHELL.\n"
         "[General]\n"
         f"accent={accent.lower()}\n"
         f"clock24={'true' if clock == '24' else 'false'}\n"

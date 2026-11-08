@@ -24,9 +24,13 @@ PanelWindow {
     function beginExternalDialog() { dialogs += 1 }
     function endExternalDialog() { dialogs = Math.max(0, dialogs - 1) }
 
-    // show(), or show("Tasks") to open on that page
+    // show(), or show("Tasks") to open on that page (a tab's name opens
+    // that tab: show("Keybinds"))
     function show(start) {
-        page = Math.max(0, pageIndex(start || ""))
+        page = 0
+        lastTabs = {}
+        tab = 0
+        go(start || "")
         searchField.text = ""
         Qt.callLater(function() { searchField.forceActiveFocus() })   // type to search; Esc works right away
         // always opens at its default size, in the middle
@@ -37,12 +41,44 @@ PanelWindow {
         showing = true
     }
 
-    function pageIndex(name) {
-        var n = String(name).toLowerCase()
-        for (var i = 0; i < pages.length; i++)
-            if (pages[i].name.toLowerCase() === n || pages[i].file.toLowerCase() === n + "page")
-                return i
-        return -1
+    // where a page or a tab is, by its name or its file ("keybinds",
+    // "Default Apps"): { page, tab }, or null
+    function locate(name) {
+        var n = String(name).toLowerCase().replace(/[^a-z&]/g, "")
+        if (n === "")
+            return null
+        function same(p) {
+            return p.name.toLowerCase().replace(/[^a-z&]/g, "") === n
+                || (p.file !== undefined && p.file.toLowerCase() === n + "page")
+        }
+        for (var i = 0; i < pages.length; i++) {
+            if (same(pages[i]))
+                return { page: i, tab: -1 }
+            var tabs = pages[i].tabs || []
+            for (var j = 0; j < tabs.length; j++)
+                if (same(tabs[j]))
+                    return { page: i, tab: j }
+        }
+        return null
+    }
+
+    // open a page or a tab; false when there is none by that name. A group
+    // asked for by its own name opens on its first tab.
+    function go(name) {
+        var at = locate(name)
+        if (!at)
+            return false
+        page = at.page
+        tab = Math.max(0, at.tab)
+        return true
+    }
+
+    // "DESKTOP · TOP BAR" for a tab, "SOUND" for a page
+    function placeOf(name) {
+        var at = locate(name)
+        if (!at || at.tab < 0)
+            return String(name).toUpperCase()
+        return (pages[at.page].name + "  ·  " + pages[at.page].tabs[at.tab].name).toUpperCase()
     }
 
     // Tasks -> REMOVE PACKAGE: switch to Programs with that package's plan
@@ -51,7 +87,7 @@ PanelWindow {
 
     function openPrograms(names) {
         pendingRemove = names
-        page = pageIndex("Programs")
+        go("Programs")
     }
 
     // ---- search (SettingsSearch.js): type, then Enter or click a result
@@ -74,10 +110,8 @@ PanelWindow {
             Quickshell.execDetached([Paths.shell + "/bin/yakushi", r.entry.run])
             return
         }
-        var target = pageIndex(r.entry.page)
-        if (target < 0)
+        if (!go(r.entry.page))
             return
-        page = target
         finder.texts = r.entry.find || []
         finder.tries = 0
         finder.restart()
@@ -183,24 +217,48 @@ PanelWindow {
         id: saved
     }
 
+    // The page list. A page with `tabs` is a group: its tabs are pages of
+    // their own, named in the page heading (PageTitle); the first one opens.
+    // Ordered: the computer, how it looks, the devices.
     readonly property var pages: [
         { name: "System",       jp: "システム",       file: "SystemPage",      glyph: "󰒓" },
         { name: "Tasks",        jp: "タスク",         file: "TasksPage",       glyph: String.fromCodePoint(0xF04C5) },
-        { name: "Programs",     jp: "プログラム",     file: "ProgramsPage",    glyph: String.fromCodePoint(0xF03D7) },
+        { name: "Programs",     jp: "プログラム",     glyph: String.fromCodePoint(0xF03D7), tabs: [
+            { name: "Programs",         file: "ProgramsPage" },
+            { name: "Default Apps",     file: "DefaultAppsPage" }
+        ] },
         { name: "Security",     jp: "セキュリティ",   file: "SecurityPage",    glyph: String.fromCodePoint(0xF0565) },
         { name: "Appearance",   jp: "外観",           file: "AppearancePage",  glyph: "󰏘" },
-        { name: "Top Bar",      jp: "トップバー",     file: "TopBarPage",      glyph: String.fromCodePoint(0xF1513) },
-        { name: "Notifications", jp: "通知",          file: "NotificationsPage", glyph: String.fromCodePoint(0xF009A) },
-        { name: "Login Screen", jp: "ログイン画面",   file: "LoginScreenPage", glyph: "󰌾" },
-        { name: "Keybinds",     jp: "キー設定",       file: "KeybindsPage",    glyph: "󰌌" },
-        { name: "Default Apps", jp: "既定アプリ",     file: "DefaultAppsPage", glyph: String.fromCodePoint(0xF003B) },
-        { name: "Input",        jp: "入力",           file: "InputPage",       glyph: "󰍽" },
-        { name: "Sound",        jp: "サウンド",       file: "SoundPage",       glyph: "" },
-        { name: "Monitors",     jp: "モニター",       file: "MonitorsPage",    glyph: "" },
+        { name: "Desktop",      jp: "デスクトップ",   glyph: String.fromCodePoint(0xF0A07), tabs: [
+            { name: "Top Bar",          file: "TopBarPage" },
+            { name: "Notifications",    file: "NotificationsPage" },
+            { name: "Login Screen",     file: "LoginScreenPage" }
+        ] },
+        { name: "Input",        jp: "入力",           glyph: "󰍽", tabs: [
+            { name: "Keyboard & Mouse", file: "InputPage" },
+            { name: "Keybinds",         file: "KeybindsPage" }
+        ] },
+        { name: "Sound",        jp: "サウンド",       file: "SoundPage",       glyph: "" },
+        { name: "Monitors",     jp: "モニター",       file: "MonitorsPage",    glyph: "" },
         // these two keep their own right margin
-        { name: "Network",      jp: "ネットワーク",   file: "NetworkPage",     glyph: "", ownMargin: true },
+        { name: "Network",      jp: "ネットワーク",   file: "NetworkPage",     glyph: "", ownMargin: true },
         { name: "Bluetooth",    jp: "ブルートゥース", file: "BluetoothPage",   glyph: "󰂯", ownMargin: true }
     ]
+
+    // the open tab of a group, and the one each group had last (while
+    // Settings is open)
+    property int tab: 0
+    property var lastTabs: ({})
+    readonly property var current: pages[page].tabs ? pages[page].tabs[Math.min(tab, pages[page].tabs.length - 1)] : pages[page]
+
+    onPageChanged: tab = lastTabs[page] || 0
+    onTabChanged: lastTabs[page] = tab
+
+    function nextTab(step) {
+        var tabs = pages[page].tabs
+        if (tabs)
+            tab = (tab + step + tabs.length) % tabs.length
+    }
 
     function two(n) {
         return n < 10 ? "0" + n : String(n)
@@ -228,6 +286,19 @@ PanelWindow {
             sequence: "Escape"
             enabled: settings.showing && !settings.stepAside && outside.Window.activeFocusItem === null
             onActivated: picker.opened ? picker.dismiss() : settings.hide()
+        }
+
+        // the tabs of a group: Ctrl + Tab, Ctrl + Shift + Tab
+        Shortcut {
+            sequence: "Ctrl+Tab"
+            enabled: settings.showing && !settings.stepAside && !picker.opened && !!settings.pages[settings.page].tabs
+            onActivated: settings.nextTab(1)
+        }
+
+        Shortcut {
+            sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab"]
+            enabled: settings.showing && !settings.stepAside && !picker.opened && !!settings.pages[settings.page].tabs
+            onActivated: settings.nextTab(-1)
         }
 
         MouseArea {
@@ -652,7 +723,7 @@ PanelWindow {
                                     textFormat: Text.PlainText
                                     width: parent.width
                                     elide: Text.ElideRight
-                                    text: hit.modelData.entry.page ? hit.modelData.entry.page.toUpperCase() : "OPENS ON ITS OWN"
+                                    text: hit.modelData.entry.page ? settings.placeOf(hit.modelData.entry.page) : "OPENS ON ITS OWN"
                                     color: hit.here ? Theme.tint(hit.ink, 0.75) : Theme.inkSoft
                                     font.family: Theme.mono
                                     font.pixelSize: 9
@@ -810,8 +881,8 @@ PanelWindow {
                     id: view
 
                     anchors.fill: parent
-                    anchors.rightMargin: settings.pages[settings.page].ownMargin ? 0 : 28
-                    source: "SettingsPages/" + settings.pages[settings.page].file + ".qml"
+                    anchors.rightMargin: settings.current.ownMargin ? 0 : 28
+                    source: "SettingsPages/" + settings.current.file + ".qml"
                     onLoaded: item.hostWindow = settings
 
                     // each page fades in

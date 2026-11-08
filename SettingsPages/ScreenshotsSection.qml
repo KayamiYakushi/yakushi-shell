@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Default Apps -> Screenshots (the section at the bottom)
+// Settings -> Programs -> Default Apps -> Screenshots (the section at the bottom)
 //
 // Every screenshot goes to the clipboard. Writing it to a file as well is
 // off until you turn it on here, so no folder fills up on its own. Saved by
@@ -161,7 +161,7 @@ Column {
         textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.Wrap
-        text: "Change the keys in Settings -> Keybinds."
+        text: "Change the keys in Settings -> Input -> Keybinds."
         color: Theme.inkMute
         font.family: Theme.mono
         font.pixelSize: 9

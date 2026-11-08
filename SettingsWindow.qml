@@ -2,7 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "SettingsPages"
-import "SettingsSearch.js" as SettingsSearch
+import "SearchLanguages.js" as SearchLanguages
 
 // The Settings panel (SUPER + I): a card in the middle of the screen with
 // the page list on the left and the chosen page on the right: a header strip
@@ -94,9 +94,19 @@ PanelWindow {
     property string searchQuery: ""
     property int searchIndex: 0
     // English, plus the languages of your locale (LANG, LC_TIME, ...)
-    readonly property var searchLanguages: SettingsSearch.languages(function(name) { return Quickshell.env(name) })
+    readonly property var searchLanguages: SearchLanguages.languages(function(name) { return Quickshell.env(name) })
     readonly property var searchResults: searchQuery.trim() === "" ? []
-        : SettingsSearch.search(searchQuery, 8, searchLanguages)
+        : searchEngine.item ? searchEngine.item.search(searchQuery, 8, searchLanguages) : []
+
+    // the index loads with the first letter typed, not with Settings
+    Loader {
+        id: searchEngine
+
+        active: settings.searchQuery !== ""
+        source: "SettingsSearchEngine.qml"
+        // stays loaded once used: the next search needs no new compile
+        onActiveChanged: if (active) active = true
+    }
 
     onSearchQueryChanged: searchIndex = 0
 
@@ -191,8 +201,16 @@ PanelWindow {
 
     // In-card image chooser shared by System and Login Screen.
     // `done(path)` runs with the chosen file.
+    // the chooser once loaded; until then a closed stand-in
+    readonly property QtObject picker: pickerLoader.item ? pickerLoader.item : pickerIdle
+    property QtObject pickerIdle: QtObject {
+        property bool opened: false
+        function dismiss() {}
+    }
+
     function openImagePicker(homeDir, startDir, done) {
-        picker.whenChosen = done
+        pickerLoader.active = true
+        pickerLoader.whenChosen = done
         picker.homeDir = homeDir
         picker.openAt(startDir)
     }
@@ -670,7 +688,7 @@ PanelWindow {
                             textFormat: Text.PlainText
                             visible: searchField.text === ""
                             anchors.verticalCenter: parent.verticalCenter
-                            text: SettingsSearch.placeholder(settings.searchLanguages)
+                            text: SearchLanguages.placeholder(settings.searchLanguages)
                             color: Theme.inkMute
                             font.family: Theme.mono
                             font.pixelSize: 10
@@ -950,21 +968,32 @@ PanelWindow {
             }
 
             // ============ image chooser, over the whole card ============
-            ImagePicker {
-                id: picker
-
-                property var whenChosen: null
+            // loaded the first time a page asks for it: most visits never do
+            Loader {
+                id: pickerLoader
 
                 anchors.fill: parent
                 z: 100
+                active: false
+                // by its file, not its type name: then it is not even compiled
+                // until it is needed
+                source: "SettingsPages/ImagePicker.qml"
 
-                onAccepted: function(path) {
-                    if (whenChosen)
-                        whenChosen(path)
-                    whenChosen = null
+                property var whenChosen: null
+
+                Connections {
+                    target: pickerLoader.item
+
+                    function onAccepted(path) {
+                        if (pickerLoader.whenChosen)
+                            pickerLoader.whenChosen(path)
+                        pickerLoader.whenChosen = null
+                    }
+
+                    function onClosed() {
+                        outside.forceActiveFocus()
+                    }
                 }
-
-                onClosed: outside.forceActiveFocus()
             }
         }
     }

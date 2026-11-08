@@ -1,4 +1,5 @@
 .pragma library
+.import "SearchLanguages.js" as Lang
 
 // Settings search: what you type -> the setting you mean, in your language.
 //
@@ -23,15 +24,9 @@
 // below 1: ranks after an equal match (the top bar's show/hide switches come
 // after the setting itself).
 //
-// Adding a language: its code in LANGS, WORD (the placeholder), STOPS
+// Adding a language: its code in LANGS and WORD (SearchLanguages.js), STOPS
 // (filler words) and a line per setting in its keys. Languages written
 // without spaces between words (Japanese, Chinese) would need another matcher.
-
-var LANGS = ["en", "tr", "de", "es", "fr", "pt", "it", "ru", "pl"]
-
-// "SEARCH  ·  <this>" in the search field
-var WORD = { tr: "ara", de: "suchen", es: "buscar", fr: "rechercher", pt: "pesquisar", it: "cerca",
-             ru: "поиск", pl: "szukaj" }
 
 var INDEX = [
     // ---- System
@@ -501,28 +496,13 @@ function words(text) {
     return fold(text).split(" ").filter(function(w) { return w.length > 1 || /[0-9]/.test(w) })
 }
 
-// the languages to search in, from the locale variables (`env` reads one)
+// (kept here too for KeybindsSearch.js and older callers)
 function languages(env) {
-    var found = ["en"]
-    var names = ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG", "LC_TIME", "LC_NUMERIC", "LC_MONETARY", "LC_PAPER",
-                 "LC_MEASUREMENT", "LC_ADDRESS", "LC_TELEPHONE", "LC_NAME"]
-    for (var i = 0; i < names.length; i++) {
-        var parts = String(env(names[i]) || "").split(":")      // LANGUAGE is a list
-        for (var j = 0; j < parts.length; j++) {
-            var code = parts[j].split(/[_.@]/)[0].toLowerCase()
-            if (LANGS.indexOf(code) >= 0 && found.indexOf(code) < 0)
-                found.push(code)
-        }
-    }
-    return found
+    return Lang.languages(env)
 }
 
-// the hint in the search field: "SEARCH", plus the word in your language
 function placeholder(langs) {
-    for (var i = 0; i < langs.length; i++)
-        if (WORD[langs[i]])
-            return "SEARCH  ·  " + WORD[langs[i]]
-    return "SEARCH"
+    return Lang.placeholder(langs)
 }
 
 // Damerau-Levenshtein (optimal string alignment): swaps count as one

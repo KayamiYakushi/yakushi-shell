@@ -62,6 +62,7 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | SUPER + Q / E / B | Terminal / files / browser |
 | SUPER + W | Wallpapers (put your pictures in `~/Pictures/Wallpapers`) |
 | SUPER + SHIFT + S | Screenshot of an area (CTRL instead of SHIFT: the window; SUPER + Delete: the screen). Clipboard only, unless Settings -> Programs -> Default Apps saves them too |
+| SUPER + SHIFT + C | Colour picker: point, click, the hex code (`#RRGGBB`) is on the clipboard. Esc cancels |
 | SUPER + Tab | Lock |
 | SUPER + ` | Power menu |
 | SUPER + Escape | What is running, and why |
@@ -116,6 +117,7 @@ all of it):
 "yakushi volume up|down|mute" -- volume keys
 "yakushi bar toggle"
 "yakushi wallpaper"           -- SUPER + W
+"yakushi color-picker"        -- SUPER + SHIFT + C
 "yakushi launcher"            -- SUPER + Space
 "yakushi launcher clipboard"  -- SUPER + SHIFT + V
 "yakushi power"               -- SUPER + `  (the island's power menu)
@@ -135,6 +137,13 @@ The wallpaper picker (SUPER + W) is the same kind of card:
 
 ```lua
 hl.layer_rule({ match = { namespace = "yakushi-wallpaper" }, blur = true, ignore_alpha = 0.15, no_anim = true })
+```
+
+The colour picker (SUPER + SHIFT + C) holds the screen still while you
+aim; without a fade the frozen picture does not blink in:
+
+```lua
+hl.layer_rule({ match = { namespace = "yakushi-colorpicker" }, no_anim = true })
 ```
 
 Windows get the same cut corners from Hyprland itself:

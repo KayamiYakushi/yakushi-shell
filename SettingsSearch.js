@@ -18,7 +18,8 @@
 // so accents never decide. Everything runs here, offline.
 //
 // `find` is text shown on the page next to the setting: Settings scrolls to
-// it and lights it up. `run` instead of `page`: a yakushi command. `weight`
+// it and lights it up. `run` instead of `page`: a yakushi command (`wait`:
+// once Settings has closed). `weight`
 // below 1: ranks after an equal match (the top bar's show/hide switches come
 // after the setting itself).
 //
@@ -439,6 +440,19 @@ var INDEX = [
         tr: "duvar kağıdı arka plan masaüstü resmi masaüstü arka planı", de: "hintergrundbild hintergrund",
         es: "fondo de pantalla fondo", fr: "fond d'écran", pt: "papel de parede plano de fundo", it: "sfondo",
         ru: "обои фон рабочего стола", pl: "tapeta tło pulpitu" } },
+
+    // ---- not a page: the colour picker (SUPER + SHIFT + C); `wait`: after
+    // Settings has closed, or it would be in the picture
+    { run: "color-picker", wait: true, title: "Colour picker (copies a hex code, SUPER + SHIFT + C)", keys: {
+        en: "color colour picker pick eyedropper hex code screen pixel copy",
+        tr: "renk seçici seç pipet damlalık hex kodu ekran piksel kopyala",
+        de: "farbe farbwähler pipette hex code bildschirm pixel kopieren",
+        es: "color selector cuentagotas código hex pantalla píxel copiar",
+        fr: "couleur sélecteur pipette code hex écran pixel copier",
+        pt: "cor seletor conta-gotas código hex tela pixel copiar",
+        it: "colore selettore contagocce codice hex schermo pixel copiare",
+        ru: "цвет пипетка выбор цвета hex код экран пиксель копировать",
+        pl: "kolor próbnik pipeta kod hex ekran piksel kopiuj" } },
 
     // ---- Bluetooth
     { page: "Bluetooth", find: ["BLUETOOTH"], title: "Bluetooth devices", keys: {

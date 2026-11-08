@@ -21,6 +21,7 @@
 #                                      Show notifications or not (off: apps are
 #                                      still answered at once, nothing is shown).
 #   yakushi wallpaper                  The wallpaper picker.
+#   yakushi color-picker               Point at a colour, click: its hex code is copied.
 #   yakushi screenshot area|window|screen
 #                                      To the clipboard; also to Pictures/Screenshots
 #                                      only while Settings -> Programs -> Default Apps says so.
@@ -279,6 +280,7 @@ case "$cmd" in
             *) usage ;;
         esac ;;
     wallpaper) exec sh "$root/wallpicker/launch.sh" ;;
+    color-picker|colour-picker|colorpicker) exec sh "$root/colorpicker/launch.sh" ;;
     screenshot)
         case "${1:-}" in
             area|window|screen) exec python3 "$scripts/yakushi-screenshot.py" take "$1" ;;

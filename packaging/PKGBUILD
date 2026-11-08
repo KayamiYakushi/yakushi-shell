@@ -7,7 +7,7 @@
 # A fresh clone works the same: git clone, cd packaging, makepkg -si.
 
 pkgname=yakushi-shell
-pkgver=r59.b8f45d8
+pkgver=r61.a10fecf
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock and login screen)"
 arch=('any')
@@ -33,7 +33,7 @@ optdepends=(
     'awww: wallpapers and the wallpaper picker'
     'imagemagick: wallpaper picker thumbnails'
     'cliphist: clipboard history (SUPER + V)'
-    'wl-clipboard: clipboard history and screenshots'
+    'wl-clipboard: clipboard history, screenshots and the colour picker'
     'playerctl: media keys and now playing'
     'xdg-desktop-portal-hyprland: the screen-share picker'
     'qt6-imageformats: WebP wallpapers'
@@ -43,7 +43,7 @@ optdepends=(
     'cava: the top bar visualizer'
     'brightnessctl: screen brightness keys'
     'hyprsunset: night light'
-    'grim: screenshots'
+    'grim: screenshots and the colour picker'
     'slurp: area screenshots'
     'hyprpolkitagent: password prompts for system changes (started by the starter config)'
     'libnotify: test notifications from Settings'

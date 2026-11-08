@@ -193,6 +193,8 @@ yakushi_bind("screenshot_full", "SUPER + Delete", hl.dsp.exec_cmd("yakushi scree
 yakushi_bind("screenshot_area", "SUPER + SHIFT + S", hl.dsp.exec_cmd("yakushi screenshot area"))
 -- YAKUSHI_BIND screenshot_window|Screenshots|Window Screenshot
 yakushi_bind("screenshot_window", "SUPER + CTRL + S", hl.dsp.exec_cmd("yakushi screenshot window"))
+-- YAKUSHI_BIND color_picker|Utilities|Colour Picker (copies the hex code)
+yakushi_bind("color_picker", "SUPER + SHIFT + C", hl.dsp.exec_cmd("yakushi color-picker"))
 -- YAKUSHI_BIND keyboard_layout|Input|Switch Keyboard Layout
 yakushi_bind("keyboard_layout", "SUPER + X", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 

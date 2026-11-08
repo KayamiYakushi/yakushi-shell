@@ -107,7 +107,11 @@ PanelWindow {
         searchField.text = ""
         if (r.entry.run) {                       // not a page (the wallpaper picker)
             hide()
-            Quickshell.execDetached([Paths.shell + "/bin/yakushi", r.entry.run])
+            if (r.entry.wait)                    // once the card has closed (the colour picker)
+                Quickshell.execDetached(["sh", "-c", 'sleep 0.6; exec "$0" "$1"',
+                                         Paths.shell + "/bin/yakushi", r.entry.run])
+            else
+                Quickshell.execDetached([Paths.shell + "/bin/yakushi", r.entry.run])
             return
         }
         if (!go(r.entry.page))

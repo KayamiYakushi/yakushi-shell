@@ -731,8 +731,11 @@ Item {
 
             Slider {
                 width: parent.width
-                visible: page.appsColours
+                // always shown, so it can be found; usable once the colours are on
+                opacity: page.appsColours ? 1 : 0.35
+                enabled: page.appsColours && page.appsLoaded
                 label: "File manager opacity  " + Math.round(page.filesOpacity * 100) + "%"
+                    + (page.appsColours ? "" : "   (turn on Match app colours)")
                 icon: "◐"
                 tint: Theme.accent
                 value: (page.filesOpacity - 0.30) / 0.70

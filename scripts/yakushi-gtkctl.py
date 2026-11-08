@@ -10,12 +10,17 @@ Commands:
                             stay solid; Hyprland blurs what shows through.
     sync                    Write the files again (after the accent changed;
                             called by yakushi-themesync.py).
+    reopen                  Restart Files (Nautilus) on the folders it shows:
+                            GTK reads its style only when an app starts, so
+                            open windows keep the old look until then. Never
+                            done on its own, as it would cut a running copy.
 
 What it writes, only while colours are on:
     ~/.config/gtk-4.0/yakushi.css, ~/.config/gtk-3.0/yakushi.css
     and one @import line, between yakushi markers, at the top of gtk.css
     in both folders. Whatever else you keep in gtk.css is left alone; off
-    removes exactly what was added. Open apps pick it up when reopened.
+    removes exactly what was added. Open apps pick it up when reopened
+(`reopen` does that for Files).
 
 Settings live in the "apps" section of ~/.config/yakushi/config.json.
 Runs only when called: no daemon, no timers.
@@ -25,7 +30,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import time
 
 import yakushi_config as config
 import yakushi_paths as paths
@@ -252,6 +260,51 @@ def apply(state: dict) -> None:
                 pass
 
 
+def files_running() -> bool:
+    try:
+        return subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "nautilus"],
+                              capture_output=True, timeout=3).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def files_locations() -> list[str]:
+    """The folder each open Files window shows (its first tab)."""
+    try:
+        out = subprocess.run(
+            ["busctl", "--user", "--json=short", "get-property", "org.freedesktop.FileManager1",
+             "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1", "OpenWindowsWithLocations"],
+            capture_output=True, text=True, timeout=3)
+        windows = json.loads(out.stdout).get("data", {})
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired):
+        return []
+    places = []
+    for _window, uris in sorted(windows.items()):
+        if isinstance(uris, list) and uris and isinstance(uris[0], str) and uris[0] not in places:
+            places.append(uris[0])
+    return places
+
+
+def reopen_files() -> str:
+    if not shutil.which("nautilus"):
+        return "Files (Nautilus) is not installed."
+    if not files_running():
+        return "Files is not open; it will use the new look when you open it."
+    places = files_locations()
+    subprocess.run(["nautilus", "-q"], capture_output=True, timeout=10)
+    for _ in range(50):                     # up to 5 s to close
+        if not files_running():
+            break
+        time.sleep(0.1)
+    else:
+        return "Files did not close (busy?). Close it yourself and open it again."
+    for place in places or [None]:
+        command = ["nautilus", "--new-window"] + ([place] if place else [])
+        subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    return "Files reopened with the new look."
+
+
 def save(change) -> dict:
     def edit(saved: dict) -> dict:
         state = sanitize(saved)
@@ -270,7 +323,7 @@ def main() -> None:
 
     try:
         if args == ["get"]:
-            emit({"ok": True, **sanitize(config.section("apps"))})
+            emit({"ok": True, **sanitize(config.section("apps")), "filesOpen": files_running()})
 
         elif len(args) == 3 and args[:2] == ["set", "colours"]:
             if args[2] not in ("on", "off"):
@@ -278,9 +331,9 @@ def main() -> None:
             value = args[2] == "on"
             state = save(lambda s: s.update(colours=value))
             apply(state)
-            emit({"ok": True, **state,
-                  "message": "GTK apps use the shell's colours. Reopen open apps to see it."
-                  if value else "GTK apps are back to plain Adwaita dark."})
+            emit({"ok": True, **state, "filesOpen": files_running(),
+                  "message": "GTK apps use the shell's colours; apps that are open change when reopened."
+                  if value else "GTK apps are back to plain Adwaita dark (open apps: when reopened)."})
 
         elif len(args) == 3 and args[:2] == ["set", "opacity"]:
             try:
@@ -290,7 +343,8 @@ def main() -> None:
                 return
             state = save(lambda s: s.update(filesOpacity=value))
             apply(state)
-            emit({"ok": True, **state, "message": f"File manager opacity {round(value * 100)}%."})
+            emit({"ok": True, **state, "filesOpen": files_running(),
+                  "message": f"File manager opacity {round(value * 100)}%."})
 
         elif args == ["sync"]:
             state = sanitize(config.section("apps"))
@@ -298,8 +352,11 @@ def main() -> None:
                 apply(state)
             emit({"ok": True, **state})
 
+        elif args == ["reopen"]:
+            emit({"ok": True, "message": reopen_files(), "filesOpen": files_running()})
+
         else:
-            fail("Usage: get | set colours on|off | set opacity <0.30..1> | sync")
+            fail("Usage: get | set colours on|off | set opacity <0.30..1> | sync | reopen")
     except OSError as error:
         fail(f"Could not write the GTK files: {error.strerror or error}")
 

@@ -402,12 +402,45 @@ Item {
     property bool appsColours: false
     property real filesOpacity: 1.0
     property string appsStatus: ""
+    property bool filesOpen: false          // Files (Nautilus) is running
+    property bool appsChanged: false        // changed since this page opened
 
     function readApps(data) {
         if (typeof data.colours === "boolean")
             appsColours = data.colours
         if (typeof data.filesOpacity === "number")
             filesOpacity = data.filesOpacity
+        if (typeof data.filesOpen === "boolean")
+            filesOpen = data.filesOpen
+    }
+
+    // GTK reads its style only at start-up: open Files windows keep the old
+    // look until Files restarts. Done only on request (a running copy would
+    // be cut short).
+    function reopenFiles() {
+        if (appsReopen.running)
+            return
+        appsStatus = "Reopening Files..."
+        appsReopen.running = true
+    }
+
+    Process {
+        id: appsReopen
+
+        command: ["python3", Paths.script("yakushi-gtkctl.py"), "reopen"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var data = JSON.parse(text)
+                    page.appsStatus = data.message || ""
+                    page.appsChanged = false
+                    if (typeof data.filesOpen === "boolean")
+                        page.filesOpen = data.filesOpen
+                } catch (e) {
+                    page.appsStatus = "Could not reopen Files."
+                }
+            }
+        }
     }
 
     function setAppsColours(on) {
@@ -462,10 +495,12 @@ Item {
                 try {
                     var data = JSON.parse(text)
                     page.appsStatus = data.message || ""
-                    if (data.ok)
+                    if (data.ok) {
                         page.readApps(data)
-                    else
+                        page.appsChanged = true
+                    } else {
                         appsGet.running = true
+                    }
                 } catch (e) {
                     page.appsStatus = "Could not save the app settings."
                 }
@@ -683,6 +718,69 @@ Item {
                 color: Theme.inkMute
                 font.family: Theme.mono
                 font.pixelSize: 9
+            }
+
+            ToggleRow {
+                width: parent.width
+                icon: String.fromCodePoint(0xF024B)
+                label: "Match app colours"
+                checked: page.appsColours
+                available: page.appsLoaded && !appsSet.running
+                onToggled: page.setAppsColours(!page.appsColours)
+            }
+
+            Slider {
+                width: parent.width
+                visible: page.appsColours
+                label: "File manager opacity  " + Math.round(page.filesOpacity * 100) + "%"
+                icon: "◐"
+                tint: Theme.accent
+                value: (page.filesOpacity - 0.30) / 0.70
+
+                onSliding: function(v) {
+                    page.filesOpacity = 0.30 + v * 0.70
+                    filesOpacityDebounce.restart()
+                }
+
+                onSettled: function(v) {
+                    page.filesOpacity = 0.30 + v * 0.70
+                    filesOpacityDebounce.stop()
+                    page.saveFilesOpacity()
+                }
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                text: page.appsStatus !== ""
+                    ? page.appsStatus
+                    : "GTK apps (Files, Celluloid, Meld...) take the shell's surfaces and accent. The opacity is for the file manager only (Files, Nemo, Thunar): its background lets the wallpaper through, text and icons stay solid. Apps that are open change when reopened (REOPEN FILES does it for Files). Off brings back plain Adwaita dark."
+                wrapMode: Text.WordWrap
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 9
+                elide: Text.ElideRight
+            }
+
+            // open Files windows keep the old look until Files restarts
+            Row {
+                visible: page.appsChanged && page.filesOpen
+                spacing: 12
+
+                HeaderButton {
+                    label: "REOPEN FILES"
+                    icon: String.fromCodePoint(0xF0450)
+                    onActivated: page.reopenFiles()
+                }
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Files is open with the old look"
+                    color: Theme.inkSoft
+                    font.family: Theme.mono
+                    font.pixelSize: 9
+                }
             }
 
             Divider {}
@@ -1414,52 +1512,6 @@ Item {
                 elide: Text.ElideRight
             }
 
-            Divider {}
-
-            // ---------------- Apps ----------------
-            SectionLabel { text: "APPS" }
-
-            ToggleRow {
-                width: parent.width
-                icon: String.fromCodePoint(0xF024B)
-                label: "Match app colours"
-                checked: page.appsColours
-                available: page.appsLoaded && !appsSet.running
-                onToggled: page.setAppsColours(!page.appsColours)
-            }
-
-            Slider {
-                width: parent.width
-                visible: page.appsColours
-                label: "File manager opacity  " + Math.round(page.filesOpacity * 100) + "%"
-                icon: "◐"
-                tint: Theme.accent
-                value: (page.filesOpacity - 0.30) / 0.70
-
-                onSliding: function(v) {
-                    page.filesOpacity = 0.30 + v * 0.70
-                    filesOpacityDebounce.restart()
-                }
-
-                onSettled: function(v) {
-                    page.filesOpacity = 0.30 + v * 0.70
-                    filesOpacityDebounce.stop()
-                    page.saveFilesOpacity()
-                }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                text: page.appsStatus !== ""
-                    ? page.appsStatus
-                    : "GTK apps (Files, Celluloid, Meld...) take the shell's surfaces and accent. The opacity is for the file manager only (Files, Nemo, Thunar): its background lets the wallpaper through, text and icons stay solid. Reopen an app to see a change. Off brings back plain Adwaita dark."
-                wrapMode: Text.WordWrap
-                color: Theme.inkMute
-                font.family: Theme.mono
-                font.pixelSize: 9
-                elide: Text.ElideRight
-            }
 
             Text {
                 textFormat: Text.PlainText

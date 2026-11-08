@@ -628,8 +628,11 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.margins: 1
-            height: 32
+            // same inset as the text, so a low value never sits on the border
+            anchors.leftMargin: 18
+            anchors.rightMargin: 14
+            anchors.bottomMargin: 12
+            height: 26
 
             onWidthChanged: requestPaint()
 

@@ -57,7 +57,10 @@ PanelWindow {
     // ---- search (SettingsSearch.js): type, then Enter or click a result
     property string searchQuery: ""
     property int searchIndex: 0
-    readonly property var searchResults: searchQuery.trim() === "" ? [] : SettingsSearch.search(searchQuery, 8)
+    // English, plus the languages of your locale (LANG, LC_TIME, ...)
+    readonly property var searchLanguages: SettingsSearch.languages(function(name) { return Quickshell.env(name) })
+    readonly property var searchResults: searchQuery.trim() === "" ? []
+        : SettingsSearch.search(searchQuery, 8, searchLanguages)
 
     onSearchQueryChanged: searchIndex = 0
 
@@ -592,7 +595,7 @@ PanelWindow {
                             textFormat: Text.PlainText
                             visible: searchField.text === ""
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "SEARCH  ·  ara"
+                            text: SettingsSearch.placeholder(settings.searchLanguages)
                             color: Theme.inkMute
                             font.family: Theme.mono
                             font.pixelSize: 10
@@ -676,7 +679,7 @@ PanelWindow {
                         width: parent.width - 36
                         topPadding: 8
                         wrapMode: Text.Wrap
-                        text: "No setting matches. Try other words, in English or Turkish."
+                        text: "No setting matches. Try other words."
                         color: Theme.inkSoft
                         font.family: Theme.mono
                         font.pixelSize: 10

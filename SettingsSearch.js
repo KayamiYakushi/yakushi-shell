@@ -496,8 +496,9 @@ function fold(text) {
         .trim()
 }
 
+// one-letter words say nothing, but digits do ("workspace 3")
 function words(text) {
-    return fold(text).split(" ").filter(function(w) { return w.length > 1 })
+    return fold(text).split(" ").filter(function(w) { return w.length > 1 || /[0-9]/.test(w) })
 }
 
 // the languages to search in, from the locale variables (`env` reads one)
@@ -578,30 +579,23 @@ function fit(q, k) {
     return 0
 }
 
-// the index folded for one set of languages (kept: they do not change while
-// Settings is open)
-var cache = { key: "", list: [], stop: {} }
-
-function prepare(langs) {
-    var key = langs.join(",")
-    if (cache.key === key)
-        return cache
+// An index folded for one set of languages. `stops` is a table like STOPS
+// (Keybinds brings its own: there "open" and "close" are what you mean).
+function prepareList(index, langs, stops) {
     var stop = {}
-    langs.forEach(function(l) { words(STOPS[l] || "").forEach(function(w) { stop[w] = true }) })
-    var list = INDEX.map(function(e, at) {
+    langs.forEach(function(l) { words((stops || STOPS)[l] || "").forEach(function(w) { stop[w] = true }) })
+    var list = index.map(function(e, at) {
         var text = e.title
         langs.forEach(function(l) { text += " " + ((e.keys || {})[l] || "") })
         var seen = {}
         var keys = words(text).filter(function(w) { if (seen[w]) return false; seen[w] = true; return true })
         return { entry: e, at: at, keys: keys, page: words(e.page || ""), title: words(e.title) }
     })
-    cache = { key: key, list: list, stop: stop }
-    return cache
+    return { list: list, stop: stop }
 }
 
-// [{entry, score}], best first
-function search(query, limit, langs) {
-    var prepared = prepare(langs && langs.length ? langs : ["en"])
+// [{entry, score}], best first, from a prepareList() result
+function rank(prepared, query, limit) {
     var q = words(query).filter(function(w) { return !prepared.stop[w] })
     if (q.length === 0)
         return []
@@ -636,4 +630,14 @@ function search(query, limit, langs) {
         return []
     var top = scored[0].score
     return scored.filter(function(s) { return s.score >= top * 0.45 }).slice(0, limit || 8)
+}
+
+// Settings' own index (kept: the languages do not change while Settings is open)
+var cache = { key: "", prepared: null }
+
+function search(query, limit, langs) {
+    langs = langs && langs.length ? langs : ["en"]
+    if (cache.key !== langs.join(","))
+        cache = { key: langs.join(","), prepared: prepareList(INDEX, langs) }
+    return rank(cache.prepared, query, limit)
 }

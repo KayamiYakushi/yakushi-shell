@@ -74,8 +74,16 @@ değiştir"), and Enter takes you to the setting and lights it up. Settings ->
 Programs -> CLEAN UP finds leftovers of removed programs, old backups,
 broken links, caches and old packages; your files go to an undo-able trash.
 
-Every shortcut can be changed in Settings -> Input -> Keybinds. Put a square
-picture in Settings -> System to see yourself on the lock screen.
+Every shortcut can be changed in Settings -> Input -> Keybinds. Its search
+takes questions in your own words ("how do I open the launcher", "ekran
+görüntüsü nasıl alınır") or keys ("super + c"), and the list also shows the
+keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
+shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
+System to see yourself on the lock screen.
+
+Adding a shortcut or a window that takes keys: give it words in
+`KeybindsSearch.js`; `scripts/check-keybinds.py` (run by the package build)
+fails until you do.
 
 The login screen is the lock screen's twin: the package installs it as the
 SDDM theme `yakushi` (`sddm/` here). Turn it on once with

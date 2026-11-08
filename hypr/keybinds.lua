@@ -5,6 +5,9 @@
 --     yakushi_bind("<id>", "<keys>", <action>[, <options>])
 -- Change the keys there (or here, keeping that shape). Shortcuts turned
 -- off in Settings are listed in yakushi-disabled-binds.txt and skipped.
+-- A new shortcut also needs its words in the shell's KeybindsSearch.js, so
+-- Settings finds it when asked ("how do I ..."); shortcuts bound anywhere
+-- else are still listed there, read-only.
 
 HOME = HOME or os.getenv("HOME")
 

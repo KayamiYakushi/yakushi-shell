@@ -218,6 +218,103 @@ def parse():
 
     return entries
 
+# ---- shortcuts Hyprland has that keybinds.lua does not mark --------------
+# Anything bound elsewhere (another .lua file, a line added by hand or by an
+# app's install notes) still belongs in the list: it is shown read-only,
+# with what it does as far as the source tells.
+
+MODBITS = [(64, "SUPER"), (4, "CTRL"), (8, "ALT"), (1, "SHIFT")]
+HL_BIND_RE = re.compile(r'^\s*hl\.bind\(\s*"([^"]+)"\s*,\s*(.*)$')
+EXEC_RE = re.compile(r'exec_cmd\(\s*"((?:[^"\\]|\\.)*)"')
+DSP_RE = re.compile(r'hl\.dsp\.([\w.]+)\(')
+
+
+def active_binds():
+    """What Hyprland has bound right now, or None when it cannot be asked."""
+    try:
+        proc = subprocess.run(["hyprctl", "binds", "-j"], text=True,
+                              capture_output=True, timeout=3)
+        data = json.loads(proc.stdout) if proc.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    return data if isinstance(data, list) else None
+
+
+def combo_of(bind):
+    mask = int(bind.get("modmask") or 0)
+    mods = [name for bit, name in MODBITS if mask & bit]
+    key = bind.get("key") or ""
+    if not key and bind.get("keycode"):
+        key = f"code:{bind['keycode']}"
+    return normalize(" + ".join(mods + ([key] if key else [])))
+
+
+def describe(action):
+    """A readable name for the action text after the keys in hl.bind()."""
+    m = EXEC_RE.search(action)
+    if m:
+        return "Run " + m.group(1).replace('\\"', '"')
+    m = DSP_RE.search(action)
+    if m:
+        return m.group(1).replace(".", " ").replace("_", " ").capitalize()
+    return action.rstrip(" )").strip()[:60] or "Unknown action"
+
+
+def sources():
+    """Normalized keys -> (file name, action) for every literal hl.bind()
+    in the Hyprland config folder (yakushi_bind lines are marked already)."""
+    found = {}
+    for path in sorted(paths.HYPR.glob("*.lua")):
+        try:
+            text = path.read_text(errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            m = HL_BIND_RE.match(line)
+            if m:
+                found.setdefault(normalize(m.group(1)).casefold(), (path.name, m.group(2)))
+    return found
+
+
+def unmarked(entries):
+    binds = active_binds()
+    if binds is None:
+        return []
+    known = {normalize(e["combo"]).casefold() for e in entries if e["bindEnabled"]}
+    src = None
+    extra, seen = [], set()
+    for bind in binds:
+        combo = combo_of(bind)
+        submap = bind.get("submap") or ""
+        key = (submap, combo.casefold())
+        if not combo or key in seen or (not submap and combo.casefold() in known):
+            continue
+        seen.add(key)
+        if src is None:
+            src = sources()
+        where = src.get(combo.casefold())
+        if bind.get("description"):
+            label = bind["description"]
+        elif where:
+            label = describe(where[1])
+        else:
+            dsp = str(bind.get("dispatcher") or "")
+            m = re.match(r"HL\.Dispatcher\((\w+)\)", dsp)
+            label = (m.group(1).replace("_", " ").capitalize() if m
+                     else "Lua function" if dsp.startswith("function") else dsp or "Unknown action")
+        extra.append({
+            "id": "other:" + submap + ":" + combo,
+            "category": "Submap " + submap if submap else "Elsewhere",
+            "label": label,
+            "combo": combo,
+            "danger": False,
+            "bindEnabled": True,
+            "readonly": True,
+            "source": where[0] if where else "",
+        })
+    return extra
+
+
 def find_active_conflict(entries, bind_id, combo):
     normalized = normalize(combo).casefold()
 
@@ -258,7 +355,7 @@ def set_combo(bind_id, combo):
     target = next((e for e in entries if e["id"] == bind_id), None)
 
     if target is None:
-        fail(f"Unknown binding: {bind_id}")
+        fail(f"Unknown binding: {bind_id} (shortcuts set outside keybinds.lua are changed where they are set)")
 
     # Only ACTIVE bindings participate in conflict detection.
     # A disabled binding keeps its remembered shortcut without reserving it.
@@ -302,7 +399,7 @@ def set_enabled(bind_id, enabled):
     target = next((e for e in entries if e["id"] == bind_id), None)
 
     if target is None:
-        fail(f"Unknown binding: {bind_id}")
+        fail(f"Unknown binding: {bind_id} (shortcuts set outside keybinds.lua are changed where they are set)")
 
     disabled = disabled_ids()
 
@@ -385,7 +482,8 @@ def main():
     cmd = sys.argv[1]
 
     if cmd == "list":
-        emit(parse())
+        entries = parse()
+        emit(entries + unmarked(entries))
     elif cmd == "set" and len(sys.argv) >= 4:
         set_combo(sys.argv[2], sys.argv[3])
     elif cmd == "enable" and len(sys.argv) >= 3:

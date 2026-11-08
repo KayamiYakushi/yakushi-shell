@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../"
+import "../KeybindsSearch.js" as KeybindsSearch
 
 Item {
     id: page
@@ -13,6 +14,11 @@ Item {
     property string statusText: "Loading keybinds..."
     property bool statusError: false
     property var allBinds: []
+    // the system's languages (Settings search reads them the same way)
+    readonly property var searchLanguages: KeybindsSearch.languages(function(name) { return Quickshell.env(name) })
+    property string loadedText: ""
+    // what is typed in the search field (Settings can open the page with a question)
+    property alias query: searchInput.text
 
     function helperPath() {
         return Paths.script("yakushi-keybindctl.py")
@@ -59,27 +65,41 @@ Item {
         toggleProc.running = true
     }
 
+    // What you typed -> the shortcuts it means (KeybindsSearch.js): words in
+    // your languages ("how do I open the launcher"), or keys ("super + c").
     function rebuildFiltered() {
-        var q = searchInput.text.trim().toLowerCase()
+        var found = KeybindsSearch.find(allBinds, searchInput.text, searchLanguages)
         bindsModel.clear()
 
-        for (var i = 0; i < allBinds.length; ++i) {
-            var b = allBinds[i]
-            var matched = q === ""
-                || b.label.toLowerCase().indexOf(q) !== -1
-                || b.category.toLowerCase().indexOf(q) !== -1
-                || b.combo.toLowerCase().indexOf(q) !== -1
+        for (var i = 0; i < found.rows.length; ++i) {
+            var b = found.rows[i]
+            bindsModel.append({
+                bindId: b.id,
+                category: b.category,
+                label: b.label,
+                combo: b.combo,
+                danger: !!b.danger,
+                bindEnabled: !!b.bindEnabled,
+                viewOnly: !!b.readonly,
+                inApp: !!b.inApp,
+                source: b.source || "",
+                best: found.best === b
+            })
+        }
 
-            if (matched) {
-                bindsModel.append({
-                    bindId: b.id,
-                    category: b.category,
-                    label: b.label,
-                    combo: b.combo,
-                    danger: b.danger,
-                    bindEnabled: b.bindEnabled
-                })
-            }
+        if (found.mode === "all") {
+            statusText = loadedText
+            statusError = false
+        } else if (found.rows.length === 0) {
+            statusText = "Nothing matches. Try other words, or the keys themselves (super + c)."
+            statusError = false
+        } else if (found.best) {
+            statusText = "→  " + found.best.label + ":  " + found.best.combo.split(" + ")
+                .map(KeybindsSearch.prettyKey).join(" + ")
+            statusError = false
+        } else {
+            statusText = found.rows.length + (found.rows.length === 1 ? " shortcut uses" : " shortcuts use") + " these keys."
+            statusError = false
         }
 
         bindList.positionViewAtBeginning()
@@ -101,10 +121,10 @@ Item {
             onStreamFinished: {
                 try {
                     var data = JSON.parse(text)
-                    page.allBinds = data
+                    var apps = KeybindsSearch.appRows()
+                    page.loadedText = data.length + " shortcuts, " + apps.length + " keys inside Yakushi's windows."
+                    page.allBinds = data.concat(apps)
                     page.rebuildFiltered()
-                    page.statusText = data.length + " keybinds loaded."
-                    page.statusError = false
                 } catch (e) {
                     page.statusText = "Could not parse keybind list."
                     page.statusError = true
@@ -255,7 +275,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
             anchors.leftMargin: 36
-            text: "Search actions, categories or shortcuts..."
+            text: KeybindsSearch.placeholder(page.searchLanguages)
             color: Theme.inkMute
             font.family: Theme.mono
             font.pixelSize: 10
@@ -287,7 +307,9 @@ Item {
         anchors.right: parent.right
         height: 16
         text: page.statusText
-        color: page.statusError ? Theme.alert : Theme.inkSoft
+        color: page.statusError ? Theme.alert
+            : searchInput.text !== "" && bindsModel.count > 0 && bindsModel.get(0).best ? Theme.accent
+            : Theme.inkSoft
         font.family: Theme.mono
         font.pixelSize: 9
         elide: Text.ElideRight
@@ -301,7 +323,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 16
-        text: "The pencil edits a shortcut (Enter saves, Esc cancels); the switch turns one off without deleting it."
+        text: "Ask in your own words, or type keys. The pencil edits a shortcut (Enter saves, Esc cancels); the switch turns one off."
         color: Theme.inkMute
         font.family: Theme.mono
         font.pixelSize: 9
@@ -335,16 +357,23 @@ Item {
             required property string combo
             required property bool danger
             required property bool bindEnabled
+            required property bool viewOnly
+            required property bool inApp
+            required property string source
+            required property bool best
 
             property bool editing: false
-            readonly property var keys: combo.split("+").map(function(k) { return k.trim() })
-                .filter(function(k) { return k !== "" })
+            // alternatives ("Esc / Right click"), each a list of keys
+            readonly property var groups: combo.split(" / ").map(function(alt) {
+                return alt.split(" + ").map(function(k) { return KeybindsSearch.prettyKey(k.trim()) })
+                    .filter(function(k) { return k !== "" })
+            })
 
             width: ListView.view.width
             height: 50
             color: rowHover.hovered || editing ? Theme.tint(Theme.ink, 0.035) : Theme.card
             border.width: 1
-            border.color: editing
+            border.color: editing || best
                 ? Theme.accent
                 : danger ? Theme.tint(Theme.alert, 0.45)
                 : rowHover.hovered ? Theme.lineHot : Theme.line
@@ -355,6 +384,16 @@ Item {
 
             HoverHandler {
                 id: rowHover
+            }
+
+            // the answer to what was asked
+            Rectangle {
+                visible: bindRow.best
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 3
+                color: Theme.accent
             }
 
             Column {
@@ -378,8 +417,11 @@ Item {
 
                 Text {
                     textFormat: Text.PlainText
-                    text: bindRow.category.toUpperCase()
-                    color: Theme.inkMute
+                    width: parent.width
+                    elide: Text.ElideRight
+                    text: (bindRow.best ? "BEST MATCH  ·  " : "") + bindRow.category.toUpperCase()
+                        + (bindRow.source !== "" ? "  ·  " + bindRow.source : "")
+                    color: bindRow.best ? Theme.accent : Theme.inkMute
                     font.family: Theme.mono
                     font.pixelSize: 8
                     font.letterSpacing: 1
@@ -390,7 +432,7 @@ Item {
             Item {
                 id: keyArea
 
-                anchors.right: enableSwitch.left
+                anchors.right: bindRow.viewOnly ? readonlyTag.left : enableSwitch.left
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 width: bindRow.editing ? 210 : keycaps.implicitWidth
@@ -406,37 +448,59 @@ Item {
                     spacing: 4
 
                     Repeater {
-                        model: bindRow.keys
+                        model: bindRow.groups
 
-                        delegate: Rectangle {
-                            required property string modelData
+                        delegate: Row {
+                            id: group
 
-                            width: Math.max(26, capText.implicitWidth + 14)
-                            height: 24
-                            color: Theme.tint(Theme.ink, 0.06)
-                            border.width: 1
-                            border.color: Theme.tint(Theme.ink, 0.10)
+                            required property var modelData
+                            required property int index
 
-                            // subtle key "depth"
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                anchors.margins: 1
-                                height: 2
-                                color: Theme.tint("#000000", 0.35)
-                            }
+                            spacing: 4
 
                             Text {
-                                id: capText
-
-                                textFormat: Text.PlainText
-                                anchors.centerIn: parent
-                                anchors.verticalCenterOffset: -1
-                                text: parent.modelData
-                                color: Theme.ink
+                                visible: group.index > 0
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "/"
+                                color: Theme.inkMute
                                 font.family: Theme.mono
                                 font.pixelSize: 9
+                            }
+
+                            Repeater {
+                                model: group.modelData
+
+                                delegate: Rectangle {
+                                    required property string modelData
+
+                                    width: Math.max(26, capText.implicitWidth + 14)
+                                    height: 24
+                                    color: Theme.tint(Theme.ink, 0.06)
+                                    border.width: 1
+                                    border.color: Theme.tint(Theme.ink, 0.10)
+
+                                    // subtle key "depth"
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 1
+                                        height: 2
+                                        color: Theme.tint("#000000", 0.35)
+                                    }
+
+                                    Text {
+                                        id: capText
+
+                                        textFormat: Text.PlainText
+                                        anchors.centerIn: parent
+                                        anchors.verticalCenterOffset: -1
+                                        text: parent.modelData
+                                        color: Theme.ink
+                                        font.family: Theme.mono
+                                        font.pixelSize: 9
+                                    }
+                                }
                             }
                         }
                     }
@@ -481,9 +545,28 @@ Item {
                 }
             }
 
+            // shortcuts that are not keybinds.lua's: shown, not edited here
+            Text {
+                id: readonlyTag
+
+                visible: bindRow.viewOnly
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                width: 86
+                horizontalAlignment: Text.AlignRight
+                textFormat: Text.PlainText
+                text: bindRow.inApp ? "IN APP" : "SET ELSEWHERE"
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 8
+                font.letterSpacing: 1
+            }
+
             Switch {
                 id: enableSwitch
 
+                visible: !bindRow.viewOnly
                 anchors.right: editButton.left
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
@@ -494,6 +577,7 @@ Item {
             IconButton {
                 id: editButton
 
+                visible: !bindRow.viewOnly
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter

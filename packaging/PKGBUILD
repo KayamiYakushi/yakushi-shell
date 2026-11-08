@@ -66,6 +66,12 @@ pkgver() {
     printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
 }
 
+# every shortcut is listed in Settings -> Keybinds and found by asking
+check() {
+    cd "$pkgname"
+    python scripts/check-keybinds.py .
+}
+
 package() {
     cd "$pkgname"
     local share="$pkgdir/usr/share/$pkgname"

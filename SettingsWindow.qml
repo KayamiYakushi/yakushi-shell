@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "SettingsPages"
+import "SettingsSearch.js" as SettingsSearch
 
 // The Settings panel (SUPER + I): a card in the middle of the screen with
 // the page list on the left and the chosen page on the right: a header strip
@@ -26,7 +27,8 @@ PanelWindow {
     // show(), or show("Tasks") to open on that page
     function show(start) {
         page = Math.max(0, pageIndex(start || ""))
-        Qt.callLater(function() { outside.forceActiveFocus() })   // Esc works right away
+        searchField.text = ""
+        Qt.callLater(function() { searchField.forceActiveFocus() })   // type to search; Esc works right away
         // always opens at its default size, in the middle
         Theme.settingsWidth = 0
         Theme.settingsHeight = 0
@@ -50,6 +52,84 @@ PanelWindow {
     function openPrograms(names) {
         pendingRemove = names
         page = pageIndex("Programs")
+    }
+
+    // ---- search (SettingsSearch.js): type, then Enter or click a result
+    property string searchQuery: ""
+    property int searchIndex: 0
+    readonly property var searchResults: searchQuery.trim() === "" ? [] : SettingsSearch.search(searchQuery, 8)
+
+    onSearchQueryChanged: searchIndex = 0
+
+    function openResult(i) {
+        var r = searchResults[i]
+        if (!r)
+            return
+        searchField.text = ""
+        if (r.entry.run) {                       // not a page (the wallpaper picker)
+            hide()
+            Quickshell.execDetached([Paths.shell + "/bin/yakushi", r.entry.run])
+            return
+        }
+        var target = pageIndex(r.entry.page)
+        if (target < 0)
+            return
+        page = target
+        finder.texts = r.entry.find || []
+        finder.tries = 0
+        finder.restart()
+    }
+
+    // the visible Text on the page that reads like `wanted` (exact, then the
+    // start, then anywhere), or null
+    function findText(root, wanted) {
+        function clean(s) {
+            return String(s).replace(/\s+/g, " ").trim().toUpperCase()
+        }
+        var texts = []
+        function walk(item) {
+            if (!item || !item.visible)
+                return
+            if (typeof item.text === "string" && item.font !== undefined && item.text !== "")
+                texts.push(item)
+            var kids = item.children || []
+            for (var i = 0; i < kids.length; i++)
+                walk(kids[i])
+        }
+        walk(root)
+        var tests = [
+            function(have, want) { return have === want },
+            function(have, want) { return have.indexOf(want) === 0 },
+            function(have, want) { return have.indexOf(want) >= 0 }
+        ]
+        for (var t = 0; t < tests.length; t++)
+            for (var w = 0; w < wanted.length; w++)
+                for (var i = 0; i < texts.length; i++)
+                    if (tests[t](clean(texts[i].text), clean(wanted[w])))
+                        return texts[i]
+        return null
+    }
+
+    // scroll the page so `item` sits in the upper third, then light it up
+    function reveal(item) {
+        var flick = item.parent
+        while (flick && !(flick.contentY !== undefined && flick.contentHeight !== undefined
+                          && flick.flickableDirection !== undefined))
+            flick = flick.parent
+        if (flick && flick.contentHeight > flick.height) {
+            var y = item.mapToItem(flick.contentItem, 0, 0).y
+            flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, y - flick.height * 0.3))
+        }
+        // the row the label belongs to, when it is a row
+        var box = item.parent && item.parent.height <= 72 && item.parent.width > item.width ? item.parent : item
+        Qt.callLater(function() {
+            var at = box.mapToItem(pageArea, 0, 0)
+            flash.x = Math.max(0, at.x - 8)
+            flash.y = at.y - 5
+            flash.width = Math.min(pageArea.width - flash.x, box.width + 16)
+            flash.height = box.height + 10
+            flashAnim.restart()
+        })
     }
 
     function hide() {
@@ -454,10 +534,160 @@ PanelWindow {
                     color: Theme.tint(Theme.ink, 0.12)
                 }
 
+                // ---- search
+                CutBox {
+                    id: searchBox
+
+                    x: 16
+                    y: 14
+                    width: parent.width - 33
+                    height: 32
+                    cut: Theme.cutSmall
+                    fill: Theme.tint(Theme.ink, 0.03)
+                    stroke: searchField.activeFocus ? Theme.accent : Theme.line
+
+                    Text {
+                        id: searchGlyph
+
+                        textFormat: Text.PlainText
+                        x: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: String.fromCodePoint(0xF0349)
+                        color: searchField.activeFocus ? Theme.accent : Theme.inkSoft
+                        font.family: Theme.glyphs
+                        font.pixelSize: 13
+                    }
+
+                    TextInput {
+                        id: searchField
+
+                        anchors.left: searchGlyph.right
+                        anchors.leftMargin: 9
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Theme.ink
+                        selectionColor: Theme.tint(Theme.accent, 0.4)
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                        clip: true
+                        selectByMouse: true
+
+                        onTextChanged: settings.searchQuery = text
+
+                        Keys.onEscapePressed: {
+                            if (text !== "")
+                                text = ""
+                            else if (picker.opened)
+                                picker.dismiss()
+                            else
+                                settings.hide()
+                        }
+                        Keys.onDownPressed: settings.searchIndex = Math.min(settings.searchResults.length - 1, settings.searchIndex + 1)
+                        Keys.onUpPressed: settings.searchIndex = Math.max(0, settings.searchIndex - 1)
+                        Keys.onReturnPressed: settings.openResult(settings.searchIndex)
+                        Keys.onEnterPressed: settings.openResult(settings.searchIndex)
+
+                        Text {
+                            textFormat: Text.PlainText
+                            visible: searchField.text === ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "SEARCH  ·  ara"
+                            color: Theme.inkMute
+                            font.family: Theme.mono
+                            font.pixelSize: 10
+                            font.letterSpacing: 2
+                        }
+                    }
+                }
+
+                // ---- results, in place of the page list while you search
+                Column {
+                    id: resultList
+
+                    visible: settings.searchQuery.trim() !== ""
+                    y: searchBox.y + searchBox.height + 10
+                    width: parent.width - 1
+
+                    Repeater {
+                        model: settings.searchResults
+
+                        delegate: Rectangle {
+                            id: hit
+
+                            required property var modelData
+                            required property int index
+                            readonly property bool here: settings.searchIndex === index
+                            readonly property color ink: here ? settings.onAccent : Theme.ink
+
+                            width: parent.width
+                            height: 46
+                            color: here ? Theme.accent : hitMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
+
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.tFast }
+                            }
+
+                            Column {
+                                x: 20
+                                width: parent.width - 36
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    text: hit.modelData.entry.title
+                                    color: hit.ink
+                                    font.family: Theme.mono
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                }
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    text: hit.modelData.entry.page ? hit.modelData.entry.page.toUpperCase() : "OPENS ON ITS OWN"
+                                    color: hit.here ? Theme.tint(hit.ink, 0.75) : Theme.inkSoft
+                                    font.family: Theme.mono
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 1.5
+                                }
+                            }
+
+                            MouseArea {
+                                id: hitMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onEntered: settings.searchIndex = hit.index
+                                onClicked: settings.openResult(hit.index)
+                            }
+                        }
+                    }
+
+                    Text {
+                        textFormat: Text.PlainText
+                        visible: settings.searchResults.length === 0
+                        x: 20
+                        width: parent.width - 36
+                        topPadding: 8
+                        wrapMode: Text.Wrap
+                        text: "No setting matches. Try other words, in English or Turkish."
+                        color: Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 10
+                    }
+                }
+
                 Column {
                     id: pageList
 
-                    y: 14
+                    visible: !resultList.visible
+                    y: searchBox.y + searchBox.height + 10
                     width: parent.width - 1
 
                     Repeater {
@@ -472,7 +702,7 @@ PanelWindow {
                             readonly property color ink: here ? settings.onAccent : Theme.ink
 
                             width: parent.width
-                            height: 36
+                            height: 33
                             color: here ? Theme.accent : lineMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
 
                             Behavior on color {
@@ -565,6 +795,8 @@ PanelWindow {
 
             // ============ the page ============
             Item {
+                id: pageArea
+
                 x: list.width + 28
                 y: strip.height + 20
                 width: parent.width - x
@@ -596,6 +828,46 @@ PanelWindow {
                     }
 
                     Component.onCompleted: fade.restart()
+                }
+
+                // a search found this: the page waits until the setting is
+                // there (pages load their data), then shows it
+                Timer {
+                    id: finder
+
+                    property var texts: []
+                    property int tries: 0
+
+                    interval: 120
+                    repeat: true
+                    onTriggered: {
+                        tries += 1
+                        var hit = view.item && texts.length ? settings.findText(view.item, texts) : null
+                        if (hit) {
+                            stop()
+                            settings.reveal(hit)
+                        } else if (tries > 25) {
+                            stop()
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: flash
+
+                    z: 50
+                    opacity: 0
+                    color: Theme.tint(Theme.accent, 0.10)
+                    border.width: 1
+                    border.color: Theme.accent
+
+                    SequentialAnimation {
+                        id: flashAnim
+
+                        NumberAnimation { target: flash; property: "opacity"; from: 0; to: 1; duration: Theme.tMid }
+                        PauseAnimation { duration: 900 }
+                        NumberAnimation { target: flash; property: "opacity"; to: 0; duration: Theme.tSlow * 2 }
+                    }
                 }
             }
 

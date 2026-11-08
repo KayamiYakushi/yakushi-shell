@@ -67,6 +67,12 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | SUPER + Escape | What is running, and why |
 | SUPER + CTRL + Escape | Restart a frozen bar or Settings |
 
+Settings opens with the cursor in its search field: type what you are
+looking for, in English or Turkish, typos and all ("curosr", "mouse imlecini
+değiştir"), and Enter takes you to the setting and lights it up. Settings ->
+Programs -> CLEAN UP finds leftovers of removed programs, old backups,
+broken links, caches and old packages; your files go to an undo-able trash.
+
 Every shortcut can be changed in Settings -> Keybinds. Put a square
 picture in Settings -> System to see yourself on the lock screen.
 

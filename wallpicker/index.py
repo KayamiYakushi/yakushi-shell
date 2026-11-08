@@ -7,22 +7,22 @@ The pictures come from the "wallpaper" section of the config:
       "folder": "~/Pictures/Walls",   default: Pictures/Wallpapers when it has
                                       pictures, else your XDG Documents folder
       "visibleCount": 10,             tiles across the strip
-      "thumbJobs": 4                  thumbnails made at once
+      "thumbJobs": 4,                 thumbnails made at once
+      "current": "/path/to/picture"   the wallpaper (yakushi-wallpaperctl.py)
     }
 
 Every picture under the folder gets a stable symlink in
 ~/.cache/yakushi/wallpaper/index (so the picker can list one flat folder);
 links and thumbnails of pictures that are gone are removed. "current" is
-the index name of the picture on screen now (from `awww query`), so the
+the index name of the wallpaper now (yakushi-wallpaperctl.py), so the
 picker opens there.
 """
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
-import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -71,20 +71,15 @@ def settings() -> dict:
 
 
 def on_screen() -> set[Path]:
-    """the pictures awww shows now (one per output)"""
+    """the wallpaper now, as remembered by yakushi-wallpaperctl.py"""
+    spec = importlib.util.spec_from_file_location("yakushi_wallpaperctl", paths.SCRIPTS / "yakushi-wallpaperctl.py")
+    ctl = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ctl)
+    picture = ctl.current()
     try:
-        out = subprocess.run(["awww", "query"], capture_output=True, text=True, timeout=2).stdout
-    except (OSError, subprocess.TimeoutExpired):
+        return {Path(picture).resolve()} if picture else set()
+    except OSError:
         return set()
-    found = set()
-    for line in out.splitlines():
-        m = re.search(r"currently displaying: image: (/.+)$", line)
-        if m:
-            try:
-                found.add(Path(m.group(1).strip()).resolve())
-            except OSError:
-                pass
-    return found
 
 
 def main() -> None:

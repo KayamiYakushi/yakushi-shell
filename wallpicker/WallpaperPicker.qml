@@ -9,9 +9,11 @@ import "../"
 // The wallpaper picker (SUPER + W): one card in the Settings shape, opening
 // from its notches along the diagonal like Settings and the launcher.
 //
-// Inside, a strip of tiles that grow toward the middle like a dock; the one
-// in the middle opens up to its real 16:9 shape. Tiles are cut on the same
-// diagonal as the card. It opens on the wallpaper you have now.
+// Inside, only the pictures: a strip of tiles that grow toward the middle
+// like a dock; the one in the middle opens up to its real 16:9 shape and
+// carries its name. Tiles are cut on the same diagonal as the card and fade
+// out toward the ends. It opens on the wallpaper you have now (small slanted
+// mark). No header, no footer: the keys are the obvious ones.
 //
 //   Left / Right, wheel    move one wallpaper
 //   Enter, Space, click    set it (the card closes)
@@ -116,17 +118,13 @@ PanelWindow {
     function apply(i) {
         var file = files.get(i, "filePath")
         if (file)
-            Quickshell.execDetached(["sh", here + "/apply.sh", file])
+            Quickshell.execDetached(["python3", Paths.script("yakushi-wallpaperctl.py"), "set", file])
         hide()
     }
 
     // "sakura-b20d17a5a1e7.png" -> "sakura"
     function title(name) {
         return String(name || "").replace(/-[0-9a-f]{12}(\.[^.]*)?$/, "").replace(/[_-]+/g, " ")
-    }
-
-    function two(n) {
-        return n < 10 ? "0" + n : String(n)
     }
 
     FolderListModel {
@@ -163,8 +161,8 @@ PanelWindow {
         id: card
 
         anchors.centerIn: parent
-        width: Math.min(1560, picker.width - 80)
-        height: header.height + stripBox.height + footer.height
+        width: Math.min(1280, picker.width - 120)
+        height: stripBox.height
         leanDegrees: 1
         duration: picker.animation
         shown: picker.showing
@@ -174,87 +172,21 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        // ---- header: the same strip as the share picker's
-        Item {
-            id: header
-
-            width: parent.width
-            height: 52
-
-            Row {
-                x: 24
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 12
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "薬"
-                    color: Theme.alert
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 24
-                    font.bold: true
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "WALLPAPER"
-                    color: Theme.ink
-                    font.family: Theme.mono
-                    font.pixelSize: 14
-                    font.bold: true
-                    font.letterSpacing: 6
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "壁紙"
-                    color: Theme.inkSoft
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 13
-                    font.letterSpacing: 3
-                }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                anchors.right: parent.right
-                anchors.rightMargin: 28
-                anchors.verticalCenter: parent.verticalCenter
-                text: files.count > 0 ? picker.two(strip.marked + 1) + " / " + picker.two(files.count) : ""
-                color: Theme.accent
-                font.family: Theme.mono
-                font.pixelSize: 11
-                font.bold: true
-                font.letterSpacing: 2
-            }
-
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: Theme.tint(Theme.ink, 0.12)
-            }
-        }
-
         // ---- the strip
         Item {
             id: stripBox
 
-            y: header.height
             width: parent.width
-            height: Math.round(Math.min(440, picker.height * 0.42)) + 2 * 22
+            height: Math.round(Math.min(380, picker.height * 0.36)) + 2 * picker.pad
             clip: true
 
             Item {
                 id: strip
 
                 x: picker.pad
-                y: 22
+                y: picker.pad
                 width: parent.width - 2 * picker.pad
-                height: parent.height - 2 * 22
+                height: parent.height - 2 * picker.pad
                 focus: true
 
                 property bool started: false
@@ -395,6 +327,11 @@ PanelWindow {
                         readonly property bool inView: middle + width / 2 > -picker.pad
                             && middle - width / 2 < strip.width + picker.pad
                         readonly property bool marked: strip.marked === index
+                        // 1 near the middle, fading to 0.15 at the strip's ends
+                        readonly property real edge: {
+                            var e = Math.abs(middle - strip.half) / Math.max(1, strip.half)
+                            return 1 - 0.85 * strip.smooth(Math.max(0, Math.min(1, (e - 0.5) / 0.5)))
+                        }
                         readonly property bool isCurrent: fileName === picker.current
                         // the cut grows with the tile: small tiles, small cuts
                         readonly property real cut: Theme.cutSmall + (Theme.cut - Theme.cutSmall) * open
@@ -408,6 +345,7 @@ PanelWindow {
                         x: middle - width / 2
                         y: (strip.height - height) / 2
                         visible: inView
+                        opacity: edge
 
                         // the empty tile, until (or unless) its picture is there
                         CutBox {
@@ -495,7 +433,7 @@ PanelWindow {
                             maskThresholdMin: 0.5
                             maskSpreadAtMin: 1
                             // the middle one at full light, the rest quieter
-                            opacity: tile.marked ? 1 : 0.5 + 0.45 * tile.open
+                            opacity: tile.marked ? 1 : 0.45 + 0.5 * tile.open
 
                             Behavior on opacity {
                                 NumberAnimation { duration: Theme.tFast }
@@ -526,6 +464,34 @@ PanelWindow {
                             cutBottomRight: false
                         }
 
+                        // its name, on the open tile: a small slanted label
+                        CutBox {
+                            id: nameTag
+
+                            visible: tile.open > 0.05 && picture.status === Image.Ready
+                            opacity: tile.open
+                            x: 14
+                            y: parent.height - height - 14
+                            width: nameText.implicitWidth + 30
+                            height: 24
+                            fill: Theme.tint(Theme.surface, 0.82)
+                            cut: 9
+                            cutTopLeft: false
+                            cutBottomRight: false
+
+                            Text {
+                                id: nameText
+
+                                textFormat: Text.PlainText
+                                anchors.centerIn: parent
+                                text: picker.title(tile.fileName)
+                                color: Theme.ink
+                                font.family: Theme.mono
+                                font.pixelSize: 11
+                                font.letterSpacing: 1.5
+                            }
+                        }
+
                         MouseArea {
                             anchors.fill: parent
                             hoverEnabled: true
@@ -536,62 +502,6 @@ PanelWindow {
                         }
                     }
                 }
-            }
-        }
-
-        // ---- footer: the name of the marked one, quietly
-        Item {
-            id: footer
-
-            y: header.height + stripBox.height
-            width: parent.width
-            height: 56
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.tint(Theme.ink, 0.12)
-            }
-
-            Row {
-                x: 28
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 14
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: files.count > 0 ? picker.title(files.get(strip.marked, "fileName")) : ""
-                    color: Theme.ink
-                    font.family: Theme.mono
-                    font.pixelSize: 15
-                    font.letterSpacing: 1
-                    elide: Text.ElideRight
-                    width: Math.min(implicitWidth, card.width * 0.5)
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: files.count > 0 && files.get(strip.marked, "fileName") === picker.current
-                    text: "NOW  現在"
-                    color: Theme.accent
-                    font.family: Theme.mono
-                    font.pixelSize: 10
-                    font.letterSpacing: 2
-                }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                anchors.right: parent.right
-                anchors.rightMargin: 28
-                anchors.verticalCenter: parent.verticalCenter
-                text: "←→  MOVE     ENTER  SET     ESC  CLOSE"
-                color: Theme.inkMute
-                font.family: Theme.mono
-                font.pixelSize: 10
-                font.letterSpacing: 1
             }
         }
     }

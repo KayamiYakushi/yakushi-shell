@@ -26,7 +26,7 @@ ShellRoot {
 
     readonly property bool preview: Quickshell.env("YAKUSHI_LOCK_PREVIEW") === "1"
     property bool leaving: false
-    property var wallpapers: ({})        // screen name -> image path
+    property string wallpaper: ""         // the picture behind the lock, dimmed
 
     readonly property bool clock24: Config.topbar.clock24 === true
 
@@ -86,21 +86,18 @@ ShellRoot {
     }
 
     // ------------------------------------------------------------------
-    // The wallpaper each screen shows now (awww knows it per output)
+    // The wallpaper (yakushi-wallpaperctl.py remembers it)
     // ------------------------------------------------------------------
     Process {
         running: true
-        command: ["awww", "query"]
+        command: ["python3", Paths.script("yakushi-wallpaperctl.py"), "get"]
 
         stdout: StdioCollector {
             onStreamFinished: {
-                var found = {}
-                text.split("\n").forEach(function(line) {
-                    var m = line.match(/([A-Za-z0-9._-]+): \d+x\d+.*currently displaying: image: (\/.+)$/)
-                    if (m)
-                        found[m[1]] = m[2].trim()
-                })
-                root.wallpapers = found
+                try {
+                    root.wallpaper = JSON.parse(text).current || ""
+                } catch (e) {
+                }
             }
         }
     }
@@ -128,7 +125,7 @@ ShellRoot {
             LockSurface {
                 anchors.fill: parent
                 context: lockContext
-                wallpaper: root.wallpapers[lockSurface.screen ? lockSurface.screen.name : ""] || ""
+                wallpaper: root.wallpaper
                 clock24: root.clock24
                 shown: !root.leaving
             }
@@ -169,7 +166,7 @@ ShellRoot {
             LockSurface {
                 anchors.fill: parent
                 context: lockContext
-                wallpaper: root.wallpapers[previewWindow.screen ? previewWindow.screen.name : ""] || ""
+                wallpaper: root.wallpaper
                 clock24: root.clock24
                 shown: !root.leaving
             }

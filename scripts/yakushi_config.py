@@ -7,7 +7,7 @@
       "topbar":     { ... },   owned by yakushi-topbarctl.py
       "appearance": { ... },   owned by yakushi-uistatectl.py
       "terminal":   { ... },   owned by yakushi-termctl.py
-      "wallpaper":  { ... },   read by wallpicker/index.py
+      "wallpaper":  { ... },   read by wallpicker/index.py; "current" by yakushi-wallpaperctl.py
       "notifications": { ... }, owned by yakushi-notifyctl.py
       "launcher":   { ... },   owned by yakushi-launchctl.py
       "lock":       { ... },   owned by yakushi-securityctl.py (auto lock)

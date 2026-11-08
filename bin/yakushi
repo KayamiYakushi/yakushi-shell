@@ -23,7 +23,7 @@
 #   yakushi wallpaper                  The wallpaper picker.
 #   yakushi screenshot area|window|screen
 #                                      To the clipboard; also to Pictures/Screenshots
-#                                      only while Settings -> Screenshots says so.
+#                                      only while Settings -> Default Apps says so.
 #   yakushi share-picker               Screen-share picker (for xdg-desktop-portal-hyprland).
 #   yakushi setup-hyprland             Put the starter Hyprland config in ~/.config/hypr
 #                                      (yours is moved aside, never deleted).

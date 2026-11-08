@@ -493,6 +493,26 @@ Item {
                 font.family: Theme.mono
                 font.pixelSize: 10
             }
+
+            Item {
+                width: 1
+                height: 22
+            }
+
+            Rectangle {
+                width: body.width
+                height: 1
+                color: Theme.line
+            }
+
+            Item {
+                width: 1
+                height: 18
+            }
+
+            ScreenshotsSection {
+                width: body.width
+            }
         }
     }
 }

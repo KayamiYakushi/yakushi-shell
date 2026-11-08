@@ -3,15 +3,15 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Screenshots
+// Settings -> Default Apps -> Screenshots (the section at the bottom)
 //
 // Every screenshot goes to the clipboard. Writing it to a file as well is
 // off until you turn it on here, so no folder fills up on its own. Saved by
 // scripts/yakushi-screenshot.py; the next screenshot follows the switch.
-Item {
+Column {
     id: page
 
-    property var hostWindow: null
+    spacing: 16
 
     readonly property string helper: Paths.script("yakushi-screenshot.py")
 
@@ -106,94 +106,75 @@ Item {
         }
     }
 
-    Flickable {
-        id: flick
+    Text {
+        textFormat: Text.PlainText
+        text: "SCREENSHOTS"
+        color: Theme.inkSoft
+        font.family: Theme.mono
+        font.pixelSize: 11
+        font.letterSpacing: 2
+    }
 
-        anchors.fill: parent
-        contentWidth: width
-        contentHeight: body.height + 8
-        boundsBehavior: Flickable.StopAtBounds
-        clip: true
+    ToggleRow {
+        width: parent.width
+        icon: String.fromCodePoint(0xF024B)
+        label: "Also save to a folder"
+        checked: page.save
+        available: page.loaded && !setProc.running
 
-        Column {
-            id: body
-
-            width: flick.width
-            spacing: 16
-
-            PageTitle {
-                width: parent.width
-                title: "SCREENSHOTS"
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
-            ToggleRow {
-                width: parent.width
-                icon: String.fromCodePoint(0xF024B)
-                label: "Also save to a folder"
-                checked: page.save
-                available: page.loaded && !setProc.running
-
-                onToggled: {
-                    page.save = !page.save
-                    setProc.command = ["python3", page.helper, "set", "save", page.save ? "on" : "off"]
-                    setProc.running = true
-                }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: page.save
-                    ? "Every screenshot is copied to the clipboard and kept as a PNG in " + page.shortPath(page.folder) + "."
-                    : "Screenshots go to the clipboard only: paste them where you need them. Nothing is written to disk."
-                color: Theme.inkMute
-                font.family: Theme.mono
-                font.pixelSize: 10
-                lineHeight: 1.2
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
-
-            Column {
-                width: parent.width
-                spacing: 2
-
-                KeyRow { keys: "SUPER + SHIFT + S"; what: "Area (drag; Esc cancels)" }
-                KeyRow { keys: "SUPER + CTRL + S"; what: "Focused window" }
-                KeyRow { keys: "SUPER + DELETE"; what: "Whole screen (the one you are on)" }
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                wrapMode: Text.Wrap
-                text: "Change the keys in Settings -> Keybinds."
-                color: Theme.inkMute
-                font.family: Theme.mono
-                font.pixelSize: 9
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width
-                visible: page.status !== ""
-                wrapMode: Text.Wrap
-                text: page.status
-                color: Theme.inkSoft
-                font.family: Theme.mono
-                font.pixelSize: 10
-            }
+        onToggled: {
+            page.save = !page.save
+            setProc.command = ["python3", page.helper, "set", "save", page.save ? "on" : "off"]
+            setProc.running = true
         }
+    }
+
+    Text {
+        textFormat: Text.PlainText
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: page.save
+            ? "Every screenshot is copied to the clipboard and kept as a PNG in " + page.shortPath(page.folder) + "."
+            : "Screenshots go to the clipboard only: paste them where you need them. Nothing is written to disk."
+        color: Theme.inkMute
+        font.family: Theme.mono
+        font.pixelSize: 10
+        lineHeight: 1.2
+    }
+
+    Rectangle {
+        width: parent.width
+        height: 1
+        color: Theme.line
+    }
+
+    Column {
+        width: parent.width
+        spacing: 2
+
+        KeyRow { keys: "SUPER + SHIFT + S"; what: "Area (drag; Esc cancels)" }
+        KeyRow { keys: "SUPER + CTRL + S"; what: "Focused window" }
+        KeyRow { keys: "SUPER + DELETE"; what: "Whole screen (the one you are on)" }
+    }
+
+    Text {
+        textFormat: Text.PlainText
+        width: parent.width
+        wrapMode: Text.Wrap
+        text: "Change the keys in Settings -> Keybinds."
+        color: Theme.inkMute
+        font.family: Theme.mono
+        font.pixelSize: 9
+    }
+
+    Text {
+        textFormat: Text.PlainText
+        width: parent.width
+        visible: page.status !== ""
+        wrapMode: Text.Wrap
+        text: page.status
+        color: Theme.inkSoft
+        font.family: Theme.mono
+        font.pixelSize: 10
     }
 }

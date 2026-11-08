@@ -186,7 +186,7 @@ yakushi_bind("unfreeze", "SUPER + CTRL + Escape", hl.dsp.exec_cmd("yakushi unfre
 -- YAKUSHI_BIND clipboard|Utilities|Clipboard History
 yakushi_bind("clipboard", "SUPER + SHIFT + V", hl.dsp.exec_cmd("yakushi launcher clipboard"))
 -- Screenshots go to the clipboard; to Pictures/Screenshots as well only
--- while Settings -> Screenshots says so. Esc cancels an area.
+-- while Settings -> Default Apps says so. Esc cancels an area.
 -- YAKUSHI_BIND screenshot_full|Screenshots|Screen Screenshot
 yakushi_bind("screenshot_full", "SUPER + Delete", hl.dsp.exec_cmd("yakushi screenshot screen"))
 -- YAKUSHI_BIND screenshot_area|Screenshots|Area Screenshot

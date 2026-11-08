@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Screenshots, for the keybinds and Settings -> Screenshots.
+"""Screenshots, for the keybinds and Settings -> Default Apps.
 
 Commands:
     take area|window|screen   Take one. It always goes to the clipboard; it is

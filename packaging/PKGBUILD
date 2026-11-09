@@ -7,7 +7,7 @@
 # A fresh clone works the same: git clone, cd packaging, makepkg -si.
 
 pkgname=yakushi-shell
-pkgver=r71.aa5b390
+pkgver=r73.deae7db
 pkgrel=1
 pkgdesc="Yakushi: a Quickshell desktop shell for Hyprland (bar, Settings, launcher, notifications, lock and login screen)"
 arch=('any')

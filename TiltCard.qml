@@ -23,6 +23,7 @@ Item {
     property real leanDegrees: 5
     property bool still: false
     property real cut: Theme.cutLarge
+    property color fill: Theme.backdrop          // card background
     property int duration: Theme.tSlow + 100     // opening / closing, ms (0 = none)
 
     // pointer position over the card, centre = (0, 0), edges = ±0.5
@@ -159,7 +160,7 @@ Item {
 
             CutBox {
                 anchors.fill: parent
-                fill: Theme.backdrop
+                fill: card.fill
                 stroke: Theme.tint(Theme.ink, 0.12)
                 cut: card.cut
                 cutTopLeft: false

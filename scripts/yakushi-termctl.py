@@ -9,6 +9,10 @@ Commands:
     opacity <0.30..1.00>
                 Terminal background opacity (kitty, alacritty, foot,
                 ghostty). Until set here, your own opacity setting stays.
+    padding <0..40>
+                Space between the text and the window edge, in pixels
+                (kitty, alacritty, foot, ghostty). Until set here, your own
+                padding setting stays.
     blur on|off Blur behind terminal windows (done by Hyprland, so it works
                 for every terminal). Turning it on below ~97% opacity
                 lowers the opacity to 85% so the blur can be seen.
@@ -245,6 +249,27 @@ def lighten(colour: str, amount: float) -> str:
 
 
 OPACITY_MIN = 0.30
+PADDING_MAX = 40          # px
+PT_PER_PX = 0.75          # kitty and ghostty take points (96 dpi: 1 pt = 4/3 px)
+
+
+def own_padding(term: str) -> int:
+    """The padding your own terminal config sets (px), shown until Settings
+    sets one. Only the first value of the main file is read; 0 if none."""
+    pattern, path, per_px = {
+        "kitty": (r"^\s*window_padding_width\s+([\d.]+)", CONFIG / "kitty/kitty.conf", PT_PER_PX),
+        "ghostty": (r"^\s*window-padding-x\s*=\s*([\d.]+)", CONFIG / "ghostty/config", PT_PER_PX),
+        "foot": (r"^\s*pad\s*=\s*(\d+)", CONFIG / "foot/foot.ini", 1.0),
+        "footclient": (r"^\s*pad\s*=\s*(\d+)", CONFIG / "foot/foot.ini", 1.0),
+        "alacritty": (r"^\s*padding\s*=\s*\{[^}]*\bx\s*=\s*(\d+)", CONFIG / "alacritty/alacritty.toml", 1.0),
+    }.get(term, (None, None, 1.0))
+    if pattern is None:
+        return 0
+    try:
+        match = re.search(pattern, path.read_text(), re.M)
+    except OSError:
+        return 0
+    return max(0, min(PADDING_MAX, round(float(match.group(1)) / per_px))) if match else 0
 
 
 def palette(acc: str) -> dict:
@@ -335,6 +360,8 @@ def apply_kitty(p: dict) -> str:
             "dynamic_background_opacity yes",
             f"background_opacity {p['opacity']:.2f}",
         ]
+    if p.get("padding") is not None:
+        lines.append(f"window_padding_width {p['padding'] * PT_PER_PX:g}")
     d.mkdir(parents=True, exist_ok=True)
     (d / "yakushi-theme.conf").write_text("\n".join(lines) + "\n")
     # Last include wins, so ours goes at the end of kitty.conf.
@@ -392,8 +419,13 @@ def apply_alacritty(p: dict) -> str:
     ] + [f'{n} = "{a[i]}"' for i, n in enumerate(names)] + ["[colors.bright]"] + [
         f'{n} = "{a[i + 8]}"' for i, n in enumerate(names)
     ]
+    window = []
     if p.get("opacity") is not None:
-        lines += ["[window]", f"opacity = {p['opacity']:.2f}"]
+        window.append(f"opacity = {p['opacity']:.2f}")
+    if p.get("padding") is not None:
+        window.append(f"padding = {{ x = {p['padding']}, y = {p['padding']} }}")
+    if window:
+        lines += ["[window]"] + window
     d.mkdir(parents=True, exist_ok=True)
     theme = d / "yakushi-theme.toml"
     theme.write_text("\n".join(lines) + "\n")
@@ -420,6 +452,10 @@ def apply_foot(p: dict) -> str:
     a = [c.lstrip("#") for c in p["ansi"]]
     lines = [
         f"# {MARK}: written by Yakushi Settings -> Appearance -> Terminal",
+    ]
+    if p.get("padding") is not None:
+        lines.append(f"pad={p['padding']}x{p['padding']}")      # main section: before any [section]
+    lines += [
         "[cursor]",
         f"color={p['bg'].lstrip('#')} {p['cursor'].lstrip('#')}",
         "[colors]",
@@ -450,6 +486,9 @@ def apply_ghostty(p: dict) -> str:
     ] + [f"palette = {i}={c}" for i, c in enumerate(p["ansi"])]
     if p.get("opacity") is not None:
         lines.append(f"background-opacity = {p['opacity']:.2f}")
+    if p.get("padding") is not None:
+        pt = f"{p['padding'] * PT_PER_PX:g}"
+        lines += [f"window-padding-x = {pt}", f"window-padding-y = {pt}"]
     d.mkdir(parents=True, exist_ok=True)
     (d / "yakushi-theme").write_text("\n".join(lines) + "\n")
     ensure_line(d / "config", "config-file = yakushi-theme")
@@ -737,15 +776,21 @@ def settings(state: dict) -> dict:
         "enabled": state.get("enabled") is True,
         "opacity": state.get("opacity", 1.0),
         "opacitySet": isinstance(state.get("opacity"), (int, float)),
+        "padding": state["padding"] if isinstance(state.get("padding"), int)
+        else own_padding(preferred_terminal()),
         "blur": state.get("blur", True) is not False,
         "blurStrength": int(state.get("blur_strength", BLUR_DEFAULT_STRENGTH)),
     }
 
 
-def apply_all(state: dict) -> list[str]:
+def apply_all(state: dict, terminals_only: bool = False) -> list[str]:
+    """terminals_only: just the terminal files (padding needs neither fish nor
+    Hyprland, and skipping them saves a fish start and a config reload)."""
     p = palette(accent())
     if isinstance(state.get("opacity"), (int, float)):
         p["opacity"] = max(OPACITY_MIN, min(1.0, float(state["opacity"])))
+    if isinstance(state.get("padding"), int):
+        p["padding"] = max(0, min(PADDING_MAX, state["padding"]))
     done = []
     for name, apply in APPLIERS.items():
         if installed(name):
@@ -753,6 +798,8 @@ def apply_all(state: dict) -> list[str]:
                 done.append(apply(p))
             except OSError as exc:
                 done.append(f"{name} (failed: {exc})")
+    if terminals_only:
+        return done
     if installed("fish"):
         done.append(apply_fish(p, state))
     apply_hypr(state)
@@ -778,6 +825,18 @@ def main() -> None:
         save_state(state)
         emit({"ok": True, **settings(state),
               "message": f"Terminal opacity {round(value * 100)}%."})
+
+    elif len(args) == 2 and args[0] == "padding":
+        try:
+            value = max(0, min(PADDING_MAX, int(args[1])))
+        except ValueError:
+            emit({"ok": False, "message": "Invalid padding."})
+            raise SystemExit(1)
+        state["padding"] = value
+        if state.get("enabled") is True:
+            apply_all(state, terminals_only=True)
+        save_state(state)
+        emit({"ok": True, **settings(state), "message": f"Terminal padding {value} px."})
 
     elif len(args) == 2 and args[0] == "blur" and args[1] in ("on", "off"):
         state["blur"] = args[1] == "on"
@@ -831,7 +890,7 @@ def main() -> None:
         emit({"ok": True})
 
     else:
-        emit({"ok": False, "message": "Usage: status | enable | disable | sync | opacity <0.3-1> | blur on|off | blur-strength <1-10>"})
+        emit({"ok": False, "message": "Usage: status | enable | disable | sync | opacity <0.3-1> | padding <0-40> | blur on|off | blur-strength <1-10>"})
         raise SystemExit(1)
 
 

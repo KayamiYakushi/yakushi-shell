@@ -90,6 +90,13 @@ PanelWindow {
         return typeof ms === "number" ? Math.max(0, Math.min(1000, Math.round(ms))) : 480
     }
 
+    // Card opacity, Settings -> Appearance -> Launcher; until set there it
+    // follows the panel opacity (Glass)
+    readonly property real backdropOpacity: {
+        var o = Config.launcher.opacity
+        return typeof o === "number" ? Math.max(0.3, Math.min(1, o)) : Theme.backdrop.a
+    }
+
     // the card closes back into its notches first
     Timer {
         id: closeTimer
@@ -281,6 +288,7 @@ PanelWindow {
         height: Math.min(490, launcher.height - 40)
         leanDegrees: 2
         duration: launcher.animation
+        fill: Qt.rgba(Theme.backdrop.r, Theme.backdrop.g, Theme.backdrop.b, launcher.backdropOpacity)
         shown: launcher.showing
 
         // clicks on the card stay on the card

@@ -184,6 +184,13 @@ var INDEX = [
         es: "lanzador animación velocidad menú de inicio", fr: "lanceur animation vitesse menu démarrer",
         pt: "lançador animação velocidade menu iniciar", it: "launcher animazione velocità menu start",
         ru: "лаунчер анимация скорость меню запуска", pl: "launcher animacja szybkość menu start" } },
+    { page: "Appearance", find: ["Launcher opacity"], title: "Launcher opacity", keys: {
+        en: "launcher opacity transparency transparent app menu start menu background",
+        tr: "başlatıcı saydamlık şeffaflık opaklık uygulama menüsü arka plan",
+        de: "starter transparenz deckkraft startmenü", es: "lanzador transparencia opacidad menú de inicio",
+        fr: "lanceur transparence opacité menu démarrer", pt: "lançador transparência opacidade menu iniciar",
+        it: "launcher trasparenza opacità menu start", ru: "лаунчер прозрачность непрозрачность меню запуска",
+        pl: "launcher przezroczystość krycie menu start" } },
     { page: "Appearance", find: ["Screen edge gap"], title: "Gap at the screen edges", keys: {
         en: "gaps gap edge margin space window spacing", tr: "boşluk kenar pencere aralığı",
         de: "abstand rand fenster", es: "espacio margen bordes ventanas", fr: "espace marge bords fenêtres",
@@ -216,6 +223,13 @@ var INDEX = [
         de: "terminal transparenz", es: "transparencia del terminal", fr: "transparence du terminal",
         pt: "transparência do terminal", it: "trasparenza del terminale", ru: "прозрачность терминала",
         pl: "przezroczystość terminala" } },
+    { page: "Appearance", find: ["Terminal padding"], title: "Terminal padding", keys: {
+        en: "terminal padding space edge margin gap border kitty text inset",
+        tr: "terminal kenar boşluk boşluğu kenarlardan iç boşluk dolgu yazı",
+        de: "terminal innenabstand abstand rand", es: "relleno espacio margen del terminal",
+        fr: "marge intérieure espacement bord du terminal", pt: "preenchimento espaço margem do terminal",
+        it: "spaziatura margine bordo del terminale", ru: "отступ поля терминала край",
+        pl: "dopełnienie odstęp margines terminala" } },
     { page: "Appearance", find: ["Background blur"], title: "Terminal blur", keys: {
         en: "blur background blur frosted terminal", tr: "bulanıklık bulanık", de: "unschärfe weichzeichnen",
         es: "desenfoque", fr: "flou", pt: "desfoque", it: "sfocatura", ru: "размытие", pl: "rozmycie" } },

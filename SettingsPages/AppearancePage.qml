@@ -47,6 +47,10 @@ Item {
                     var data = JSON.parse(text)
                     if (data.ok && typeof data.animationMs === "number")
                         page.launcherAnim = data.animationMs
+                    if (data.ok && typeof data.opacity === "number") {
+                        page.launcherOpacity = data.opacity
+                        page.launcherOpacitySet = true
+                    }
                 } catch (e) {
                 }
                 page.launcherLoaded = true
@@ -62,6 +66,30 @@ Item {
         id: launcherSave
         interval: 150
         onTriggered: page.saveLauncherAnim()
+    }
+
+    // ---- launcher card opacity; until set it follows PANEL OPACITY
+    property bool launcherOpacitySet: false
+    property real launcherOpacity: 0.8
+    readonly property real launcherOpacityShown: launcherOpacitySet ? launcherOpacity : Theme.glass
+
+    function saveLauncherOpacity() {
+        if (launcherOpacityProc.running) {
+            launcherOpacitySave.restart()
+            return
+        }
+        launcherOpacityProc.command = ["python3", Paths.script("yakushi-launchctl.py"), "set", "opacity", launcherOpacity.toFixed(2)]
+        launcherOpacityProc.running = true
+    }
+
+    Process {
+        id: launcherOpacityProc
+    }
+
+    Timer {
+        id: launcherOpacitySave
+        interval: 150
+        onTriggered: page.saveLauncherOpacity()
     }
 
     // ---- apps light / dark (scripts/yakushi-schemectl.py)
@@ -205,6 +233,7 @@ Item {
     property real termOpacity: 1.0
     property bool termBlur: true
     property int termBlurStrength: 3
+    property int termPadding: 0
     property string termName: ""
     property bool termColours: true
 
@@ -215,6 +244,38 @@ Item {
             page.termBlur = data.blur
         if (typeof data.blurStrength === "number")
             page.termBlurStrength = data.blurStrength
+        if (typeof data.padding === "number" && !termPaddingProc.running && !termPaddingDebounce.running)
+            page.termPadding = data.padding
+    }
+
+    function saveTermPadding() {
+        if (homeDir === "")
+            return
+        if (termPaddingProc.running) {
+            termPaddingDebounce.restart()
+            return
+        }
+        termPaddingProc.command = ["python3", termHelperPath(), "padding", String(termPadding)]
+        termPaddingProc.running = true
+    }
+
+    Timer {
+        id: termPaddingDebounce
+        interval: 200
+        onTriggered: page.saveTermPadding()
+    }
+
+    Process {
+        id: termPaddingProc
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    page.termStatus = JSON.parse(text).message || ""
+                } catch (e) {
+                }
+            }
+        }
     }
 
     function setTermBlur(on) {
@@ -968,6 +1029,33 @@ Item {
                 }
             }
 
+            Slider {
+                width: parent.width
+                opacity: page.launcherLoaded ? 1 : 0.35
+                enabled: page.launcherLoaded
+                label: "Launcher opacity  " + Math.round(page.launcherOpacityShown * 100) + "%"
+                icon: "◐"
+                tint: Theme.accent
+                value: (page.launcherOpacityShown - 0.30) / 0.70
+
+                // in steps of 1 %
+                onSliding: function(v) {
+                    var next = Math.round(30 + v * 70) / 100
+                    if (next !== page.launcherOpacity || !page.launcherOpacitySet) {
+                        page.launcherOpacity = next
+                        page.launcherOpacitySet = true
+                        launcherOpacitySave.restart()
+                    }
+                }
+
+                onSettled: function(v) {
+                    page.launcherOpacity = Math.round(30 + v * 70) / 100
+                    page.launcherOpacitySet = true
+                    launcherOpacitySave.stop()
+                    page.saveLauncherOpacity()
+                }
+            }
+
             // open the launcher to see the new speed
             Rectangle {
                 width: tryLabel.implicitWidth + 28
@@ -1409,6 +1497,29 @@ Item {
                     page.termOpacity = 0.30 + v * 0.70
                     termOpacityDebounce.stop()
                     page.saveTermOpacity()
+                }
+            }
+
+            Slider {
+                width: parent.width
+                visible: page.termEnabled && page.termColours
+                label: "Terminal padding  " + page.termPadding + "px"
+                icon: "▣"
+                tint: Theme.accent
+                value: page.termPadding / 40
+
+                onSliding: function(v) {
+                    var next = Math.round(v * 40)
+                    if (next !== page.termPadding) {
+                        page.termPadding = next
+                        termPaddingDebounce.restart()
+                    }
+                }
+
+                onSettled: function(v) {
+                    page.termPadding = Math.round(v * 40)
+                    termPaddingDebounce.stop()
+                    page.saveTermPadding()
                 }
             }
 

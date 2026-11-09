@@ -5,6 +5,9 @@ Commands:
     get                        Print the launcher settings as JSON.
     set animation <0..1000>    Opening / closing time in ms (0 = none);
                                config.json "launcher.animationMs".
+    set opacity <0.30..1.00>   Card background opacity, "launcher.opacity";
+                               until set, the card follows Settings' panel
+                               opacity (Appearance -> Glass).
     import-rofi                Add rofi's launch counts (~/.cache/rofi3.druncache)
                                once, so the old order carries over.
     used <desktop id>          Count one launch (apps you use often rise in
@@ -41,6 +44,7 @@ import yakushi_paths as paths
 STATE = paths.STATE / "launcher.json"
 MAX_APPS = 500
 ANIMATION_DEFAULT, ANIMATION_MAX = 480, 1000
+OPACITY_MIN = 0.30
 
 
 def emit(obj: dict) -> None:
@@ -51,8 +55,12 @@ def settings(saved: dict) -> dict:
     ms = saved.get("animationMs")
     if not isinstance(ms, int) or isinstance(ms, bool):
         ms = ANIMATION_DEFAULT
-    return {"animationMs": max(0, min(ANIMATION_MAX, ms)),
-            "clipboard": saved.get("clipboard") is not False}     # on unless turned off
+    out = {"animationMs": max(0, min(ANIMATION_MAX, ms)),
+           "clipboard": saved.get("clipboard") is not False}      # on unless turned off
+    opacity = saved.get("opacity")
+    if isinstance(opacity, (int, float)) and not isinstance(opacity, bool):
+        out["opacity"] = round(max(OPACITY_MIN, min(1.0, float(opacity))), 2)
+    return out
 
 
 def set_animation(raw: str) -> None:
@@ -73,6 +81,26 @@ def set_animation(raw: str) -> None:
         emit({"ok": False, "message": str(error)})
         raise SystemExit(1)
     emit({"ok": True, **state, "message": "Launcher animation " + (f"{ms} ms." if ms else "off.")})
+
+
+def set_opacity(raw: str) -> None:
+    try:
+        value = round(max(OPACITY_MIN, min(1.0, float(raw))), 2)
+    except ValueError:
+        emit({"ok": False, "message": "Use a number from 0.30 to 1.00."})
+        raise SystemExit(1)
+
+    def change(saved: dict) -> dict:
+        saved.update(settings(saved))
+        saved["opacity"] = value
+        return saved
+
+    try:
+        state = settings(config.update("launcher", change))
+    except config.NewerConfig as error:
+        emit({"ok": False, "message": str(error)})
+        raise SystemExit(1)
+    emit({"ok": True, **state, "message": f"Launcher opacity {round(value * 100)}%."})
 
 
 # ---- clipboard history ----------------------------------------------------
@@ -259,6 +287,8 @@ def main() -> None:
         emit({"ok": True, **settings(config.section("launcher"))})
     elif len(args) == 3 and args[:2] == ["set", "animation"]:
         set_animation(args[2])
+    elif len(args) == 3 and args[:2] == ["set", "opacity"]:
+        set_opacity(args[2])
     elif args == ["import-rofi"]:
         import_rofi()
     elif len(args) == 2 and args[0] == "used":
@@ -271,7 +301,7 @@ def main() -> None:
     elif len(args) in (2, 3) and args[0] == "terminal" and args[2:] in ([], ["--wait"]):
         terminal(args[1], wait=len(args) == 3)
     else:
-        raise SystemExit("Usage: get | set animation <ms> | import-rofi | used <desktop id> | clipboard on|off|login | terminal <Exec line> [--wait]")
+        raise SystemExit("Usage: get | set animation <ms> | set opacity <0.3-1> | import-rofi | used <desktop id> | clipboard on|off|login | terminal <Exec line> [--wait]")
 
 
 if __name__ == "__main__":

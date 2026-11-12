@@ -8,10 +8,12 @@ import "../"
 // only what you press after that.
 //
 //   SHIELD    firewall, what listens to your network, SSH server, updates and
-//             known security holes, auto lock, disk encryption, Secure Boot
+//             known security holes, auto lock, hardening (kernel and network
+//             settings), disk encryption, Secure Boot
 //   GUARD     what changed in the places an intruder would use to stay
 //   LOGINS    failed password attempts, sudo use, SSH logins
-//   DEEP SCAN every system file compared with its package (on demand)
+//   DEEP SCAN every system file compared with its package, and programs
+//             with root rights that no package installed (on demand)
 //
 // Your password, when needed, is asked inside the page (PasswordRow) and goes
 // to sudo through a pipe. UPDATE runs pacman -Syu right here with its progress;
@@ -32,6 +34,8 @@ Item {
     readonly property var events: guard && guard.events ? guard.events : ({})
     readonly property var scan: st ? st.scan : null
     readonly property var lock: st ? st.autolock : null
+    readonly property var hard: st && st.hardening ? st.hardening : null
+    readonly property var hardWeak: hard ? hard.items.filter(function(i) { return !i.ok }) : []
 
     // ---- one short line under the header
     property string note: ""
@@ -306,16 +310,17 @@ Item {
     }
 
     // ------------------------------------------------------------------
-    // The overview: how the seven shield checks stand, and what needs you
+    // The overview: how the shield checks stand, and what needs you
     // ------------------------------------------------------------------
     readonly property string fwMood: fw === null ? "info" : fw.on ? "good" : "bad"
     readonly property string netMood: listeners.length === 0 || (fw && fw.on) ? "good" : "bad"
     readonly property string sshMood: st === null ? "info" : st.ssh.active || st.ssh.enabled ? "bad" : "good"
     readonly property string updMood: upd === null ? "info" : holesFixed.length > 0 ? "bad" : pendingCount > 0 ? "info" : "good"
     readonly property string lockMood: lock === null ? "info" : lock.minutes === "off" ? "bad" : "good"
+    readonly property string hardMood: hard === null ? "info" : hard.weak > 0 ? "bad" : "good"
     readonly property string encMood: st === null || !st.encryption.known ? "info" : st.encryption.on ? "good" : "info"
     readonly property string bootMood: st === null || !st.secureBoot.known ? "info" : st.secureBoot.on ? "good" : "info"
-    readonly property var moods: [fwMood, netMood, sshMood, updMood, lockMood, encMood, bootMood]
+    readonly property var moods: [fwMood, netMood, sshMood, updMood, lockMood, hardMood, encMood, bootMood]
     readonly property int goodCount: moods.filter(function(m) { return m === "good" }).length
     readonly property int badCount: moods.filter(function(m) { return m === "bad" }).length
 
@@ -323,7 +328,8 @@ Item {
     readonly property int failedCount: (events.failed || []).length
     readonly property int sudoCount: (events.sudo || []).length
     readonly property int sshCount: (events.ssh || []).length
-    readonly property int scanRed: scan ? scan.redCount : 0
+    readonly property int scanSuid: scan && scan.suid ? scan.suid.length : 0
+    readonly property int scanRed: (scan ? scan.redCount : 0) + scanSuid
     // what asks for you: weak shield checks, changes, wrong passwords, odd files
     readonly property int needsYou: badCount + changeCount + failedCount + sshCount + scanRed
 
@@ -775,6 +781,7 @@ Item {
         return k === "scan" ? "Comparing every system file with its package… this takes a few minutes."
             : k === "firewall" ? (args[1] === "on" ? "Turning the firewall on…" : "Turning the firewall off…")
             : k === "ssh" ? "Turning the SSH server off…"
+            : k === "harden" ? (args[1] === "on" ? "Hardening…" : "Putting the settings back…")
             : k === "autolock" ? "Setting auto lock…"
             : "Working…"
     }
@@ -869,7 +876,7 @@ Item {
                         textFormat: Text.PlainText
                         width: parent.width
                         elide: Text.ElideRight
-                        text: page.st === null ? "" : page.goodCount + " of 7 protections on"
+                        text: page.st === null ? "" : page.goodCount + " of " + page.moods.length + " protections on"
                             + (page.guard && page.guard.time ? "  ·  guard checked " + page.ago(page.guard.time) : "")
                         color: Theme.inkSoft
                         font.family: Theme.mono
@@ -877,7 +884,7 @@ Item {
                     }
                 }
 
-                // the seven checks as seven cells
+                // one cell for each check
                 Row {
                     id: shieldCells
 
@@ -917,7 +924,7 @@ Item {
                     host: page
                     target: shieldHead
                     label: "SHIELD"
-                    value: page.st === null ? "…" : page.goodCount + " / 7"
+                    value: page.st === null ? "…" : page.goodCount + " / " + page.moods.length
                     sub: page.badCount > 0 ? page.badCount + " off that should be on" : "protections on"
                     mood: page.st === null ? "info" : page.badCount > 0 ? "bad" : "good"
                 }
@@ -959,7 +966,7 @@ Item {
                 id: shieldHead
                 glyph: String.fromCodePoint(0xF0565)
                 label: "SHIELD"
-                side: page.goodCount + " of 7 on"
+                side: page.goodCount + " of " + page.moods.length + " on"
             }
 
             ShieldRow {
@@ -1305,6 +1312,52 @@ Item {
             }
 
             ShieldRow {
+                glyph: String.fromCodePoint(0xF099D)
+                title: "Hardening"
+                mood: page.hardMood
+                text: page.hard === null ? "…"
+                    : page.hard.weak === 0
+                      ? "All " + page.hard.total + " kernel and network settings are at their safe value."
+                    : page.hard.weak + " of " + page.hard.total + " kernel and network settings are weaker than they need to be."
+                      + " HARDEN closes them; games and apps keep working, and UNDO puts everything back."
+
+                Button {
+                    host: page
+                    visible: page.hard !== null && page.hard.weak > 0
+                    label: "HARDEN"
+                    onPressed: page.ask(["harden", "on"], "Your password, to harden the system", "HARDEN")
+                }
+
+                Button {
+                    host: page
+                    key: "hardoff"
+                    visible: page.hard !== null && page.hard.applied
+                    label: "UNDO"
+                    danger: true
+                    onPressed: if (page.confirm("hardoff")) page.ask(["harden", "off"], "Your password, to undo the hardening", "UNDO")
+                }
+            }
+
+            // what is still open
+            Flow {
+                visible: page.hardWeak.length > 0
+                x: 54
+                width: parent.width - 54
+                bottomPadding: 16
+                spacing: 6
+
+                Repeater {
+                    model: page.hardWeak
+
+                    delegate: Tag {
+                        required property var modelData
+                        label: modelData.label
+                        hot: true
+                    }
+                }
+            }
+
+            ShieldRow {
                 glyph: String.fromCodePoint(0xF02CA)
                 title: "Disk encryption"
                 mood: page.encMood
@@ -1348,7 +1401,7 @@ Item {
                     wrapMode: Text.WordWrap
                     text: page.guard === null ? "…"
                         : page.changeCount === 0
-                          ? "Nothing changed. Watching what starts at login, services and timers, users and the wheel group, SSH keys, shell start files, /etc/ld.so.preload, pacman.conf and what listens to your network."
+                          ? "Nothing changed. Watching what starts at login, services and timers, users and the wheel group, SSH keys, shell start files, commands and launchers in your home, PAM, kernel modules and boot options, pacman.conf and who listens to your network."
                           : page.changeCount + (page.changeCount === 1 ? " change" : " changes")
                             + " since you last accepted. If you did it (installed something, edited a file), press THAT WAS ME. If not, look closer before anything else."
                     color: page.changeCount > 0 ? Theme.ink : Theme.inkSoft
@@ -1581,16 +1634,21 @@ Item {
             }
 
             ShieldRow {
-                glyph: String.fromCodePoint(page.scan && page.scan.redCount === 0 ? 0xF05E0 : 0xF0028)
-                title: page.scan === null ? "Not run yet" : page.scan.redCount === 0 ? "Every system file matches" : page.scan.redCount + " system files differ"
-                mood: page.scan === null ? "info" : page.scan.redCount === 0 ? "good" : "bad"
+                glyph: String.fromCodePoint(page.scan && page.scanRed === 0 ? 0xF05E0 : 0xF0028)
+                title: page.scan === null ? "Not run yet" : page.scanRed === 0 ? "Every system file matches"
+                    : page.scan.redCount === 0 ? page.scanSuid + (page.scanSuid === 1 ? " program" : " programs") + " with root rights from no package"
+                    : page.scan.redCount + " system files differ"
+                mood: page.scan === null ? "info" : page.scanRed === 0 ? "good" : "bad"
                 text: page.scan === null
-                      ? "Compares every program and library with the copy its package installed, to find anything swapped or patched. Takes a few minutes; nothing is changed."
-                      : page.scan.redCount === 0
-                        ? "Every system program and library matches its package. " + page.scan.configs
+                      ? "Compares every program and library with the copy its package installed, to find anything swapped or patched, and looks for programs with root rights that no package installed. Takes a few minutes; nothing is changed."
+                      : page.scanRed === 0
+                        ? "Every system program and library matches its package"
+                          + (page.scan.suid ? ", and every program with root rights came from one. " : ". ") + page.scan.configs
                           + " settings files in /etc differ from their defaults"
                           + (page.scan.caches ? " and " + page.scan.caches + " caches were rebuilt on this computer" : "")
                           + ", which is normal."
+                      : page.scan.redCount === 0
+                        ? "A program that runs with root rights and belongs to no package is how an intruder keeps the keys. If you did not put it there, look closer before anything else."
                         : "A broken update can do this too: reinstalling the package (sudo pacman -S <name>) puts the right copy back."
 
                 Button {
@@ -1602,7 +1660,7 @@ Item {
 
             Column {
                 width: parent.width
-                visible: page.scan !== null && page.scan.redCount > 0
+                visible: page.scan !== null && page.scanRed > 0
                 leftPadding: 54
                 topPadding: 4
                 bottomPadding: 8
@@ -1618,6 +1676,22 @@ Item {
                         width: body.width - 54
                         elide: Text.ElideMiddle
                         text: modelData.path + "   ·   " + modelData.package + "   ·   " + modelData.why.toLowerCase()
+                        color: Theme.alert
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                    }
+                }
+
+                Repeater {
+                    model: page.scan && page.scan.suid ? page.scan.suid.slice(0, 20) : []
+
+                    Text {
+                        required property var modelData
+
+                        textFormat: Text.PlainText
+                        width: body.width - 54
+                        elide: Text.ElideMiddle
+                        text: modelData + "   ·   runs with root rights, from no package"
                         color: Theme.alert
                         font.family: Theme.mono
                         font.pixelSize: 11

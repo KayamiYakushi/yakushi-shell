@@ -333,11 +333,24 @@ Item {
         var red = d.scan !== null && typeof d.scan === "object" ? Number(d.scan.redCount) || 0 : 0
         if (red > 0)
             lines.push(count(red, "system file differs from its package", "system files differ from their package"))
+        var suid = list(d.scan !== null && typeof d.scan === "object" ? d.scan.suid : null).length
+        if (suid > 0)
+            lines.push(count(suid, "program", "programs") + " with root rights from no package")
+        // the shield: a protection that is off (the firewall, an SSH server
+        // that is on) is an alert, a weaker setting is something to review
+        var weak = list(d.shield).filter(function(w) { return w && typeof w.text === "string" })
+        var soft = 0
+        for (var i = 0; i < weak.length; i++) {
+            if (weak[i].alert === true)
+                lines.push(weak[i].text)
+            else
+                soft += 1
+        }
         var holes = list(d.updates !== null && typeof d.updates === "object" ? d.updates.holes : null)
             .filter(function(h) { return h && h.fix }).length
         if (holes > 0)
             lines.push(count(holes, "package with a known security hole has", "packages with a known security hole have") + " a fix")
-        reviewCount = list(d.changes).length - changes.length
+        reviewCount = list(d.changes).length - changes.length + soft
             + (remote === 0 && failed.length < 3 ? failed.length : 0)
         alertCount = lines.length
         alerts = lines.length > 3 ? lines.slice(0, 2).concat("and " + (lines.length - 2) + " more") : lines

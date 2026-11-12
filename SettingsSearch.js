@@ -114,6 +114,13 @@ var INDEX = [
         de: "aktualisierung aktualisieren", es: "actualizaciones actualizar", fr: "mises à jour mettre à jour",
         pt: "atualizações atualizar", it: "aggiornamenti aggiornare", ru: "обновления обновить",
         pl: "aktualizacje zaktualizuj" } },
+    { page: "Security", find: ["Hardening"], title: "Hardening (kernel and network)", keys: {
+        en: "hardening harden kernel sysctl llmnr mdns avahi dns over tls protection strengthen secure",
+        tr: "sıkılaştırma güçlendirme çekirdek koruma güvenli sertleştirme",
+        de: "härtung härten kernel absichern schutz", es: "endurecimiento reforzar núcleo protección",
+        fr: "durcissement renforcer noyau protection", pt: "endurecimento reforçar núcleo proteção",
+        it: "rafforzamento rafforzare kernel protezione", ru: "усиление защита ядро укрепить",
+        pl: "utwardzanie wzmocnienie jądro ochrona" } },
     { page: "Security", find: ["Disk encryption"], title: "Disk encryption", keys: {
         en: "disk encryption luks encrypted", tr: "şifreleme şifreli disk", de: "verschlüsselung festplattenverschlüsselung",
         es: "cifrado de disco", fr: "chiffrement du disque", pt: "criptografia de disco", it: "crittografia del disco",

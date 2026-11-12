@@ -14,6 +14,10 @@ Used by Settings -> Security, and once at login.
     yakushi-securityctl.py accept <key>|all "that was me": take changes into the baseline
     yakushi-securityctl.py firewall on|off  * ufw: block everything coming in, allow going out
     yakushi-securityctl.py ssh off          * stop and disable the SSH server
+    yakushi-securityctl.py harden on|off    * kernel and network settings to their safe values
+                                            (one file in /etc/sysctl.d, one for systemd-resolved,
+                                            Avahi off, your home closed to other users); off
+                                            puts everything back as it was
     yakushi-securityctl.py autolock <min>|off   lock after <min> idle minutes (the shell
                                             watches for idle itself; config "lock")
     yakushi-securityctl.py upgrade          * the system update (pacman -Syu), right in Settings:
@@ -22,16 +26,20 @@ Used by Settings -> Security, and once at login.
                                             stops it halfway
     yakushi-securityctl.py follow           watch an update that is already running
     yakushi-securityctl.py scan             * compare every system file with its package
-                                            (pacman -Qkk; a few minutes)
+                                            (pacman -Qkk; a few minutes), and look for programs
+                                            with root rights that no package installed
 
 * needs your password: --password-stdin and the first line of stdin (Settings
   asks for it in the page; it goes to sudo through a pipe), else pkexec asks.
 
 The guard keeps a fingerprint of the places an intruder changes to stay
-(what starts at login, services and timers, users and the wheel group, SSH
-keys, shell start files, /etc/ld.so.preload, pacman.conf, open ports) and
-says what changed since you last accepted it, plus failed logins and sudo
-use from the journal. State: ~/.local/state/yakushi/security.json (only you
+(what starts at login, services and timers and their unit files, users and
+the wheel group, SSH keys and config, shell start files and functions,
+commands in ~/.local/bin, app launchers, PAM, the library loader, kernel
+modules and boot options, udev rules, pacman hooks, pacman.conf, open
+ports) and says what changed since you last accepted it, plus failed logins
+and sudo use from the journal. A program you accepted once may open and
+close its ports as it likes: only a program never seen before is news. State: ~/.local/state/yakushi/security.json (only you
 can read it).
 """
 from __future__ import annotations
@@ -238,6 +246,103 @@ def autolock() -> dict:
     return {"minutes": minutes, "installed": True, "running": True}
 
 
+# ---- hardening ---------------------------------------------------------------------------
+# Settings that close doors nobody here uses. Each is safe for a desktop that
+# plays games and runs Flatpak apps (nothing below touches user namespaces,
+# ptrace between your own programs or performance).
+SYSCTL_FILE = "/etc/sysctl.d/90-yakushi-hardening.conf"
+RESOLVED_FILE = "/etc/systemd/resolved.conf.d/90-yakushi-hardening.conf"
+AVAHI = ["avahi-daemon.socket", "avahi-daemon.service"]
+HARDEN_SYSCTL = [
+    # id, in words, [(kernel setting, safe value)]
+    ("kexec", "Swapping the running kernel", [("kernel.kexec_load_disabled", "1")]),
+    # 244 = sync, remount, end programs, restart (the emergency keys), no memory or debug dumps
+    ("sysrq", "Debug keys (SysRq)", [("kernel.sysrq", "244")]),
+    ("redirects", "Route changes sent by strangers", [
+        ("net.ipv4.conf.all.accept_redirects", "0"), ("net.ipv4.conf.default.accept_redirects", "0"),
+        ("net.ipv4.conf.all.secure_redirects", "0"), ("net.ipv4.conf.default.secure_redirects", "0"),
+        ("net.ipv4.conf.all.send_redirects", "0"), ("net.ipv4.conf.default.send_redirects", "0"),
+        ("net.ipv6.conf.all.accept_redirects", "0"), ("net.ipv6.conf.default.accept_redirects", "0")]),
+    ("rfc1337", "Connections cut by forged packets", [("net.ipv4.tcp_rfc1337", "1")]),
+    ("ldisc", "Line modules loaded by anyone", [("dev.tty.ldisc_autoload", "0")]),
+    ("sticky", "Files planted in shared folders", [("fs.protected_fifos", "2"), ("fs.protected_regular", "2")]),
+    ("ipv6", "IPv6 address that names this computer", [
+        ("net.ipv6.conf.all.use_tempaddr", "2"), ("net.ipv6.conf.default.use_tempaddr", "2")]),
+]
+RESOLVED_LINES = ["[Resolve]", "LLMNR=no", "MulticastDNS=no", "DNSOverTLS=opportunistic"]
+
+
+def sysctl_now(key: str) -> str:
+    """the value, '' when it cannot be read"""
+    return read("/proc/sys/" + key.replace(".", "/")).strip()
+
+
+def sysctl_safe(key: str, want: str, now: str) -> bool:
+    if key == "kernel.sysrq" and now.isdigit():      # anything inside the emergency keys
+        return int(now) != 1 and int(now) & ~244 == 0
+    return now == want
+
+
+def resolved_now() -> dict | None:
+    """how systemd-resolved stands; None when it is not what resolves names here"""
+    res = run(["resolvectl", "status"], 10)
+    m = re.search(r"^\s*Protocols:\s*(.+)$", res.stdout, re.M) if res.returncode == 0 else None   # the first is Global
+    if not m:
+        return None
+    words = m.group(1).split()
+    return {"llmnr": "-LLMNR" in words, "mdns": "-mDNS" in words,
+            "dot": "+DNSOverTLS" in words or "DNSOverTLS=opportunistic" in words}
+
+
+def avahi_on() -> bool:
+    return "active" in run(["systemctl", "is-active", *AVAHI], 10).stdout.split()
+
+
+def home_closed() -> bool:
+    try:
+        return HOME.stat().st_mode & 0o077 == 0
+    except OSError:
+        return True
+
+
+def hardening() -> dict:
+    items = []
+    for ident, label, keys in HARDEN_SYSCTL:
+        seen = [(k, want, sysctl_now(k)) for k, want in keys]
+        seen = [x for x in seen if x[2]]             # a kernel without it: nothing to say
+        if seen:
+            items.append({"id": ident, "label": label, "ok": all(sysctl_safe(*x) for x in seen)})
+    names = resolved_now()
+    avahi = avahi_on()
+    if names is not None:
+        items.append({"id": "llmnr", "label": "Answering name calls (LLMNR)", "ok": names["llmnr"]})
+    if names is not None or avahi:
+        items.append({"id": "mdns", "label": "Announcing this computer (mDNS)",
+                      "ok": not avahi and (names is None or names["mdns"])})
+    if names is not None:
+        items.append({"id": "dot", "label": "Name lookups anyone can read", "ok": names["dot"]})
+    items.append({"id": "home", "label": "Home folder open to other users", "ok": home_closed()})
+    return {"items": items, "total": len(items), "weak": sum(1 for i in items if not i["ok"]),
+            "applied": Path(SYSCTL_FILE).exists() or Path(RESOLVED_FILE).exists()}
+
+
+def shield_weak() -> list[dict]:
+    """the protections that are off, for the guard's report (alert: act now)"""
+    weak = []
+    if not firewall()["on"]:
+        weak.append({"id": "firewall", "alert": True, "text": "The firewall is off"})
+    ssh = ssh_server()
+    if ssh["active"]:
+        weak.append({"id": "ssh", "alert": True, "text": "The SSH server is on"})
+    if autolock()["minutes"] == "off":
+        weak.append({"id": "autolock", "alert": False, "text": "Auto lock is off"})
+    n = hardening()["weak"]
+    if n:
+        weak.append({"id": "hardening", "alert": False,
+                     "text": f"{n} hardening setting{'s are' if n != 1 else ' is'} weaker than needed"})
+    return weak
+
+
 # ---- updates and known holes -------------------------------------------------------------
 AUDIT = re.compile(r"^Package (\S+) is affected by (.+?)\.\s+(\w+) risk!(?:\s+Update to (\S+?)!)?", re.I)
 
@@ -281,13 +386,34 @@ def _home_form(path: Path) -> str:
     return "~/" + str(path.relative_to(HOME)) if path.is_relative_to(HOME) else str(path)
 
 
-WATCHED_FILES = [
+# what the guard watched before 2026-11-12 (a state file without "watching" has these)
+FIRST_FILES = [
     _home_form(paths.CONFIG_HOME / "fish/config.fish"), "~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile",
     "~/.xprofile", "~/.pam_environment", "~/.ssh/authorized_keys", "~/.ssh/rc",
     "/etc/ld.so.preload", "/etc/environment", "/etc/hosts", "/etc/pacman.conf", "/etc/shells",
 ]
-WATCHED_DIRS = [*(_home_form(paths.CONFIG_HOME / d) for d in ("fish/conf.d", "environment.d", "autostart", "systemd/user")),
-                "/etc/xdg/autostart", "/etc/profile.d", "/etc/cron.d"]
+FIRST_DIRS = [*(_home_form(paths.CONFIG_HOME / d) for d in ("fish/conf.d", "environment.d", "autostart", "systemd/user")),
+              "/etc/xdg/autostart", "/etc/profile.d", "/etc/cron.d"]
+
+WATCHED_FILES = FIRST_FILES + ["~/.ssh/config", "/etc/ld.so.conf", "/etc/nsswitch.conf", "/etc/crontab"]
+WATCHED_DIRS = FIRST_DIRS                  # every file in the folder
+# files written into the folder itself; a link counts by where it points (a
+# link to a package's file would change with every update of that package)
+WATCHED_PLAIN = [_home_form(paths.CONFIG_HOME / "fish/functions"), _home_form(paths.DATA_HOME / "applications"),
+                 "/etc/pam.d", "/etc/ld.so.conf.d", "/etc/modules-load.d", "/etc/modprobe.d",
+                 "/etc/udev/rules.d", "/etc/pacman.d/hooks"]
+# unit files and their drop-in folders (links are what "enabled" already says)
+WATCHED_UNITS = ["/etc/systemd/system", "/etc/systemd/user"]
+# commands that come before the system's own: a new name is the news (your
+# own tools update themselves there, so their content is not compared)
+WATCHED_NAMES = ["~/.local/bin"]
+OTHER_KEYS = ["kernel:cmdline"]
+ROOTS = WATCHED_FILES + WATCHED_DIRS + WATCHED_PLAIN + WATCHED_UNITS + WATCHED_NAMES + OTHER_KEYS
+
+
+def under(key: str, roots: list[str]) -> bool:
+    """is this snapshot key one of these watched places, or inside one?"""
+    return any(key == r or key == "file:" + r or key.startswith(f"file:{r}/") for r in roots)
 
 
 def digest(path: Path) -> str:
@@ -298,6 +424,13 @@ def digest(path: Path) -> str:
 
 
 NAMES: dict[str, str] = {}          # port key -> who, for the messages of this run
+
+
+def listed(folder: str) -> list[Path]:
+    try:
+        return sorted(Path(os.path.expanduser(folder)).iterdir())
+    except OSError:
+        return []
 
 
 def snapshot() -> dict[str, str]:
@@ -336,6 +469,30 @@ def snapshot() -> dict[str, str]:
                     snap["file:" + f"{d}/{entry.name}"] = digest(entry)
         except OSError:
             pass
+    for d in WATCHED_PLAIN:
+        for entry in listed(d):
+            if entry.name.endswith(".cache"):       # rebuilt by the system (mimeinfo.cache)
+                continue
+            if entry.is_symlink():
+                snap[f"file:{d}/{entry.name}"] = "-> " + os.readlink(entry)
+            elif entry.is_file():
+                snap[f"file:{d}/{entry.name}"] = digest(entry)
+    for d in WATCHED_UNITS:
+        for entry in listed(d):
+            if entry.is_symlink():
+                continue
+            if entry.is_file():
+                snap[f"file:{d}/{entry.name}"] = digest(entry)
+            elif entry.is_dir() and entry.name.endswith(".d"):
+                for inner in listed(f"{d}/{entry.name}"):
+                    if inner.is_file() and not inner.is_symlink():
+                        snap[f"file:{d}/{entry.name}/{inner.name}"] = digest(inner)
+    for d in WATCHED_NAMES:
+        for entry in listed(d):
+            snap[f"file:{d}/{entry.name}"] = "1"
+    cmdline = read("/proc/cmdline").strip()
+    if cmdline:
+        snap["kernel:cmdline"] = cmdline
     for sock in listening():
         # by owner when we can tell (apps pick new port numbers now and then),
         # else by port; the value says which ports, for the message only
@@ -370,7 +527,12 @@ def describe(key: str, kind: str, value: str = "") -> str:
             return f"{verb}: {who or 'something'} no longer listens to your network ({proto})" + (f": {where}" if where else "")
         return f"{verb}: {who or 'unknown program'} listens to your network ({proto})" + (f": {where}" if where else "")
     if what == "file":
+        name = rest.rsplit("/", 1)[-1]
+        if kind != "gone" and any(rest.startswith(d + "/") for d in WATCHED_NAMES) and shutil.which(name, path="/usr/bin"):
+            return f"{verb}: {rest} (it runs instead of the system's own {name})"
         return f"{verb}: {rest}"
+    if what == "kernel":
+        return f"{verb}: the options the kernel starts with" + (f": {value[:120]}" if value and kind != "gone" else "")
     return f"{verb}: {key}"
 
 
@@ -435,23 +597,45 @@ def guard(data: dict) -> dict:
     if not isinstance(base, dict):
         data["baseline"] = snap
         data["portKeys"] = 2
+        data["watching"] = ROOTS
+        data["shield"] = shield_weak()
         data["changes"] = []
         data["guardTime"] = now
         data["events"] = {"readable": True, "failed": [], "sudo": [], "ssh": [], "since": now}
         return {"first": True, "changes": []}
     if data.get("portKeys") != 2:
         migrate_ports(data, base)
+    # places watched since this build: what is there now is where we start
+    # (asking you about forty files nobody touched would teach you to click
+    # them away)
+    watching = data.get("watching")
+    known = watching if isinstance(watching, list) else FIRST_FILES + FIRST_DIRS
+    fresh = [r for r in ROOTS if r not in known]
+    if fresh:
+        for k, v in snap.items():
+            if k not in base and under(k, fresh):
+                base[k] = v
+    data["watching"] = ROOTS
     changes = []
     for k, v in snap.items():
         if k not in base:
             changes.append({"key": k, "kind": "new", "text": describe(k, "new", v)})
         elif base[k] != v and not k.startswith("port:"):    # new port numbers of a known owner are fine
             changes.append({"key": k, "kind": "changed", "text": describe(k, "changed", v)})
-    for k, v in base.items():
-        if k not in snap:
-            changes.append({"key": k, "kind": "gone", "text": describe(k, "gone", v)})
+    for k, v in list(base.items()):
+        if k in snap:
+            continue
+        if k.startswith("port:"):
+            # a closed port is no danger and no news. A program you know
+            # stays known (it opens its ports again the next time it runs);
+            # a bare port number says nothing about who comes back to it
+            if k.split(":", 2)[2].isdigit():
+                base.pop(k)
+            continue
+        changes.append({"key": k, "kind": "gone", "text": describe(k, "gone", v)})
     data["changes"] = changes
     data["current"] = snap
+    data["shield"] = shield_weak()
     since = int(data.get("events", {}).get("since") or data.get("guardTime") or now - 86400)
     # read only what is new since the last check; older ones are kept below
     ev = journal_since(max(since, int(data.get("guardTime") or since) - 5))
@@ -522,6 +706,76 @@ def ssh_off() -> dict:
     return r
 
 
+def set_hardening(on: bool) -> dict:
+    import shlex
+    data = load()
+    mine = data.get("hardening") if isinstance(data.get("hardening"), dict) else {}
+    keys = [k for _, _, pairs in HARDEN_SYSCTL for k in pairs]
+    resolved = "if systemctl -q is-active systemd-resolved.service; then systemctl restart systemd-resolved.service; fi"
+    if on:
+        before = mine.get("before") if isinstance(mine.get("before"), dict) else {}
+        for key, _ in keys:                     # how it was, for "off" (kept from the first time)
+            now = sysctl_now(key)
+            if now.isdigit():
+                before.setdefault(key, now)
+        mine["before"] = before
+        if "avahi" not in mine:
+            mine["avahi"] = avahi_on() or any(unit_state(u)[1] == "enabled" for u in AVAHI)
+        if "homeMode" not in mine:
+            mine["homeMode"] = HOME.stat().st_mode & 0o777
+        # "-" in front: a kernel without that setting is not an error
+        lines = ["# Written by Yakushi Shell (Settings -> Security -> Hardening).",
+                 "# HARDEN writes it, UNDO removes it."] + [f"-{k} = {v}" for k, v in keys]
+        text = " ".join(shlex.quote(l) for l in lines)
+        names = " ".join(shlex.quote(l) for l in RESOLVED_LINES)
+        script = ("set -e; umask 022; "
+                  f"mkdir -p {os.path.dirname(SYSCTL_FILE)} {os.path.dirname(RESOLVED_FILE)}; "
+                  f"printf '%s\\n' {text} > {SYSCTL_FILE}; "
+                  f"printf '%s\\n' {names} > {RESOLVED_FILE}; "
+                  f"sysctl -q -p {SYSCTL_FILE} || true; {resolved}; "
+                  f"systemctl disable --now {' '.join(AVAHI)} >/dev/null 2>&1 || true")
+    else:
+        back = [f"{k}={mine['before'][k]}" for k, _ in keys
+                if isinstance(mine.get("before"), dict) and re.fullmatch(r"\d+", str(mine["before"].get(k, "")))]
+        script = (f"rm -f {SYSCTL_FILE} {RESOLVED_FILE}; "
+                  + "".join(f"sysctl -q -w {shlex.quote(b)} 2>/dev/null || true; " for b in back)
+                  + resolved
+                  + (f"; systemctl enable --now {' '.join(AVAHI)} >/dev/null 2>&1 || true" if mine.get("avahi") else ""))
+    r = root(["/bin/sh", "-c", script])
+    if not r["ok"]:
+        return r
+    try:                                         # your own folder: no root needed
+        if on:
+            os.chmod(HOME, HOME.stat().st_mode & 0o700)
+        elif isinstance(mine.get("homeMode"), int) and home_closed():
+            os.chmod(HOME, mine["homeMode"] & 0o777)
+    except OSError:
+        pass
+    data = load()
+    if on:
+        data["hardening"] = mine
+    else:
+        data.pop("hardening", None)
+    base = data.get("baseline")
+    if isinstance(base, dict):                   # Avahi on or off was this button, not news
+        for unit in AVAHI:
+            if unit_state(unit)[1] == "enabled":
+                base[f"unit:system:{unit}"] = "1"
+            else:
+                base.pop(f"unit:system:{unit}", None)
+        data["changes"] = [c for c in data.get("changes", []) if c.get("key") not in
+                           [f"unit:system:{u}" for u in AVAHI]]
+    data["shield"] = shield_weak()
+    save(data)
+    left = hardening()["weak"]
+    if on:
+        r["message"] = ("Hardened: every setting is at its safe value." if left == 0 else
+                        f"Hardened, but {left} setting{'s' if left != 1 else ''} did not take. They are marked below.")
+    else:
+        r["message"] = "Hardening undone. The kernel settings are fully back after a restart."
+    return r
+
+
 def stop_old_idle() -> None:
     """earlier builds ran hypridle with their own config: end it, once"""
     if OLD_IDLE_CONF.exists():
@@ -552,9 +806,29 @@ REBUILT = re.compile(r"(\.cache|/plugins\.dat|/locale-archive|/gschemas\.compile
 SCAN_RED = re.compile(r"^warning:\s+(\S+):\s+(/.*?)\s+\(([^()]+)\)$")
 
 
+# files that run with their owner's or group's rights (setuid, setgid), on every
+# real disk and RAM disk that is mounted; -xdev keeps find out of snapshots
+SUID_MARK = "@@yakushi-suid"
+SUID_FIND = ("findmnt -rno TARGET -t btrfs,ext4,ext3,ext2,xfs,f2fs,bcachefs,zfs,tmpfs | while IFS= read -r m; do "
+             "find \"$m\" -xdev -type f -perm /6000 2>/dev/null; done")
+# Flatpak keeps its runtimes' files as they came; apps run with setuid switched off
+SUID_FINE = re.compile(r"^(/var/lib/flatpak/|/home/[^/]+/\.local/share/flatpak/)")
+
+
+def unowned(paths_: list[str]) -> list[str]:
+    """the ones no package installed (asking pacman needs no root)"""
+    out = []
+    for path in sorted(set(paths_)):
+        if SUID_FINE.match(path) or not path.startswith("/"):
+            continue
+        if run(["pacman", "-Qqo", "--", path], 20).returncode != 0:
+            out.append(path)
+    return out
+
+
 def deep_scan() -> dict:
     out = tasks.PASSWORD
-    cmd = ["/bin/sh", "-c", "LC_ALL=C pacman -Qkk 2>&1; exit 0"]
+    cmd = ["/bin/sh", "-c", f"LC_ALL=C pacman -Qkk 2>&1; echo {SUID_MARK}; {SUID_FIND}; exit 0"]
     if out is not None:
         res = subprocess.run(["sudo", "-S", "-k", "-p", "", "--", *cmd], input=out + "\n",
                              capture_output=True, text=True, timeout=1800)
@@ -565,7 +839,9 @@ def deep_scan() -> dict:
         if res.returncode in (126, 127):
             return {"ok": False, "message": tasks.ROOT_MESSAGES["cancel"]}
     red, configs, other, caches = {}, 0, 0, set()
-    for line in res.stdout.splitlines():
+    files, _, special = res.stdout.partition(SUID_MARK)
+    suid = unowned(special.split("\n"))
+    for line in files.splitlines():
         m = SCAN_RED.match(line.strip())
         if not m:
             continue
@@ -587,12 +863,14 @@ def deep_scan() -> dict:
             other += 1
     red = list(red.values())
     result = {"time": int(time.time()), "red": red[:100], "redCount": len(red), "configs": configs,
-              "caches": len(caches), "other": other}
+              "caches": len(caches), "other": other, "suid": suid[:50]}
     data = load()
     data["scan"] = result
     save(data)
     msg = ("No system program was changed: every one matches its package."
            if not red else f"{len(red)} system files differ from their package. Look at them below.")
+    if suid:
+        msg += f" {len(suid)} program{'s' if len(suid) != 1 else ''} with root rights came from no package."
     return {"ok": True, "message": msg, "scan": result}
 
 
@@ -789,6 +1067,7 @@ def status() -> dict:
         "ssh": ssh_server(),
         "updates": data.get("updates"),
         "autolock": autolock(),
+        "hardening": hardening(),
         "encryption": encrypted_root(),
         "secureBoot": secure_boot(),
         "guard": {"time": data.get("guardTime"), "changes": data.get("changes", []),
@@ -856,6 +1135,8 @@ def main() -> None:
             emit(set_firewall(a[1] == "on"))
         elif a == ["ssh", "off"]:
             emit(ssh_off())
+        elif len(a) == 2 and a[0] == "harden" and a[1] in ("on", "off"):
+            emit(set_hardening(a[1] == "on"))
         elif len(a) == 2 and a[0] == "autolock":
             emit(set_autolock(a[1]))
         elif a == ["upgrade"]:
@@ -866,7 +1147,7 @@ def main() -> None:
             emit(deep_scan())
         else:
             emit({"ok": False, "message": "usage: status | updates | login | guard | accept <key>|all | seen | "
-                                          "firewall on|off | ssh off | autolock <min>|off | scan | upgrade | follow"})
+                                          "firewall on|off | ssh off | harden on|off | autolock <min>|off | scan | upgrade | follow"})
     except Exception as e:                       # always answer the page
         emit({"ok": False, "message": f"Unexpected error: {e}"})
 

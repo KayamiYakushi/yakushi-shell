@@ -18,6 +18,9 @@ Used by Settings -> Security, and once at login.
                                             (one file in /etc/sysctl.d, one for systemd-resolved,
                                             Avahi off, your home closed to other users); off
                                             puts everything back as it was
+    yakushi-securityctl.py app <id> <what> on|off   what a Flatpak app reaches outside its
+                                            sandbox: cut one thing, or give it back (your own
+                                            override, no password; counts from the app's next start)
     yakushi-securityctl.py autolock <min>|off   lock after <min> idle minutes (the shell
                                             watches for idle itself; config "lock")
     yakushi-securityctl.py upgrade          * the system update (pacman -Syu), right in Settings:
@@ -341,6 +344,144 @@ def shield_weak() -> list[dict]:
         weak.append({"id": "hardening", "alert": False,
                      "text": f"{n} hardening setting{'s are' if n != 1 else ' is'} weaker than needed"})
     return weak
+
+
+# ---- the app sandbox (Flatpak) -------------------------------------------------------------
+# What each app may reach outside its own box, read from Flatpak's own files
+# (no process is started for it). Only the things that matter are named:
+# sound, the screen, the network and graphics are what an app is for.
+FLATPAK_SYSTEM = Path("/var/lib/flatpak")
+FLATPAK_USER = Path(os.environ.get("FLATPAK_USER_DIR") or paths.DATA_HOME / "flatpak")
+APP_ID = re.compile(r"[A-Za-z_][\w\-]*(\.[\w\-]+)+")
+APP_DEVICES = {
+    "all": ("ALL DEVICES", "The camera, controllers, security keys: every device you can use. "
+                           "Cut: graphics and plain controllers stay; the camera and the rest go."),
+    "usb": ("USB DEVICES", "USB devices, spoken to directly. Cut: it sees only what the system hands it."),
+}
+APP_SOCKETS = {
+    "x11": ("X11 WINDOWS", "The old window system: it can read the keys and windows of other X11 apps. "
+                           "Cut: the app has to draw on Wayland by itself, or it will not open."),
+    "pcsc": ("SMART CARDS", "Smart card readers. Cut: nothing changes unless you use one."),
+    "cups": ("PRINTERS", "Printers. Cut: no printing from this app."),
+    "session-bus": ("EVERY APP OF YOURS", "It may talk to every app and service of yours: as good as no sandbox. "
+                                          "Cut: some of its features may stop."),
+    "system-bus": ("SYSTEM SERVICES", "It may talk to every system service. Cut: some of its features may stop."),
+    "ssh-auth": ("SSH KEYS", "It may log in with your SSH keys. Cut: no SSH from this app."),
+    "gpg-agent": ("GPG KEYS", "It may sign and decrypt with your GPG keys. Cut: no GPG from this app."),
+}
+APP_FOLDERS = {
+    "home": "ALL YOUR FILES", "host": "ALL YOUR FILES", "host-os": "SYSTEM FILES", "host-etc": "SYSTEM SETTINGS",
+    "xdg-desktop": "DESKTOP", "xdg-documents": "DOCUMENTS", "xdg-download": "DOWNLOADS", "xdg-music": "MUSIC",
+    "xdg-pictures": "PICTURES", "xdg-videos": "VIDEOS", "xdg-public-share": "PUBLIC", "xdg-templates": "TEMPLATES",
+}
+APP_DRIVES = ("/mnt", "/media", "/run/media")
+APP_PLUMBING = ("xdg-run", "xdg-config", "xdg-cache", "/run/", "/sys/", "/tmp", "/var/", "/dev/", "/usr/", "/etc/")
+
+
+def flatpak_context(path: Path) -> dict[str, list[str]]:
+    """the [Context] lists of a metadata or override file"""
+    out, inside = {}, False
+    for line in read(path).splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            inside = line == "[Context]"
+        elif inside and "=" in line:
+            key, _, value = line.partition("=")
+            out[key.strip()] = [v for v in value.split(";") if v]
+    return out
+
+
+def bare(entry: str) -> str:
+    """a filesystem entry without its :ro / :create / :rw"""
+    head, sep, tail = entry.rpartition(":")
+    return head if sep and tail in ("ro", "rw", "create") else entry
+
+
+def flatpak_merged(base: dict, overrides: list[dict]) -> dict[str, list[str]]:
+    """the app's own lists with the overrides applied, in Flatpak's order"""
+    out = {k: list(base.get(k, [])) for k in ("devices", "sockets", "filesystems")}
+    for ov in overrides:
+        for key, items in out.items():
+            for entry in ov.get(key, []):
+                name = bare(entry.lstrip("!"))
+                items[:] = [i for i in items if bare(i) != name]
+                if not entry.startswith("!"):
+                    items.append(entry)
+    return out
+
+
+def app_perms(base: dict, now: dict) -> list[dict]:
+    """what an app asks for beyond its box, and whether it has it now"""
+    perms = []
+
+    def add(ident, label, hint, on, grant, revoke):
+        perms.append({"id": ident, "label": label, "hint": hint, "on": on, "grant": grant, "revoke": revoke})
+    for kind, known, flag in (("devices", APP_DEVICES, "device"), ("sockets", APP_SOCKETS, "socket")):
+        for name, (label, hint) in known.items():
+            if name in base.get(kind, []) or name in now[kind]:
+                keep = ["--device=dri", "--device=input"] if (kind, name) == ("devices", "all") else []
+                add(f"{flag}:{name}", label, hint, name in now[kind], [f"--{flag}={name}"], [f"--no{flag}={name}"] + keep)
+    asked = {bare(e): e for e in base.get("filesystems", [])}
+    asked.update({bare(e): e for e in now["filesystems"]})
+    has = {bare(e) for e in now["filesystems"]}
+    drives = [d for d in APP_DRIVES if d in asked]
+    for name, entry in asked.items():
+        if name in APP_DRIVES or name.startswith(APP_PLUMBING) or "/." in "/" + name.lstrip("~"):
+            continue
+        ro = entry.endswith(":ro")
+        if name in APP_FOLDERS:
+            label = APP_FOLDERS[name]
+            what = {"home": "Everything in your home folder", "host": "Every file on this computer you can open",
+                    "host-os": "The system's programs and libraries", "host-etc": "The system's settings"}.get(
+                        name, f"Your {label.capitalize()} folder")
+        else:
+            label, what = name, f"The folder {name}"
+        add("fs:" + name, label + (" (READ)" if ro else ""),
+            what + (", to read." if ro else ", to read and change.") + " Cut: it opens only the files you pick in the file chooser.",
+            name in has, [f"--filesystem={entry}"], [f"--nofilesystem={name}"])
+    if drives:
+        add("fs:drives", "OTHER DRIVES", "Drives mounted in /mnt, /media and /run/media. Cut: no files or game libraries on other drives.",
+            any(d in has for d in drives), [f"--filesystem={asked[d]}" for d in drives], [f"--nofilesystem={d}" for d in drives])
+    return perms
+
+
+def apps(full: bool = False) -> list[dict]:
+    out, seen = [], set()
+    for where in (FLATPAK_USER, FLATPAK_SYSTEM):
+        for folder in listed(str(where / "app")):
+            ident = folder.name
+            if ident in seen or not APP_ID.fullmatch(ident):
+                continue
+            base = flatpak_context(folder / "current/active/metadata")
+            if not base:
+                continue
+            seen.add(ident)
+            now = flatpak_merged(base, [flatpak_context(p) for p in (
+                FLATPAK_SYSTEM / "overrides/global", FLATPAK_SYSTEM / "overrides" / ident,
+                FLATPAK_USER / "overrides/global", FLATPAK_USER / "overrides" / ident)])
+            perms = app_perms(base, now)
+            if not perms:
+                continue
+            name = re.search(r"^Name=(.+)$", read(where / "exports/share/applications" / f"{ident}.desktop"), re.M)
+            out.append({"id": ident, "name": name.group(1).strip() if name else ident.rsplit(".", 1)[-1],
+                        "perms": perms if full else [{k: p[k] for k in ("id", "label", "hint", "on")} for p in perms]})
+    return sorted(out, key=lambda a: a["name"].lower())
+
+
+def set_app(ident: str, what: str, on: bool) -> dict:
+    app = next((a for a in apps(full=True) if a["id"] == ident), None)
+    perm = next((p for p in app["perms"] if p["id"] == what), None) if app else None
+    if perm is None:
+        return {"ok": False, "message": "That app does not ask for that."}
+    args = perm["grant"] if on else perm["revoke"]
+    res = run(["flatpak", "override", "--user", *args, ident], 30)
+    if res.returncode != 0 and "--device=input" in args:      # a Flatpak before 1.16
+        res = run(["flatpak", "override", "--user", *[a for a in args if a != "--device=input"], ident], 30)
+    if res.returncode != 0:
+        lines = [l for l in (res.stderr + res.stdout).splitlines() if l.strip()]
+        return {"ok": False, "message": "Flatpak did not take it: " + (lines[-1] if lines else "no reason given")}
+    return {"ok": True, "message": f"{app['name']} {'reaches again' if on else 'no longer reaches'}: "
+                                   f"{perm['label']}. It counts from the app's next start."}
 
 
 # ---- updates and known holes -------------------------------------------------------------
@@ -1110,6 +1251,7 @@ def status() -> dict:
         "updates": data.get("updates"),
         "autolock": autolock(),
         "hardening": hardening(),
+        "apps": apps(),
         "encryption": encrypted_root(),
         "secureBoot": secure_boot(),
         "guard": {"time": data.get("guardTime"), "changes": data.get("changes", []),
@@ -1179,6 +1321,8 @@ def main() -> None:
             emit(ssh_off())
         elif len(a) == 2 and a[0] == "harden" and a[1] in ("on", "off"):
             emit(set_hardening(a[1] == "on"))
+        elif len(a) == 4 and a[0] == "app" and a[3] in ("on", "off"):
+            emit(set_app(a[1], a[2], a[3] == "on"))
         elif len(a) == 2 and a[0] == "autolock":
             emit(set_autolock(a[1]))
         elif a == ["upgrade"]:
@@ -1189,7 +1333,7 @@ def main() -> None:
             emit(deep_scan())
         else:
             emit({"ok": False, "message": "usage: status | updates | login | guard | accept <key>|all | seen | "
-                                          "firewall on|off | ssh off | harden on|off | autolock <min>|off | scan | upgrade | follow"})
+                                          "firewall on|off | ssh off | harden on|off | app <id> <what> on|off | autolock <min>|off | scan | upgrade | follow"})
     except Exception as e:                       # always answer the page
         emit({"ok": False, "message": f"Unexpected error: {e}"})
 

@@ -12,6 +12,8 @@ import "../"
 //             settings), disk encryption, Secure Boot
 //   GUARD     what changed in the places an intruder would use to stay
 //   LOGINS    failed password attempts, sudo use, SSH logins
+//   APPS      what each Flatpak app reaches outside its sandbox; a click cuts
+//             one thing or gives it back (your own override, no password)
 //   DEEP SCAN every system file compared with its package, and programs
 //             with root rights that no package installed (on demand)
 //
@@ -35,6 +37,8 @@ Item {
     readonly property var scan: st ? st.scan : null
     readonly property var lock: st ? st.autolock : null
     readonly property var hard: st && st.hardening ? st.hardening : null
+    readonly property var apps: st && st.apps ? st.apps : []
+    property string permHint: ""         // what the thing under the pointer means
     readonly property var hardWeak: hard ? hard.items.filter(function(i) { return !i.ok }) : []
 
     // ---- one short line under the header
@@ -606,6 +610,50 @@ Item {
         }
     }
 
+    // one thing an app reaches outside its sandbox: a click cuts it, or gives it back
+    component Perm: Rectangle {
+        id: perm
+
+        property var info: ({})
+        property string app: ""
+        property var host: null
+        readonly property bool on: info.on === true
+
+        width: permText.implicitWidth + 18
+        height: 24
+        opacity: host && host.busy ? 0.5 : 1
+        color: permMouse.containsMouse ? Theme.tint(Theme.ink, 0.08) : on ? Theme.tint(Theme.ink, 0.04) : "transparent"
+        border.width: 1
+        border.color: permMouse.containsMouse ? Theme.lineHot : on ? Theme.line : Theme.tint(Theme.ink, 0.06)
+
+        Component.onDestruction: if (host && host.permHint === info.hint) host.permHint = ""
+
+        Text {
+            id: permText
+
+            textFormat: Text.PlainText
+            anchors.centerIn: parent
+            text: perm.info.label || ""
+            color: perm.on ? Theme.ink : Theme.inkMute
+            font.family: Theme.mono
+            font.pixelSize: 10
+            font.letterSpacing: 0.5
+            font.strikeout: !perm.on
+        }
+
+        MouseArea {
+            id: permMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: !(perm.host && perm.host.busy)
+            cursorShape: Qt.PointingHandCursor
+            onEntered: perm.host.permHint = (perm.on ? "" : "Cut now. ") + perm.info.hint
+            onExited: perm.host.permHint = ""
+            onClicked: perm.host.run(["app", perm.app, perm.info.id, perm.on ? "off" : "on"], "", "")
+        }
+    }
+
     // one of the four numbers on top; a click goes to its section
     component Tile: Rectangle {
         id: tile
@@ -781,6 +829,7 @@ Item {
         return k === "scan" ? "Comparing every system file with its package… this takes a few minutes."
             : k === "firewall" ? (args[1] === "on" ? "Turning the firewall on…" : "Turning the firewall off…")
             : k === "ssh" ? "Turning the SSH server off…"
+            : k === "app" ? (args[3] === "on" ? "Giving it back…" : "Cutting it…")
             : k === "harden" ? (args[1] === "on" ? "Hardening…" : "Putting the settings back…")
             : k === "autolock" ? "Setting auto lock…"
             : "Working…"
@@ -1621,6 +1670,92 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: page.showAllLog = !page.showAllLog
+                        }
+                    }
+                }
+            }
+
+            // ================= APPS =================
+            SectionHead {
+                visible: page.apps.length > 0
+                glyph: String.fromCodePoint(0xF003B)
+                label: "APP SANDBOX"
+                side: page.apps.length + (page.apps.length === 1 ? " Flatpak app reaches out" : " Flatpak apps reach out")
+            }
+
+            // two lines, always: the words change under the pointer, the page does not move
+            Item {
+                visible: page.apps.length > 0
+                width: parent.width
+                height: 62
+
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    text: page.permHint !== "" ? page.permHint
+                        : "What each app reaches outside its own box. Click one to cut it, click again to give it back. It counts from the app's next start; no password is needed."
+                    color: page.permHint !== "" ? Theme.ink : Theme.inkSoft
+                    font.family: Theme.mono
+                    font.pixelSize: 11
+                    lineHeight: 1.25
+                }
+            }
+
+            Column {
+                visible: page.apps.length > 0
+                width: parent.width
+                bottomPadding: 8
+                spacing: 12
+
+                Repeater {
+                    model: page.apps
+
+                    delegate: Item {
+                        id: appRow
+
+                        required property var modelData
+
+                        width: body.width
+                        height: Math.max(24, permFlow.implicitHeight)
+
+                        Text {
+                            id: appName
+
+                            textFormat: Text.PlainText
+                            width: 150
+                            anchors.top: parent.top
+                            anchors.topMargin: 5
+                            elide: Text.ElideRight
+                            text: appRow.modelData.name
+                            color: Theme.ink
+                            font.family: Theme.mono
+                            font.pixelSize: 12
+                        }
+
+                        Flow {
+                            id: permFlow
+
+                            anchors.left: appName.right
+                            anchors.leftMargin: 12
+                            anchors.right: parent.right
+                            spacing: 6
+
+                            Repeater {
+                                model: appRow.modelData.perms
+
+                                delegate: Perm {
+                                    required property var modelData
+
+                                    host: page
+                                    app: appRow.modelData.id
+                                    info: modelData
+                                }
+                            }
                         }
                     }
                 }

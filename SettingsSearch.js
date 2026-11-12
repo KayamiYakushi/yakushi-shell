@@ -142,6 +142,13 @@ var INDEX = [
         de: "anmeldungen falsches passwort", es: "inicios de sesión contraseña incorrecta",
         fr: "connexions mot de passe incorrect", pt: "logins senha errada", it: "accessi password errata",
         ru: "входы неверный пароль", pl: "logowania błędne hasło" } },
+    { page: "Security", find: ["APP SANDBOX"], title: "App sandbox (Flatpak permissions)", keys: {
+        en: "app sandbox flatpak permissions camera devices access files what apps can reach",
+        tr: "uygulama izinleri izin kamera erişim korumalı alan dosya aygıt",
+        de: "app berechtigungen kamera zugriff sandbox", es: "permisos de aplicaciones cámara acceso",
+        fr: "autorisations des applications caméra accès", pt: "permissões de aplicativos câmera acesso",
+        it: "permessi delle app fotocamera accesso", ru: "разрешения приложений камера доступ песочница",
+        pl: "uprawnienia aplikacji kamera dostęp piaskownica" } },
     { page: "Security", find: ["DEEP SCAN"], title: "Deep scan (system files)", keys: {
         en: "deep scan virus malware rootkit integrity system files check", tr: "virüs tarama bütünlük kontrol",
         de: "virus überprüfung systemdateien", es: "virus escaneo análisis integridad", fr: "virus analyse intégrité",

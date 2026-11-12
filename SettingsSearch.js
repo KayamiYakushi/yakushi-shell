@@ -40,7 +40,7 @@ var INDEX = [
         it: "immagine del profilo foto utente",
         ru: "фото профиля аватар изображение пользователь",
         pl: "zdjęcie profilowe awatar obraz użytkownik" } },
-    { page: "System", find: ["HARDWARE"], title: "Hardware and system info", keys: {
+    { page: "System", find: ["GPU"], title: "Hardware and system info", keys: {
         en: "hardware system info cpu processor gpu graphics card ram memory kernel uptime storage disk specs",
         tr: "donanım sistem bilgi işlemci ekran kartı bellek çekirdek depolama özellikler bilgisayar",
         de: "systeminfo prozessor grafikkarte arbeitsspeicher speicher festplatte computer",

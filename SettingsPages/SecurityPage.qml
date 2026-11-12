@@ -363,15 +363,15 @@ Item {
     // ---- the watch
     // The wall: the eight protections in the shield tab's order.
     readonly property var stones: [
-        { k: "FW", title: "Firewall", mood: fwMood, say: fw === null ? "…" : fw.on ? "on" : "off" },
-        { k: "NET", title: "Open to network", mood: netMood,
-          say: listeners.length === 0 ? "nothing listens" : listeners.length + " listening, " + (fw && fw.on ? "behind the firewall" : "open") },
+        { k: "FIREWALL", title: "Firewall", mood: fwMood, say: fw === null ? "…" : fw.on ? "on" : "off" },
+        { k: "NETWORK", title: "Open to network", mood: netMood,
+          say: listeners.length === 0 ? "nothing listens" : listeners.length + " listening, " + (fw && fw.on ? "firewalled" : "open") },
         { k: "SSH", title: "SSH server", mood: sshMood, say: st === null ? "…" : st.ssh.active ? "on" : st.ssh.enabled ? "starts at boot" : "off" },
-        { k: "UPD", title: "Updates", mood: updMood,
+        { k: "UPDATES", title: "Updates", mood: updMood,
           say: upd === null ? "not checked yet" : holesFixed.length > 0 ? holesFixed.length + " fix security holes"
              : pendingCount === 0 ? "up to date" : pendingCount + " waiting" },
         { k: "LOCK", title: "Auto lock", mood: lockMood, say: lock === null ? "…" : lock.minutes === "off" ? "off" : "after " + lock.minutes + " min" },
-        { k: "HARD", title: "Hardening", mood: hardMood,
+        { k: "HARDEN", title: "Hardening", mood: hardMood,
           say: hard === null ? "…" : hard.weak === 0 ? "all " + hard.total + " settings safe" : hard.weak + " of " + hard.total + " weak" },
         { k: "DISK", title: "Disk encryption", mood: encMood,
           say: st === null || !st.encryption.known ? "unknown" : st.encryption.on ? "encrypted" : "not encrypted" },
@@ -976,6 +976,7 @@ Item {
 
                 textFormat: Text.PlainText
                 y: 2
+                visible: page.stoneAt < 0
                 text: "SHIELD"
                 color: page.tab === 0 ? Theme.ink : Theme.inkSoft
                 font.family: Theme.mono
@@ -989,26 +990,38 @@ Item {
                 anchors.left: wallName.right
                 anchors.leftMargin: 10
                 anchors.baseline: wallName.baseline
+                visible: page.stoneAt < 0
                 text: page.st === null ? "" : page.goodCount + " / " + page.stones.length
                 color: page.badCount > 0 ? Theme.alert : Theme.ink
                 font.family: Theme.mono
                 font.pixelSize: 11
             }
 
-            // the stone under the pointer in words, else when the guard last looked
+            // when the guard last looked
             Text {
                 textFormat: Text.PlainText
                 anchors.right: parent.right
-                anchors.left: wallName.right
-                anchors.leftMargin: 60
                 anchors.baseline: wallName.baseline
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideLeft
-                text: page.stoneAt >= 0 ? page.stones[page.stoneAt].title.toUpperCase() + "  ·  " + page.stones[page.stoneAt].say
-                    : page.guard && page.guard.time ? "checked " + page.ago(page.guard.time) : ""
-                color: page.stoneAt >= 0 ? Theme.ink : Theme.inkMute
+                visible: page.stoneAt < 0
+                text: page.guard && page.guard.time ? "checked " + page.ago(page.guard.time) : ""
+                color: Theme.inkMute
                 font.family: Theme.mono
                 font.pixelSize: 10
+            }
+
+            // the stone under the pointer, in words, on the whole line
+            Text {
+                textFormat: Text.PlainText
+                width: parent.width
+                anchors.baseline: wallName.baseline
+                visible: page.stoneAt >= 0
+                elide: Text.ElideRight
+                text: page.stoneAt >= 0 ? page.stones[page.stoneAt].title.toUpperCase() + "  ·  " + page.stones[page.stoneAt].say : ""
+                color: Theme.ink
+                font.family: Theme.mono
+                font.pixelSize: 10
+                font.bold: true
+                font.letterSpacing: 1
             }
 
             Repeater {
@@ -1040,15 +1053,16 @@ Item {
 
                     Text {
                         textFormat: Text.PlainText
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width
                         anchors.bottom: parent.bottom
                         anchors.bottomMargin: 2
+                        horizontalAlignment: Text.AlignHCenter
                         text: stone.modelData.k
                         color: stone.modelData.mood === "bad" ? Theme.alert : stoneMouse.containsMouse ? Theme.ink : Theme.inkSoft
                         font.family: Theme.mono
-                        font.pixelSize: 9
-                        font.bold: true
-                        font.letterSpacing: 1
+                        font.pixelSize: 8
+                        fontSizeMode: Text.HorizontalFit
+                        minimumPixelSize: 6
                     }
 
                     MouseArea {

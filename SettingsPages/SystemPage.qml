@@ -13,8 +13,8 @@ import "../"
 // (system, kernel, uptime, user, disk) take the two top corners.
 //
 // The guard (Settings -> Security) reports here too: beside the heading it
-// says CLEAR or how many alerts there are, and while there are any they are
-// listed in a strip under the heading and the name says ALERT. This page
+// says CLEAR, or, while there are alerts, a warning box takes that corner
+// (the first alert named, the rest under the pointer) and the name says ALERT. This page
 // only reads what the guard last saved (one small file, watched, no
 // polling); if that is more than ten minutes old, one guard check is run.
 //
@@ -284,7 +284,8 @@ Item {
     // network, or three and more here: one or two typos are just typos),
     // SSH logins, changes to what starts or listens, system files that
     // differ from their package, and known security holes that have a fix.
-    // At most three lines: the rest is counted in the last one.
+    // At most three lines: the rest is counted in the last one. The box
+    // shows the first; the others open under the pointer.
     property var alerts: []
     property int alertCount: 0
     // not a danger, but waiting for you in Security (a closed port, one
@@ -611,21 +612,24 @@ Item {
         anchors.fill: parent
         spacing: 18
 
-        // SYSTEM //────────── 守 GUARD CLEAR
+        // SYSTEM //────────── 守 GUARD CLEAR   (or the alarm box, see below)
         Item {
             width: parent.width
-            height: heading.implicitHeight
+            height: page.threat ? alarm.height : heading.implicitHeight
+            z: 5                         // the alarm's list opens over the council
 
             PageTitle {
                 id: heading
 
-                width: parent.width - guardTag.width - 16
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - (page.threat ? alarm.width : guardTag.width) - 16
                 title: "SYSTEM"
             }
 
             Row {
                 id: guardTag
 
+                visible: !page.threat
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
@@ -635,7 +639,7 @@ Item {
 
                     textFormat: Text.PlainText
                     text: "守"
-                    color: page.threat ? Theme.alert : page.guardRead ? Theme.accent : Theme.inkMute
+                    color: page.guardRead ? Theme.accent : Theme.inkMute
                     font.family: "Noto Sans CJK JP"
                     font.pixelSize: 13
                 }
@@ -655,9 +659,8 @@ Item {
                     textFormat: Text.PlainText
                     anchors.verticalCenter: guardGlyph.verticalCenter
                     text: !page.guardRead ? "CHECKING"
-                        : page.threat ? page.count(page.alertCount, "ALERT", "ALERTS")
                         : page.reviewCount > 0 ? page.reviewCount + " TO REVIEW" : "CLEAR"
-                    color: page.threat ? Theme.alert : !page.guardRead ? Theme.inkMute
+                    color: !page.guardRead ? Theme.inkMute
                          : page.reviewCount > 0 ? Theme.accent : Theme.ink
                     font.family: Theme.mono
                     font.pixelSize: 10
@@ -667,88 +670,157 @@ Item {
             }
 
             MouseArea {
+                visible: !page.threat
                 anchors.fill: guardTag
                 anchors.margins: -6
                 cursorShape: Qt.PointingHandCursor
                 onClicked: page.openSecurity()
             }
-        }
 
-        // The guard's alerts, only while there are any (the council makes
-        // room). A click opens Settings -> Security.
-        Item {
-            id: alarm
+            // The guard's alerts, only while there are any: a warning box in
+            // the top right corner. The mark blinks (two frames a second,
+            // nothing is animated); the first alert is named, the rest open
+            // under the pointer, over the council. A click opens Security.
+            Item {
+                id: alarm
 
-            visible: page.threat
-            width: parent.width
-            height: alarmLines.height + 20
+                readonly property bool open: alarmMouse.containsMouse && page.alerts.length > 1
 
-            CutBox {
-                anchors.fill: parent
-                fill: Theme.tint(Theme.alert, alarmMouse.containsMouse ? 0.14 : 0.08)
-                stroke: Theme.tint(Theme.alert, 0.7)
-                cut: Theme.cutSmall
-                cutTopLeft: false
-                cutBottomRight: false
-            }
+                visible: page.threat
+                anchors.right: parent.right
+                width: Math.max(250, Math.min(420, parent.width - 230))
+                height: 44
 
-            Text {
-                textFormat: Text.PlainText
-                x: 16
-                anchors.verticalCenter: parent.verticalCenter
-                text: "警"
-                color: Theme.alert
-                font.family: "Noto Sans CJK JP"
-                font.pixelSize: 18
-            }
+                Timer {
+                    id: blink
 
-            Column {
-                id: alarmLines
+                    property bool lit: true
 
-                x: 50
-                y: 10
-                width: parent.width - x - openHint.width - 32
-                spacing: 4
+                    interval: 650
+                    repeat: true
+                    running: page.threat && page.visible
+                    onTriggered: lit = !lit
+                    onRunningChanged: lit = true
+                }
 
-                Repeater {
-                    model: page.alerts
+                CutBox {
+                    width: parent.width
+                    height: alarm.open ? parent.height + alarmList.height + 14 : parent.height
+                    fill: Qt.tint(Theme.card, Theme.tint(Theme.alert, alarmMouse.containsMouse ? 0.16 : 0.1))
+                    stroke: Theme.alert
+                    cut: Theme.cutSmall
+                    cutTopLeft: false
+                    cutTopRight: false
+                    cutBottomRight: false
+                }
+
+                // the mark: a solid tile with the exclamation knocked out
+                Rectangle {
+                    id: markTile
+
+                    x: 5
+                    y: 5
+                    width: 34
+                    height: 34
+                    color: blink.lit ? Theme.alert : "transparent"
+                    border.width: 1
+                    border.color: Theme.alert
 
                     Text {
-                        required property string modelData
-
                         textFormat: Text.PlainText
-                        width: alarmLines.width
-                        text: modelData
-                        elide: Text.ElideRight
-                        color: Theme.ink
+                        anchors.centerIn: parent
+                        text: "!"
+                        color: blink.lit ? "#0a0a0a" : Theme.alert
                         font.family: Theme.mono
-                        font.pixelSize: 13
+                        font.pixelSize: 24
+                        font.bold: true
                     }
                 }
-            }
 
-            Text {
-                id: openHint
+                Text {
+                    id: alarmHead
 
-                textFormat: Text.PlainText
-                anchors.right: parent.right
-                anchors.rightMargin: 18
-                anchors.verticalCenter: parent.verticalCenter
-                text: "SECURITY ──"
-                color: alarmMouse.containsMouse ? Theme.ink : Theme.inkSoft
-                font.family: Theme.mono
-                font.pixelSize: 10
-                font.bold: true
-                font.letterSpacing: 2
-            }
+                    textFormat: Text.PlainText
+                    x: 50
+                    y: 7
+                    text: "警告   " + page.count(page.alertCount, "ALERT", "ALERTS")
+                    color: Theme.alert
+                    font.family: Theme.mono
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 2
+                }
 
-            MouseArea {
-                id: alarmMouse
+                Text {
+                    textFormat: Text.PlainText
+                    x: 50
+                    y: 22
+                    width: parent.width - x - stripes.width - 20
+                    text: page.alerts.length > 0 ? page.alerts[0] : ""
+                    elide: Text.ElideRight
+                    color: Theme.ink
+                    font.family: Theme.mono
+                    font.pixelSize: 12
+                }
 
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: page.openSecurity()
+                // hazard marks, slanted like every bar here
+                Row {
+                    id: stripes
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    y: 8
+                    spacing: 3
+
+                    Repeater {
+                        model: 3
+
+                        CutBox {
+                            width: 12
+                            height: 28
+                            cut: 7
+                            cutTopLeft: false
+                            cutBottomRight: false
+                            fill: Theme.tint(Theme.alert, 0.55)
+                        }
+                    }
+                }
+
+                // the rest, under the pointer
+                Column {
+                    id: alarmList
+
+                    visible: alarm.open
+                    x: 50
+                    y: alarm.height + 2
+                    width: parent.width - x - 16
+                    spacing: 5
+
+                    Repeater {
+                        model: page.alerts.slice(1)
+
+                        Text {
+                            required property string modelData
+
+                            textFormat: Text.PlainText
+                            width: alarmList.width
+                            text: modelData
+                            wrapMode: Text.WordWrap
+                            color: Theme.ink
+                            font.family: Theme.mono
+                            font.pixelSize: 12
+                        }
+                    }
+                }
+
+                MouseArea {
+                    id: alarmMouse
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.openSecurity()
+                }
             }
         }
 

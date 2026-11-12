@@ -380,6 +380,45 @@ def check_updates() -> dict:
     return result
 
 
+PACMAN_DB = Path("/var/lib/pacman/local")
+
+
+def still_waiting(data: dict) -> bool:
+    """An update done outside Settings (pacman in a terminal) leaves the last
+    check behind: drop what was installed since, without asking the mirrors.
+    True when the list changed."""
+    upd = data.get("updates")
+    if not isinstance(upd, dict):
+        return False
+    try:
+        changed = int(PACMAN_DB.stat().st_mtime)    # moves whenever a package is installed or upgraded
+    except OSError:
+        return False
+    if changed <= int(upd.get("dbTime") or upd.get("time") or 0):
+        return False
+    pending = [p for p in upd.get("pending", []) if isinstance(p, dict) and p.get("name")]
+    holes = [h for h in upd.get("holes", []) if isinstance(h, dict) and h.get("name")]
+    names = sorted({x["name"] for x in pending + holes})
+    have = {}
+    if names:
+        for line in run(["pacman", "-Q", "--", *names], 30).stdout.splitlines():
+            parts = line.split()
+            if len(parts) == 2:
+                have[parts[0]] = parts[1]
+    upd["pending"] = [p for p in pending if have.get(p["name"]) == p.get("from")]
+
+    def open_still(h: dict) -> bool:
+        now = have.get(h["name"])
+        if now is None:                             # removed since
+            return False
+        if not h.get("fix"):
+            return True
+        return run(["vercmp", now, h["fix"]], 10).stdout.strip() == "-1"
+    upd["holes"] = [h for h in holes if open_still(h)]
+    upd["dbTime"] = changed
+    return True
+
+
 # ---- the guard ------------------------------------------------------------------------------
 def _home_form(path: Path) -> str:
     """~/... for paths in your home (how the guard has always named them)."""
@@ -636,6 +675,7 @@ def guard(data: dict) -> dict:
     data["changes"] = changes
     data["current"] = snap
     data["shield"] = shield_weak()
+    still_waiting(data)
     since = int(data.get("events", {}).get("since") or data.get("guardTime") or now - 86400)
     # read only what is new since the last check; older ones are kept below
     ev = journal_since(max(since, int(data.get("guardTime") or since) - 5))
@@ -1057,6 +1097,8 @@ def status() -> dict:
     data = load()
     if UPDATE_RUN.exists() and not update_pid():      # it ended while Settings was closed
         finish(data)
+        save(data)
+    if still_waiting(data):
         save(data)
     return {
         "upgrading": update_pid() != 0,

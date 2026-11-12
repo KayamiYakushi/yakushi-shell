@@ -3,18 +3,24 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Security. Nothing runs in the background for this page: it asks
-// scripts/yakushi-securityctl.py once when it opens (and once at login), and
-// only what you press after that.
+// Settings -> Security, a group of four tabs on this one file (they share
+// what the page has read, so changing tab reads nothing again). Nothing
+// runs in the background for it: it asks scripts/yakushi-securityctl.py
+// once when it opens (and once at login), and only what you press after that.
+//
+// On top of every tab stands the watch, in one line: a seal with the
+// decision (守 secure, 警 alert), the wall (one stone for each of the eight
+// protections) and three sentries (guard, apps, scan). Each part opens its
+// tab; a stone opens its own protection.
 //
 //   SHIELD    firewall, what listens to your network, SSH server, updates and
 //             known security holes, auto lock, hardening (kernel and network
 //             settings), disk encryption, Secure Boot
-//   GUARD     what changed in the places an intruder would use to stay
-//   LOGINS    failed password attempts, sudo use, SSH logins
+//   GUARD     what changed in the places an intruder would use to stay, and
+//             failed password attempts, sudo use, SSH logins
 //   APPS      what each Flatpak app reaches outside its sandbox; a click cuts
 //             one thing or gives it back (your own override, no password)
-//   DEEP SCAN every system file compared with its package, and programs
+//   SCAN      every system file compared with its package, and programs
 //             with root rights that no package installed (on demand)
 //
 // Your password, when needed, is asked inside the page (PasswordRow) and goes
@@ -25,6 +31,26 @@ Item {
     id: page
 
     property var hostWindow: null
+
+    // the open tab: 0 shield, 1 guard, 2 apps, 3 scan
+    readonly property int tab: hostWindow ? hostWindow.tab : 0
+
+    onTabChanged: scroll.contentY = 0
+
+    function openTab(index) {
+        if (hostWindow)
+            hostWindow.tab = index
+    }
+
+    // a stone of the wall: its protection, on the shield tab
+    function openProtection(title) {
+        openTab(0)
+        Qt.callLater(function() {
+            var hit = page.hostWindow ? page.hostWindow.findText(page, [title]) : null
+            if (hit)
+                page.hostWindow.reveal(hit)
+        })
+    }
 
     readonly property string home: Paths.home
     readonly property string helper: Paths.script("yakushi-securityctl.py")
@@ -334,8 +360,33 @@ Item {
     readonly property int sshCount: (events.ssh || []).length
     readonly property int scanSuid: scan && scan.suid ? scan.suid.length : 0
     readonly property int scanRed: (scan ? scan.redCount : 0) + scanSuid
-    // what asks for you: weak shield checks, changes, wrong passwords, odd files
-    readonly property int needsYou: badCount + changeCount + failedCount + sshCount + scanRed
+    // ---- the watch
+    // The wall: the eight protections in the shield tab's order.
+    readonly property var stones: [
+        { k: "FW", title: "Firewall", mood: fwMood, say: fw === null ? "…" : fw.on ? "on" : "off" },
+        { k: "NET", title: "Open to network", mood: netMood,
+          say: listeners.length === 0 ? "nothing listens" : listeners.length + " listening, " + (fw && fw.on ? "behind the firewall" : "open") },
+        { k: "SSH", title: "SSH server", mood: sshMood, say: st === null ? "…" : st.ssh.active ? "on" : st.ssh.enabled ? "starts at boot" : "off" },
+        { k: "UPD", title: "Updates", mood: updMood,
+          say: upd === null ? "not checked yet" : holesFixed.length > 0 ? holesFixed.length + " fix security holes"
+             : pendingCount === 0 ? "up to date" : pendingCount + " waiting" },
+        { k: "LOCK", title: "Auto lock", mood: lockMood, say: lock === null ? "…" : lock.minutes === "off" ? "off" : "after " + lock.minutes + " min" },
+        { k: "HARD", title: "Hardening", mood: hardMood,
+          say: hard === null ? "…" : hard.weak === 0 ? "all " + hard.total + " settings safe" : hard.weak + " of " + hard.total + " weak" },
+        { k: "DISK", title: "Disk encryption", mood: encMood,
+          say: st === null || !st.encryption.known ? "unknown" : st.encryption.on ? "encrypted" : "not encrypted" },
+        { k: "BOOT", title: "Secure Boot", mood: bootMood,
+          say: st === null || !st.secureBoot.known ? "unknown" : st.secureBoot.on ? "on" : "off" }
+    ]
+    property int stoneAt: -1              // the stone under the pointer
+
+    // One or two wrong passwords here are typos; three, or any from the
+    // network, are not.
+    readonly property int remoteFailed: (events.failed || []).filter(function(f) { return f.remote === true }).length
+    readonly property bool guardAlert: changeCount > 0 || sshCount > 0 || remoteFailed > 0 || failedCount >= 3
+    readonly property bool alarm: badCount > 0 || guardAlert || scanRed > 0
+    readonly property int alertThings: badCount + scanRed + (guardAlert ? changeCount + failedCount + sshCount : 0)
+    readonly property int reviewThings: guardAlert ? 0 : failedCount
 
     function moodColor(m) {
         return m === "good" ? Theme.good : m === "bad" ? Theme.alert : Theme.inkMute
@@ -355,11 +406,6 @@ Item {
             rows.push({ time: s[k].time, kind: "SUDO", text: s[k].text, hot: false })
         rows.sort(function(a, b) { return b.time - a.time })
         return rows
-    }
-
-    function scrollTo(item) {
-        scrollAnim.to = Math.max(0, Math.min(item.y - 4, scroll.contentHeight - scroll.height))
-        scrollAnim.restart()
     }
 
     // ------------------------------------------------------------------
@@ -454,9 +500,10 @@ Item {
         property string glyph: ""
         property string label: ""
         property string side: ""
+        property bool lead: false        // the first on its tab: no gap above it
 
         width: parent ? parent.width : 0
-        height: 64
+        height: lead ? 34 : 64
 
         Text {
             id: headGlyph
@@ -654,72 +701,76 @@ Item {
         }
     }
 
-    // one of the four numbers on top; a click goes to its section
-    component Tile: Rectangle {
-        id: tile
+    // one of the three sentries: its vote, its name, what it has to say
+    component Sentry: Item {
+        id: sentry
 
-        property string label: ""
-        property string value: ""
-        property string sub: ""
-        property string mood: "info"
-        property Item target: null
+        property string name: ""
+        property string say: ""
+        property bool voted: true
+        property bool alert: false
+        property int opens: 0
         property var host: null
+        readonly property bool here: host !== null && host.tab === opens
 
-        readonly property color tone: mood === "good" ? Theme.good : mood === "bad" ? Theme.alert : Theme.ink
+        width: parent ? parent.width : 0
+        height: 26
 
-        height: 76
-        color: tileMouse.containsMouse ? Theme.tint(Theme.ink, 0.04) : Theme.card
-        border.width: 1
-        border.color: mood === "bad" ? Theme.tint(Theme.alert, 0.45) : Theme.line
-
-        Behavior on color {
-            ColorAnimation { duration: Theme.tFast }
+        Rectangle {
+            visible: sentry.here || sentryMouse.containsMouse
+            width: 2
+            height: parent.height - 8
+            anchors.verticalCenter: parent.verticalCenter
+            color: sentry.alert ? Theme.alert : Theme.accent
         }
 
         Text {
+            id: sentryVote
+
             textFormat: Text.PlainText
-            x: 14
-            y: 12
-            text: tile.label
-            color: Theme.inkMute
+            x: 10
+            anchors.verticalCenter: parent.verticalCenter
+            text: !sentry.voted ? "・" : sentry.alert ? "警" : "守"
+            color: !sentry.voted ? Theme.inkMute : sentry.alert ? Theme.alert : Theme.accent
+            font.family: "Noto Sans CJK JP"
+            font.pixelSize: 13
+        }
+
+        Text {
+            id: sentryName
+
+            textFormat: Text.PlainText
+            x: 32
+            width: 50
+            anchors.verticalCenter: parent.verticalCenter
+            text: sentry.name
+            color: sentry.here || sentryMouse.containsMouse ? Theme.ink : Theme.inkSoft
             font.family: Theme.mono
-            font.pixelSize: 9
+            font.pixelSize: 10
+            font.bold: true
             font.letterSpacing: 2
         }
 
         Text {
-            id: tileValue
-
             textFormat: Text.PlainText
-            x: 14
-            y: 29
-            text: tile.value
-            color: tile.tone
-            font.family: Theme.mono
-            font.pixelSize: 18
-        }
-
-        Text {
-            textFormat: Text.PlainText
-            x: 14
+            anchors.left: sentryName.right
+            anchors.leftMargin: 6
             anchors.right: parent.right
-            anchors.rightMargin: 10
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
             elide: Text.ElideRight
-            text: tile.sub
-            color: Theme.inkMute
+            text: sentry.say
+            color: sentry.alert ? Theme.alert : Theme.ink
             font.family: Theme.mono
-            font.pixelSize: 10
+            font.pixelSize: 11
         }
 
         MouseArea {
-            id: tileMouse
+            id: sentryMouse
 
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: if (tile.target && tile.host) tile.host.scrollTo(tile.target)
+            onClicked: if (sentry.host) sentry.host.openTab(sentry.opens)
         }
     }
 
@@ -835,10 +886,231 @@ Item {
             : "Working…"
     }
 
+    // ================= the watch: seal, wall, sentries =================
+    Item {
+        id: watch
+
+        readonly property color tone: page.st === null ? Theme.inkMute : page.alarm ? Theme.alert : Theme.accent
+        readonly property int gap: 22
+
+        anchors.top: bar.bottom
+        anchors.topMargin: 18
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 84
+
+        // the seal: the decision
+        Item {
+            id: seal
+
+            width: 84
+            height: parent.height
+
+            CutBox {
+                anchors.fill: parent
+                fill: Theme.tint(watch.tone, 0.07)
+                stroke: Theme.tint(watch.tone, 0.6)
+                cut: Theme.cut
+                cutTopRight: false
+                cutBottomLeft: false
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 6
+                text: page.st !== null && page.alarm ? "警" : "守"
+                color: watch.tone
+                font.family: "Noto Sans CJK JP"
+                font.pixelSize: 38
+                font.bold: true
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 9
+                text: page.st === null ? "LOOKING"
+                    : page.alarm ? page.alertThings + (page.alertThings === 1 ? " ALERT" : " ALERTS")
+                    : page.reviewThings > 0 ? page.reviewThings + " TO REVIEW" : "SECURE"
+                color: Theme.ink
+                font.family: Theme.mono
+                font.pixelSize: 9
+                font.bold: true
+                font.letterSpacing: 1.5
+            }
+        }
+
+        // seal ── wall ── sentries
+        Rectangle {
+            x: seal.width + 4
+            anchors.verticalCenter: parent.verticalCenter
+            width: watch.gap - 8
+            height: 4
+            color: page.st === null ? Theme.tint(Theme.ink, 0.14) : page.badCount > 0 ? Theme.alert : Theme.tint(Theme.accent, 0.6)
+        }
+
+        Rectangle {
+            x: wall.x + wall.width + 4
+            anchors.verticalCenter: parent.verticalCenter
+            width: watch.gap - 8
+            height: 4
+            color: page.st === null ? Theme.tint(Theme.ink, 0.14)
+                 : page.guardAlert || page.scanRed > 0 ? Theme.alert : Theme.tint(Theme.accent, 0.6)
+        }
+
+        // the wall: one stone for each protection
+        Item {
+            id: wall
+
+            readonly property int space: 5
+            readonly property real stone: (width - space * (page.stones.length - 1)) / page.stones.length
+
+            x: seal.width + watch.gap
+            width: parent.width - x - sentries.width - watch.gap
+            height: parent.height
+
+            Text {
+                id: wallName
+
+                textFormat: Text.PlainText
+                y: 2
+                text: "SHIELD"
+                color: page.tab === 0 ? Theme.ink : Theme.inkSoft
+                font.family: Theme.mono
+                font.pixelSize: 10
+                font.bold: true
+                font.letterSpacing: 2
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.left: wallName.right
+                anchors.leftMargin: 10
+                anchors.baseline: wallName.baseline
+                text: page.st === null ? "" : page.goodCount + " / " + page.stones.length
+                color: page.badCount > 0 ? Theme.alert : Theme.ink
+                font.family: Theme.mono
+                font.pixelSize: 11
+            }
+
+            // the stone under the pointer in words, else when the guard last looked
+            Text {
+                textFormat: Text.PlainText
+                anchors.right: parent.right
+                anchors.left: wallName.right
+                anchors.leftMargin: 60
+                anchors.baseline: wallName.baseline
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideLeft
+                text: page.stoneAt >= 0 ? page.stones[page.stoneAt].title.toUpperCase() + "  ·  " + page.stones[page.stoneAt].say
+                    : page.guard && page.guard.time ? "checked " + page.ago(page.guard.time) : ""
+                color: page.stoneAt >= 0 ? Theme.ink : Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 10
+            }
+
+            Repeater {
+                model: page.stones
+
+                delegate: Item {
+                    id: stone
+
+                    required property var modelData
+                    required property int index
+                    readonly property color tone: page.moodColor(modelData.mood)
+                    readonly property bool plain: modelData.mood === "info"
+
+                    x: Math.round(index * (wall.stone + wall.space))
+                    y: 24
+                    width: Math.round(wall.stone)
+                    height: wall.height - y
+
+                    CutBox {
+                        width: parent.width
+                        height: 38
+                        cut: 10
+                        cutTopLeft: false
+                        cutBottomRight: false
+                        fill: stone.plain ? Theme.tint(Theme.ink, stoneMouse.containsMouse ? 0.08 : 0.03)
+                            : Theme.tint(stone.tone, stoneMouse.containsMouse ? 0.4 : 0.22)
+                        stroke: stone.plain ? Theme.tint(Theme.ink, 0.16) : Theme.tint(stone.tone, 0.75)
+                    }
+
+                    Text {
+                        textFormat: Text.PlainText
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 2
+                        text: stone.modelData.k
+                        color: stone.modelData.mood === "bad" ? Theme.alert : stoneMouse.containsMouse ? Theme.ink : Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 1
+                    }
+
+                    MouseArea {
+                        id: stoneMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onEntered: page.stoneAt = stone.index
+                        onExited: if (page.stoneAt === stone.index) page.stoneAt = -1
+                        onClicked: page.openProtection(stone.modelData.title)
+                    }
+                }
+            }
+        }
+
+        // the sentries: the other three tabs
+        Column {
+            id: sentries
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(210, Math.round(parent.width * 0.3))
+            spacing: 2
+
+            Sentry {
+                host: page
+                opens: 1
+                name: "GUARD"
+                voted: page.guard !== null
+                alert: page.guardAlert
+                say: page.guard === null ? "…"
+                    : page.changeCount > 0 ? page.changeCount + (page.changeCount === 1 ? " change" : " changes")
+                    : page.sshCount > 0 ? page.sshCount + (page.sshCount === 1 ? " SSH login" : " SSH logins")
+                    : page.failedCount > 0 ? page.failedCount + " wrong password" + (page.failedCount === 1 ? "" : "s")
+                    : "quiet"
+            }
+
+            Sentry {
+                host: page
+                opens: 2
+                name: "APPS"
+                voted: false
+                say: page.st === null ? "…" : page.apps.length === 0 ? "all boxed in" : page.apps.length + " reach out"
+            }
+
+            Sentry {
+                host: page
+                opens: 3
+                name: "SCAN"
+                voted: page.scan !== null
+                alert: page.scanRed > 0
+                say: page.st === null ? "…" : page.scan === null ? "not run yet"
+                    : page.scanRed === 0 ? "intact, " + page.ago(page.scan.time) : page.scanRed + " to look at"
+            }
+        }
+    }
+
     Flickable {
         id: scroll
 
-        anchors.top: bar.bottom
+        anchors.top: watch.bottom
         anchors.topMargin: 18
         anchors.left: parent.left
         anchors.right: parent.right
@@ -847,913 +1119,778 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
-        NumberAnimation {
-            id: scrollAnim
-
-            target: scroll
-            property: "contentY"
-            duration: Theme.tSlow
-            easing.type: Easing.OutCubic
-        }
-
         Column {
             id: body
 
             width: scroll.width
             spacing: 0
 
-            // ================= OVERVIEW =================
-            Rectangle {
-                id: overview
-
+            Column {
+                visible: page.tab === 0
                 width: parent.width
-                height: 96
-                color: Theme.card
-                border.width: 1
-                border.color: page.st === null ? Theme.line : page.needsYou > 0 ? Theme.tint(Theme.alert, 0.45) : Theme.tint(Theme.good, 0.4)
 
-                readonly property color tone: page.st === null ? Theme.inkMute : page.needsYou > 0 ? Theme.alert : Theme.good
+                // ================= SHIELD =================
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF0498)
+                    title: "Firewall"
+                    mood: page.fwMood
+                    text: page.fw ? page.fw.text : "…"
 
-                Rectangle {
-                    width: 3
-                    height: parent.height
-                    color: overview.tone
-                }
+                    Button {
+                        host: page
+                        visible: page.fw !== null && !page.fw.on
+                        label: "TURN ON"
+                        onPressed: page.ask(["firewall", "on"], "Your password, to turn the firewall on", "TURN ON")
+                    }
 
-                Rectangle {
-                    id: bigBadge
-
-                    x: 22
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 54
-                    height: 54
-                    color: Theme.tint(overview.tone, 0.1)
-                    border.width: 1
-                    border.color: Theme.tint(overview.tone, 0.5)
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: String.fromCodePoint(page.needsYou > 0 ? 0xF0498 : 0xF0565)
-                        color: overview.tone
-                        font.family: Theme.glyphs
-                        font.pixelSize: 26
+                    Button {
+                        host: page
+                        key: "fwoff"
+                        visible: page.fw !== null && page.fw.on && page.fw.tool === "ufw"
+                        label: "TURN OFF"
+                        danger: true
+                        onPressed: if (page.confirm("fwoff")) page.ask(["firewall", "off"], "Your password, to turn the firewall off", "TURN OFF")
                     }
                 }
 
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF0317)
+                    title: "Open to network"
+                    mood: page.netMood
+                    text: page.st === null ? "…"
+                        : page.listeners.length === 0 ? "Nothing on this computer listens to your network."
+                        : page.listeners.length + (page.listeners.length === 1 ? " program listens" : " programs listen")
+                          + " to your network." + (page.fw && page.fw.on
+                              ? " The firewall keeps them closed unless you allowed them."
+                              : " Without a firewall, anyone on your network can try them.")
+                }
+
+                // who listens, with their ports
                 Column {
-                    anchors.left: bigBadge.right
-                    anchors.leftMargin: 20
-                    anchors.right: shieldCells.left
-                    anchors.rightMargin: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 7
-
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        elide: Text.ElideRight
-                        text: page.st === null ? "Looking…"
-                            : page.needsYou === 0 ? "All clear"
-                            : page.needsYou + (page.needsYou === 1 ? " thing needs you" : " things need you")
-                        color: Theme.ink
-                        font.family: Theme.mono
-                        font.pixelSize: 18
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        width: parent.width
-                        elide: Text.ElideRight
-                        text: page.st === null ? "" : page.goodCount + " of " + page.moods.length + " protections on"
-                            + (page.guard && page.guard.time ? "  ·  guard checked " + page.ago(page.guard.time) : "")
-                        color: Theme.inkSoft
-                        font.family: Theme.mono
-                        font.pixelSize: 11
-                    }
-                }
-
-                // one cell for each check
-                Row {
-                    id: shieldCells
-
-                    anchors.right: parent.right
-                    anchors.rightMargin: 22
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    width: parent.width
+                    visible: page.listeners.length > 0
+                    leftPadding: 54
+                    bottomPadding: 16
+                    spacing: 10
 
                     Repeater {
-                        model: page.moods
+                        model: page.listeners
 
-                        delegate: Rectangle {
+                        delegate: Item {
+                            id: listener
+
                             required property var modelData
 
-                            width: 10
-                            height: 28
-                            color: modelData === "good" ? Theme.tint(Theme.good, 0.85)
-                                : modelData === "bad" ? Theme.tint(Theme.alert, 0.85) : Theme.groove
-                        }
-                    }
-                }
-            }
+                            width: body.width - 54
+                            height: Math.max(20, portFlow.implicitHeight)
 
-            Item { width: 1; height: 14 }
+                            Text {
+                                id: listenerName
 
-            // the four numbers
-            Row {
-                id: tiles
+                                textFormat: Text.PlainText
+                                width: 150
+                                anchors.top: parent.top
+                                anchors.topMargin: 2
+                                elide: Text.ElideRight
+                                text: listener.modelData.who
+                                color: Theme.ink
+                                font.family: Theme.mono
+                                font.pixelSize: 11
+                            }
 
-                width: parent.width
-                spacing: 10
+                            Flow {
+                                id: portFlow
 
-                readonly property real cell: (width - spacing * 3) / 4
+                                anchors.left: listenerName.right
+                                anchors.leftMargin: 12
+                                anchors.right: parent.right
+                                spacing: 6
 
-                Tile {
-                    width: tiles.cell
-                    host: page
-                    target: shieldHead
-                    label: "SHIELD"
-                    value: page.st === null ? "…" : page.goodCount + " / " + page.moods.length
-                    sub: page.badCount > 0 ? page.badCount + " off that should be on" : "protections on"
-                    mood: page.st === null ? "info" : page.badCount > 0 ? "bad" : "good"
-                }
+                                Repeater {
+                                    model: listener.modelData.tcp.map(function(p) { return "TCP " + p })
+                                        .concat(listener.modelData.udp.map(function(p) { return "UDP " + p }))
 
-                Tile {
-                    width: tiles.cell
-                    host: page
-                    target: guardHead
-                    label: "GUARD"
-                    value: page.guard === null ? "…" : page.changeCount === 0 ? "quiet" : String(page.changeCount)
-                    sub: page.changeCount === 0 ? "nothing changed" : page.changeCount === 1 ? "change to look at" : "changes to look at"
-                    mood: page.guard === null ? "info" : page.changeCount > 0 ? "bad" : "good"
-                }
-
-                Tile {
-                    width: tiles.cell
-                    host: page
-                    target: loginHead
-                    label: "LOGINS"
-                    value: page.events.readable === false ? "—" : String(page.failedCount)
-                    sub: (page.failedCount === 1 ? "wrong password" : "wrong passwords") + "  ·  sudo " + page.sudoCount + "×"
-                    mood: page.failedCount + page.sshCount > 0 ? "bad" : page.st === null ? "info" : "good"
-                }
-
-                Tile {
-                    width: tiles.cell
-                    host: page
-                    target: updatesRow
-                    label: "UPDATES"
-                    value: page.upd === null ? "?" : page.pendingCount === 0 ? "none" : String(page.pendingCount)
-                    sub: page.upd === null ? "not checked yet" : page.holesFixed.length > 0
-                        ? page.holesFixed.length + " fix security holes" : page.pendingCount === 0 ? "up to date" : "waiting"
-                    mood: page.upd === null ? "info" : page.holesFixed.length > 0 ? "bad" : page.pendingCount === 0 ? "good" : "info"
-                }
-            }
-
-            // ================= SHIELD =================
-            SectionHead {
-                id: shieldHead
-                glyph: String.fromCodePoint(0xF0565)
-                label: "SHIELD"
-                side: page.goodCount + " of " + page.moods.length + " on"
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF0498)
-                title: "Firewall"
-                mood: page.fwMood
-                text: page.fw ? page.fw.text : "…"
-
-                Button {
-                    host: page
-                    visible: page.fw !== null && !page.fw.on
-                    label: "TURN ON"
-                    onPressed: page.ask(["firewall", "on"], "Your password, to turn the firewall on", "TURN ON")
-                }
-
-                Button {
-                    host: page
-                    key: "fwoff"
-                    visible: page.fw !== null && page.fw.on && page.fw.tool === "ufw"
-                    label: "TURN OFF"
-                    danger: true
-                    onPressed: if (page.confirm("fwoff")) page.ask(["firewall", "off"], "Your password, to turn the firewall off", "TURN OFF")
-                }
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF0317)
-                title: "Open to network"
-                mood: page.netMood
-                text: page.st === null ? "…"
-                    : page.listeners.length === 0 ? "Nothing on this computer listens to your network."
-                    : page.listeners.length + (page.listeners.length === 1 ? " program listens" : " programs listen")
-                      + " to your network." + (page.fw && page.fw.on
-                          ? " The firewall keeps them closed unless you allowed them."
-                          : " Without a firewall, anyone on your network can try them.")
-            }
-
-            // who listens, with their ports
-            Column {
-                width: parent.width
-                visible: page.listeners.length > 0
-                leftPadding: 54
-                bottomPadding: 16
-                spacing: 10
-
-                Repeater {
-                    model: page.listeners
-
-                    delegate: Item {
-                        id: listener
-
-                        required property var modelData
-
-                        width: body.width - 54
-                        height: Math.max(20, portFlow.implicitHeight)
-
-                        Text {
-                            id: listenerName
-
-                            textFormat: Text.PlainText
-                            width: 150
-                            anchors.top: parent.top
-                            anchors.topMargin: 2
-                            elide: Text.ElideRight
-                            text: listener.modelData.who
-                            color: Theme.ink
-                            font.family: Theme.mono
-                            font.pixelSize: 11
-                        }
-
-                        Flow {
-                            id: portFlow
-
-                            anchors.left: listenerName.right
-                            anchors.leftMargin: 12
-                            anchors.right: parent.right
-                            spacing: 6
-
-                            Repeater {
-                                model: listener.modelData.tcp.map(function(p) { return "TCP " + p })
-                                    .concat(listener.modelData.udp.map(function(p) { return "UDP " + p }))
-
-                                delegate: Tag {
-                                    required property var modelData
-                                    label: modelData
+                                    delegate: Tag {
+                                        required property var modelData
+                                        label: modelData
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF018D)
-                title: "SSH server"
-                mood: page.sshMood
-                text: page.st === null ? "…"
-                    : page.st.ssh.active ? "On: others can try to log in to this computer over the network."
-                    : page.st.ssh.enabled ? "Off now, but it starts at boot."
-                    : "Off: nobody can log in to this computer over the network."
-
-                Button {
-                    host: page
-                    visible: page.st !== null && (page.st.ssh.active || page.st.ssh.enabled)
-                    label: "TURN OFF"
-                    danger: true
-                    onPressed: page.ask(["ssh", "off"], "Your password, to turn the SSH server off", "TURN OFF")
-                }
-            }
-
-            ShieldRow {
-                id: updatesRow
-
-                glyph: String.fromCodePoint(0xF06B0)
-                title: "Updates"
-                mood: page.updMood
-                text: page.upd === null ? "Not checked yet. CHECK asks the Arch mirrors and the Arch security tracker."
-                    : (page.pendingCount === 0 ? "Everything is up to date."
-                       : page.pendingCount + (page.pendingCount === 1 ? " update waits" : " updates wait")
-                         + (page.holesFixed.length > 0 ? ", " + page.holesFixed.length
-                            + (page.holesFixed.length === 1 ? " of them fixes" : " of them fix") + " a known security hole." : "."))
-                      + "  Checked " + page.ago(page.upd.time) + "."
-                      + (page.upd.errors && page.upd.errors.length ? "  (" + page.upd.errors[0] + ")" : "")
-
-                Button {
-                    host: page
-                    label: "CHECK"
-                    onPressed: page.run(["updates"], "", "Asking the mirrors and the security tracker…")
-                }
-
-                Button {
-                    host: page
-                    visible: page.pendingCount > 0 && page.up === null
-                    label: "UPDATE"
-                    onPressed: page.ask(["upgrade"], "Your password, to update the system", "UPDATE")
-                }
-
-                Button {
-                    host: page
-                    visible: page.up === null && page.upResult !== null && page.upResult.terminal === true
-                    label: "OPEN IN TERMINAL"
-                    onPressed: terminal.running = true
-                }
-            }
-
-            // the update, while it runs (and what went wrong, if it did)
-            Item {
-                id: upPanel
-
-                readonly property bool running: page.up !== null
-                readonly property bool failed: !running && page.upResult !== null && page.upResult.ok === false
-
-                width: parent.width
-                visible: running || failed
-                height: visible ? upCol.implicitHeight + 28 : 0
-
-                Rectangle {
-                    x: 54
-                    y: 6
-                    width: parent.width - 54
-                    height: parent.height - 14
-                    color: Theme.tint(Theme.ink, 0.025)
-                    border.width: 1
-                    border.color: upPanel.failed ? Theme.tint(Theme.alert, 0.5) : Theme.line
-                }
-
-                Column {
-                    id: upCol
-
-                    x: 70
-                    y: 20
-                    width: parent.width - 86
-                    spacing: 8
-
-                    Item {
-                        width: parent.width
-                        height: 16
-                        visible: upPanel.running
-
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: page.up ? page.up.phase.toUpperCase() : ""
-                            color: Theme.ink
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: 2
-                        }
-
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: page.up && page.up.total > 0 ? page.up.n + " / " + page.up.total : ""
-                            color: Theme.inkSoft
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    // the bar: steps when pacman counts them, a moving block when it does not
-                    Rectangle {
-                        id: track
-
-                        visible: upPanel.running
-                        width: parent.width
-                        height: 4
-                        color: Theme.groove
-                        clip: true
-
-                        readonly property bool counted: page.up !== null && page.up.total > 0
-
-                        Rectangle {
-                            visible: track.counted
-                            width: track.counted ? track.width * Math.min(1, page.up.n / page.up.total) : 0
-                            height: parent.height
-                            color: Theme.accent
-
-                            Behavior on width {
-                                NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
-                            }
-                        }
-
-                        Rectangle {
-                            id: sweep
-
-                            visible: !track.counted
-                            width: track.width * 0.22
-                            height: parent.height
-                            color: Theme.accent
-
-                            NumberAnimation on x {
-                                running: upPanel.running && !track.counted && page.visible
-                                from: -sweep.width
-                                to: track.width
-                                duration: 1300
-                                loops: Animation.Infinite
-                            }
-                        }
-                    }
-
-                    Repeater {
-                        model: page.upLines
-
-                        Text {
-                            required property var modelData
-
-                            textFormat: Text.PlainText
-                            width: upCol.width
-                            elide: Text.ElideRight
-                            text: modelData
-                            color: /^error/.test(modelData) ? Theme.alert : Theme.inkMute
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                        }
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        visible: upPanel.running
-                        width: parent.width
-                        wrapMode: Text.WordWrap
-                        text: "You can close Settings: the update goes on, and this page shows it again when you come back."
-                        color: Theme.inkMute
-                        font.family: Theme.mono
-                        font.pixelSize: 10
-                    }
-                }
-            }
-
-            // known security holes in what is installed
-            Column {
-                width: parent.width
-                visible: page.upd !== null && page.upd.holes && page.upd.holes.length > 0
-                leftPadding: 54
-                topPadding: 4
-                bottomPadding: 16
-                spacing: 8
-
-                Repeater {
-                    model: page.upd && page.upd.holes ? page.upd.holes : []
-
-                    delegate: Item {
-                        id: hole
-
-                        required property var modelData
-                        readonly property bool hot: modelData.fix !== "" && (modelData.risk === "high" || modelData.risk === "critical")
-
-                        width: body.width - 54
-                        height: 22
-
-                        Tag {
-                            id: riskTag
-
-                            anchors.verticalCenter: parent.verticalCenter
-                            label: hole.modelData.risk.toUpperCase()
-                            hot: hole.hot
-                        }
-
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.left: riskTag.right
-                            anchors.leftMargin: 10
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                            text: hole.modelData.name + "   " + hole.modelData.issues.join(", ")
-                                + (hole.modelData.count > hole.modelData.issues.length ? " +" + (hole.modelData.count - hole.modelData.issues.length) : "")
-                                + (hole.modelData.fix !== "" ? "   ·   fixed in " + hole.modelData.fix : "   ·   no fix yet")
-                            color: hole.hot ? Theme.ink : Theme.inkSoft
-                            font.family: Theme.mono
-                            font.pixelSize: 11
-                        }
-                    }
-                }
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF033E)
-                title: "Auto lock"
-                mood: page.lockMood
-                text: page.lock === null ? "…"
-                    : page.lock.minutes === "off" ? "Off: the screen stays open when you walk away."
-                    : "Locks after " + page.lock.minutes + " idle minutes (a playing video keeps it open), and on Suspend."
-
-                Repeater {
-                    model: [["off", "OFF"], ["5", "5"], ["10", "10"], ["15", "15"], ["30", "30 MIN"]]
-
-                    Chip {
-                        required property var modelData
-
-                        host: page
-                        label: modelData[1]
-                        on: page.lock !== null && page.lock.minutes === modelData[0]
-                        onPicked: {
-                            if (on)
-                                return
-                            page.run(["autolock", modelData[0]], "", "Setting auto lock…")
-                        }
-                    }
-                }
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF099D)
-                title: "Hardening"
-                mood: page.hardMood
-                text: page.hard === null ? "…"
-                    : page.hard.weak === 0
-                      ? "All " + page.hard.total + " kernel and network settings are at their safe value."
-                    : page.hard.weak + " of " + page.hard.total + " kernel and network settings are weaker than they need to be."
-                      + " HARDEN closes them; games and apps keep working, and UNDO puts everything back."
-
-                Button {
-                    host: page
-                    visible: page.hard !== null && page.hard.weak > 0
-                    label: "HARDEN"
-                    onPressed: page.ask(["harden", "on"], "Your password, to harden the system", "HARDEN")
-                }
-
-                Button {
-                    host: page
-                    key: "hardoff"
-                    visible: page.hard !== null && page.hard.applied
-                    label: "UNDO"
-                    danger: true
-                    onPressed: if (page.confirm("hardoff")) page.ask(["harden", "off"], "Your password, to undo the hardening", "UNDO")
-                }
-            }
-
-            // what is still open
-            Flow {
-                visible: page.hardWeak.length > 0
-                x: 54
-                width: parent.width - 54
-                bottomPadding: 16
-                spacing: 6
-
-                Repeater {
-                    model: page.hardWeak
-
-                    delegate: Tag {
-                        required property var modelData
-                        label: modelData.label
-                        hot: true
-                    }
-                }
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF02CA)
-                title: "Disk encryption"
-                mood: page.encMood
-                text: page.st === null ? "…"
-                    : !page.st.encryption.known ? "Could not tell how your system disk is set up."
-                    : page.st.encryption.on ? "On: without your passphrase the disk cannot be read, even if it is taken out."
-                    : "Off: someone holding the disk could read it. Encryption is chosen when installing; it cannot be turned on safely from here."
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(0xF061A)
-                title: "Secure Boot"
-                mood: page.bootMood
-                text: page.st === null ? "…"
-                    : !page.st.secureBoot.efi ? "This computer starts in legacy (BIOS) mode, without Secure Boot."
-                    : !page.st.secureBoot.known ? "Could not read the Secure Boot setting."
-                    : page.st.secureBoot.on ? "On: the firmware only starts signed boot files."
-                    : "Off. It is a firmware (BIOS) setting and needs signed boot files; leave it unless you plan for it."
-            }
-
-            // ================= GUARD =================
-            SectionHead {
-                id: guardHead
-                glyph: String.fromCodePoint(0xF0208)
-                label: "GUARD"
-                side: page.guard && page.guard.time ? "checked " + page.ago(page.guard.time) : ""
-            }
-
-            Item {
-                width: parent.width
-                height: guardText.implicitHeight + 32
-
-                Text {
-                    id: guardText
-
-                    textFormat: Text.PlainText
-                    anchors.left: parent.left
-                    anchors.right: guardButtons.left
-                    anchors.rightMargin: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                    wrapMode: Text.WordWrap
-                    text: page.guard === null ? "…"
-                        : page.changeCount === 0
-                          ? "Nothing changed. Watching what starts at login, services and timers, users and the wheel group, SSH keys, shell start files, commands and launchers in your home, PAM, kernel modules and boot options, pacman.conf and who listens to your network."
-                          : page.changeCount + (page.changeCount === 1 ? " change" : " changes")
-                            + " since you last accepted. If you did it (installed something, edited a file), press THAT WAS ME. If not, look closer before anything else."
-                    color: page.changeCount > 0 ? Theme.ink : Theme.inkSoft
-                    font.family: Theme.mono
-                    font.pixelSize: 11
-                    lineHeight: 1.25
-                }
-
-                Row {
-                    id: guardButtons
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF018D)
+                    title: "SSH server"
+                    mood: page.sshMood
+                    text: page.st === null ? "…"
+                        : page.st.ssh.active ? "On: others can try to log in to this computer over the network."
+                        : page.st.ssh.enabled ? "Off now, but it starts at boot."
+                        : "Off: nobody can log in to this computer over the network."
 
                     Button {
                         host: page
-                        visible: page.changeCount > 1
-                        label: "ALL WERE ME"
-                        onPressed: page.run(["accept", "all"], "", "Taking them as yours…")
+                        visible: page.st !== null && (page.st.ssh.active || page.st.ssh.enabled)
+                        label: "TURN OFF"
+                        danger: true
+                        onPressed: page.ask(["ssh", "off"], "Your password, to turn the SSH server off", "TURN OFF")
                     }
                 }
-            }
 
-            Column {
-                width: parent.width
-                spacing: 6
-                bottomPadding: page.changeCount > 0 ? 8 : 0
+                ShieldRow {
+                    id: updatesRow
 
-                Repeater {
-                    model: page.guard ? page.guard.changes : []
+                    glyph: String.fromCodePoint(0xF06B0)
+                    title: "Updates"
+                    mood: page.updMood
+                    text: page.upd === null ? "Not checked yet. CHECK asks the Arch mirrors and the Arch security tracker."
+                        : (page.pendingCount === 0 ? "Everything is up to date."
+                           : page.pendingCount + (page.pendingCount === 1 ? " update waits" : " updates wait")
+                             + (page.holesFixed.length > 0 ? ", " + page.holesFixed.length
+                                + (page.holesFixed.length === 1 ? " of them fixes" : " of them fix") + " a known security hole." : "."))
+                          + "  Checked " + page.ago(page.upd.time) + "."
+                          + (page.upd.errors && page.upd.errors.length ? "  (" + page.upd.errors[0] + ")" : "")
+
+                    Button {
+                        host: page
+                        label: "CHECK"
+                        onPressed: page.run(["updates"], "", "Asking the mirrors and the security tracker…")
+                    }
+
+                    Button {
+                        host: page
+                        visible: page.pendingCount > 0 && page.up === null
+                        label: "UPDATE"
+                        onPressed: page.ask(["upgrade"], "Your password, to update the system", "UPDATE")
+                    }
+
+                    Button {
+                        host: page
+                        visible: page.up === null && page.upResult !== null && page.upResult.terminal === true
+                        label: "OPEN IN TERMINAL"
+                        onPressed: terminal.running = true
+                    }
+                }
+
+                // the update, while it runs (and what went wrong, if it did)
+                Item {
+                    id: upPanel
+
+                    readonly property bool running: page.up !== null
+                    readonly property bool failed: !running && page.upResult !== null && page.upResult.ok === false
+
+                    width: parent.width
+                    visible: running || failed
+                    height: visible ? upCol.implicitHeight + 28 : 0
 
                     Rectangle {
-                        id: change
-
-                        required property var modelData
-                        readonly property bool gone: modelData.kind === "gone"
-
-                        width: body.width
-                        height: 50
-                        color: change.gone ? Theme.tint(Theme.ink, 0.03) : Theme.tint(Theme.alert, 0.06)
+                        x: 54
+                        y: 6
+                        width: parent.width - 54
+                        height: parent.height - 14
+                        color: Theme.tint(Theme.ink, 0.025)
                         border.width: 1
-                        border.color: change.gone ? Theme.line : Theme.tint(Theme.alert, 0.3)
+                        border.color: upPanel.failed ? Theme.tint(Theme.alert, 0.5) : Theme.line
+                    }
 
+                    Column {
+                        id: upCol
+
+                        x: 70
+                        y: 20
+                        width: parent.width - 86
+                        spacing: 8
+
+                        Item {
+                            width: parent.width
+                            height: 16
+                            visible: upPanel.running
+
+                            Text {
+                                textFormat: Text.PlainText
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: page.up ? page.up.phase.toUpperCase() : ""
+                                color: Theme.ink
+                                font.family: Theme.mono
+                                font.pixelSize: 10
+                                font.letterSpacing: 2
+                            }
+
+                            Text {
+                                textFormat: Text.PlainText
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: page.up && page.up.total > 0 ? page.up.n + " / " + page.up.total : ""
+                                color: Theme.inkSoft
+                                font.family: Theme.mono
+                                font.pixelSize: 10
+                            }
+                        }
+
+                        // the bar: steps when pacman counts them, a moving block when it does not
                         Rectangle {
-                            width: 2
-                            height: parent.height
-                            color: change.gone ? Theme.inkMute : Theme.alert
+                            id: track
+
+                            visible: upPanel.running
+                            width: parent.width
+                            height: 4
+                            color: Theme.groove
+                            clip: true
+
+                            readonly property bool counted: page.up !== null && page.up.total > 0
+
+                            Rectangle {
+                                visible: track.counted
+                                width: track.counted ? track.width * Math.min(1, page.up.n / page.up.total) : 0
+                                height: parent.height
+                                color: Theme.accent
+
+                                Behavior on width {
+                                    NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+                                }
+                            }
+
+                            Rectangle {
+                                id: sweep
+
+                                visible: !track.counted
+                                width: track.width * 0.22
+                                height: parent.height
+                                color: Theme.accent
+
+                                NumberAnimation on x {
+                                    running: upPanel.running && !track.counted && page.visible
+                                    from: -sweep.width
+                                    to: track.width
+                                    duration: 1300
+                                    loops: Animation.Infinite
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            model: page.upLines
+
+                            Text {
+                                required property var modelData
+
+                                textFormat: Text.PlainText
+                                width: upCol.width
+                                elide: Text.ElideRight
+                                text: modelData
+                                color: /^error/.test(modelData) ? Theme.alert : Theme.inkMute
+                                font.family: Theme.mono
+                                font.pixelSize: 10
+                            }
                         }
 
                         Text {
                             textFormat: Text.PlainText
-                            anchors.left: parent.left
-                            anchors.leftMargin: 18
-                            anchors.right: meButton.left
-                            anchors.rightMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideMiddle
-                            text: change.modelData.text
-                            color: Theme.ink
+                            visible: upPanel.running
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "You can close Settings: the update goes on, and this page shows it again when you come back."
+                            color: Theme.inkMute
                             font.family: Theme.mono
-                            font.pixelSize: 11
-                        }
-
-                        Button {
-                            id: meButton
-
-                            anchors.right: parent.right
-                            anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            host: page
-                            label: "THAT WAS ME"
-                            onPressed: page.run(["accept", change.modelData.key], "", "Taking it as yours…")
+                            font.pixelSize: 10
                         }
                     }
                 }
-            }
 
-            // ================= LOGINS =================
-            SectionHead {
-                id: loginHead
-                glyph: String.fromCodePoint(0xF0342)
-                label: "PASSWORDS AND LOGINS"
-                side: page.events.since ? "since " + page.clock(page.events.since) : ""
-            }
-
-            Item {
-                width: parent.width
-                height: loginText.implicitHeight + 32
-
-                Text {
-                    id: loginText
-
-                    textFormat: Text.PlainText
-                    anchors.left: parent.left
-                    anchors.right: seenButton.left
-                    anchors.rightMargin: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                    wrapMode: Text.WordWrap
-                    text: page.events.readable === false
-                          ? "Your user cannot read the system journal. Being in the wheel group allows it."
-                          : (page.failedCount === 0 ? "No wrong passwords." : page.failedCount + (page.failedCount === 1 ? " wrong password." : " wrong passwords."))
-                            + "  " + (page.sudoCount === 0 ? "sudo was not used." : "sudo used " + page.sudoCount + (page.sudoCount === 1 ? " time." : " times."))
-                            + (page.sshCount > 0 ? "  " + page.sshCount + " SSH login" + (page.sshCount === 1 ? "." : "s.") : "")
-                    color: page.failedCount > 0 || page.sshCount > 0 ? Theme.ink : Theme.inkSoft
-                    font.family: Theme.mono
-                    font.pixelSize: 11
-                    lineHeight: 1.25
-                }
-
-                Button {
-                    id: seenButton
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    host: page
-                    visible: page.logRows.length > 0
-                    label: "SEEN"
-                    onPressed: page.run(["seen"], "", "Clearing the list…")
-                }
-            }
-
-            // the log: when, what, the command
-            Rectangle {
-                visible: page.logRows.length > 0
-                width: parent.width
-                height: visible ? logCol.implicitHeight + 2 : 0
-                color: "transparent"
-                border.width: 1
-                border.color: Theme.line
-
+                // known security holes in what is installed
                 Column {
-                    id: logCol
-
-                    x: 1
-                    y: 1
-                    width: parent.width - 2
+                    width: parent.width
+                    visible: page.upd !== null && page.upd.holes && page.upd.holes.length > 0
+                    leftPadding: 54
+                    topPadding: 4
+                    bottomPadding: 16
+                    spacing: 8
 
                     Repeater {
-                        model: page.showAllLog ? page.logRows : page.logRows.slice(0, 5)
+                        model: page.upd && page.upd.holes ? page.upd.holes : []
 
-                        delegate: Rectangle {
-                            id: logRow
+                        delegate: Item {
+                            id: hole
 
                             required property var modelData
-                            required property int index
+                            readonly property bool hot: modelData.fix !== "" && (modelData.risk === "high" || modelData.risk === "critical")
 
-                            width: logCol.width
-                            height: 34
-                            color: index % 2 === 1 ? Theme.tint(Theme.ink, 0.02) : "transparent"
-
-                            Text {
-                                id: logTime
-
-                                textFormat: Text.PlainText
-                                x: 14
-                                width: 104
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: page.clock(logRow.modelData.time)
-                                color: Theme.inkMute
-                                font.family: Theme.mono
-                                font.pixelSize: 10
-                            }
+                            width: body.width - 54
+                            height: 22
 
                             Tag {
-                                id: logKind
+                                id: riskTag
 
-                                anchors.left: logTime.right
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 64
-                                label: logRow.modelData.kind
-                                hot: logRow.modelData.hot
+                                label: hole.modelData.risk.toUpperCase()
+                                hot: hole.hot
                             }
 
                             Text {
                                 textFormat: Text.PlainText
-                                anchors.left: logKind.right
-                                anchors.leftMargin: 14
+                                anchors.left: riskTag.right
+                                anchors.leftMargin: 10
                                 anchors.right: parent.right
-                                anchors.rightMargin: 14
                                 anchors.verticalCenter: parent.verticalCenter
                                 elide: Text.ElideRight
-                                text: logRow.modelData.text
-                                color: logRow.modelData.hot ? Theme.ink : Theme.inkSoft
+                                text: hole.modelData.name + "   " + hole.modelData.issues.join(", ")
+                                    + (hole.modelData.count > hole.modelData.issues.length ? " +" + (hole.modelData.count - hole.modelData.issues.length) : "")
+                                    + (hole.modelData.fix !== "" ? "   ·   fixed in " + hole.modelData.fix : "   ·   no fix yet")
+                                color: hole.hot ? Theme.ink : Theme.inkSoft
                                 font.family: Theme.mono
                                 font.pixelSize: 11
                             }
                         }
                     }
+                }
 
-                    // show the rest
-                    Rectangle {
-                        visible: page.logRows.length > 5
-                        width: logCol.width
-                        height: 34
-                        color: moreMouse.containsMouse ? Theme.tint(Theme.ink, 0.04) : "transparent"
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF033E)
+                    title: "Auto lock"
+                    mood: page.lockMood
+                    text: page.lock === null ? "…"
+                        : page.lock.minutes === "off" ? "Off: the screen stays open when you walk away."
+                        : "Locks after " + page.lock.minutes + " idle minutes (a playing video keeps it open), and on Suspend."
+
+                    Repeater {
+                        model: [["off", "OFF"], ["5", "5"], ["10", "10"], ["15", "15"], ["30", "30 MIN"]]
+
+                        Chip {
+                            required property var modelData
+
+                            host: page
+                            label: modelData[1]
+                            on: page.lock !== null && page.lock.minutes === modelData[0]
+                            onPicked: {
+                                if (on)
+                                    return
+                                page.run(["autolock", modelData[0]], "", "Setting auto lock…")
+                            }
+                        }
+                    }
+                }
+
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF099D)
+                    title: "Hardening"
+                    mood: page.hardMood
+                    text: page.hard === null ? "…"
+                        : page.hard.weak === 0
+                          ? "All " + page.hard.total + " kernel and network settings are at their safe value."
+                        : page.hard.weak + " of " + page.hard.total + " kernel and network settings are weaker than they need to be."
+                          + " HARDEN closes them; games and apps keep working, and UNDO puts everything back."
+
+                    Button {
+                        host: page
+                        visible: page.hard !== null && page.hard.weak > 0
+                        label: "HARDEN"
+                        onPressed: page.ask(["harden", "on"], "Your password, to harden the system", "HARDEN")
+                    }
+
+                    Button {
+                        host: page
+                        key: "hardoff"
+                        visible: page.hard !== null && page.hard.applied
+                        label: "UNDO"
+                        danger: true
+                        onPressed: if (page.confirm("hardoff")) page.ask(["harden", "off"], "Your password, to undo the hardening", "UNDO")
+                    }
+                }
+
+                // what is still open
+                Flow {
+                    visible: page.hardWeak.length > 0
+                    x: 54
+                    width: parent.width - 54
+                    bottomPadding: 16
+                    spacing: 6
+
+                    Repeater {
+                        model: page.hardWeak
+
+                        delegate: Tag {
+                            required property var modelData
+                            label: modelData.label
+                            hot: true
+                        }
+                    }
+                }
+
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF02CA)
+                    title: "Disk encryption"
+                    mood: page.encMood
+                    text: page.st === null ? "…"
+                        : !page.st.encryption.known ? "Could not tell how your system disk is set up."
+                        : page.st.encryption.on ? "On: without your passphrase the disk cannot be read, even if it is taken out."
+                        : "Off: someone holding the disk could read it. Encryption is chosen when installing; it cannot be turned on safely from here."
+                }
+
+                ShieldRow {
+                    glyph: String.fromCodePoint(0xF061A)
+                    title: "Secure Boot"
+                    mood: page.bootMood
+                    text: page.st === null ? "…"
+                        : !page.st.secureBoot.efi ? "This computer starts in legacy (BIOS) mode, without Secure Boot."
+                        : !page.st.secureBoot.known ? "Could not read the Secure Boot setting."
+                        : page.st.secureBoot.on ? "On: the firmware only starts signed boot files."
+                        : "Off. It is a firmware (BIOS) setting and needs signed boot files; leave it unless you plan for it."
+                }
+            }
+
+            Column {
+                visible: page.tab === 1
+                width: parent.width
+
+                // ================= GUARD =================
+                SectionHead {
+                    id: guardHead
+                    lead: true
+                    glyph: String.fromCodePoint(0xF0208)
+                    label: "GUARD"
+                    side: page.guard && page.guard.time ? "checked " + page.ago(page.guard.time) : ""
+                }
+
+                Item {
+                    width: parent.width
+                    height: guardText.implicitHeight + 32
+
+                    Text {
+                        id: guardText
+
+                        textFormat: Text.PlainText
+                        anchors.left: parent.left
+                        anchors.right: guardButtons.left
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        wrapMode: Text.WordWrap
+                        text: page.guard === null ? "…"
+                            : page.changeCount === 0
+                              ? "Nothing changed. Watching what starts at login, services and timers, users and the wheel group, SSH keys, shell start files, commands and launchers in your home, PAM, kernel modules and boot options, pacman.conf and who listens to your network."
+                              : page.changeCount + (page.changeCount === 1 ? " change" : " changes")
+                                + " since you last accepted. If you did it (installed something, edited a file), press THAT WAS ME. If not, look closer before anything else."
+                        color: page.changeCount > 0 ? Theme.ink : Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                        lineHeight: 1.25
+                    }
+
+                    Row {
+                        id: guardButtons
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Button {
+                            host: page
+                            visible: page.changeCount > 1
+                            label: "ALL WERE ME"
+                            onPressed: page.run(["accept", "all"], "", "Taking them as yours…")
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    bottomPadding: page.changeCount > 0 ? 8 : 0
+
+                    Repeater {
+                        model: page.guard ? page.guard.changes : []
 
                         Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.line
+                            id: change
+
+                            required property var modelData
+                            readonly property bool gone: modelData.kind === "gone"
+
+                            width: body.width
+                            height: 50
+                            color: change.gone ? Theme.tint(Theme.ink, 0.03) : Theme.tint(Theme.alert, 0.06)
+                            border.width: 1
+                            border.color: change.gone ? Theme.line : Theme.tint(Theme.alert, 0.3)
+
+                            Rectangle {
+                                width: 2
+                                height: parent.height
+                                color: change.gone ? Theme.inkMute : Theme.alert
+                            }
+
+                            Text {
+                                textFormat: Text.PlainText
+                                anchors.left: parent.left
+                                anchors.leftMargin: 18
+                                anchors.right: meButton.left
+                                anchors.rightMargin: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                                elide: Text.ElideMiddle
+                                text: change.modelData.text
+                                color: Theme.ink
+                                font.family: Theme.mono
+                                font.pixelSize: 11
+                            }
+
+                            Button {
+                                id: meButton
+
+                                anchors.right: parent.right
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                host: page
+                                label: "THAT WAS ME"
+                                onPressed: page.run(["accept", change.modelData.key], "", "Taking it as yours…")
+                            }
+                        }
+                    }
+                }
+
+                // ================= LOGINS =================
+                SectionHead {
+                    id: loginHead
+                    glyph: String.fromCodePoint(0xF0342)
+                    label: "PASSWORDS AND LOGINS"
+                    side: page.events.since ? "since " + page.clock(page.events.since) : ""
+                }
+
+                Item {
+                    width: parent.width
+                    height: loginText.implicitHeight + 32
+
+                    Text {
+                        id: loginText
+
+                        textFormat: Text.PlainText
+                        anchors.left: parent.left
+                        anchors.right: seenButton.left
+                        anchors.rightMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        wrapMode: Text.WordWrap
+                        text: page.events.readable === false
+                              ? "Your user cannot read the system journal. Being in the wheel group allows it."
+                              : (page.failedCount === 0 ? "No wrong passwords." : page.failedCount + (page.failedCount === 1 ? " wrong password." : " wrong passwords."))
+                                + "  " + (page.sudoCount === 0 ? "sudo was not used." : "sudo used " + page.sudoCount + (page.sudoCount === 1 ? " time." : " times."))
+                                + (page.sshCount > 0 ? "  " + page.sshCount + " SSH login" + (page.sshCount === 1 ? "." : "s.") : "")
+                        color: page.failedCount > 0 || page.sshCount > 0 ? Theme.ink : Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                        lineHeight: 1.25
+                    }
+
+                    Button {
+                        id: seenButton
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        host: page
+                        visible: page.logRows.length > 0
+                        label: "SEEN"
+                        onPressed: page.run(["seen"], "", "Clearing the list…")
+                    }
+                }
+
+                // the log: when, what, the command
+                Rectangle {
+                    visible: page.logRows.length > 0
+                    width: parent.width
+                    height: visible ? logCol.implicitHeight + 2 : 0
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Theme.line
+
+                    Column {
+                        id: logCol
+
+                        x: 1
+                        y: 1
+                        width: parent.width - 2
+
+                        Repeater {
+                            model: page.showAllLog ? page.logRows : page.logRows.slice(0, 5)
+
+                            delegate: Rectangle {
+                                id: logRow
+
+                                required property var modelData
+                                required property int index
+
+                                width: logCol.width
+                                height: 34
+                                color: index % 2 === 1 ? Theme.tint(Theme.ink, 0.02) : "transparent"
+
+                                Text {
+                                    id: logTime
+
+                                    textFormat: Text.PlainText
+                                    x: 14
+                                    width: 104
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: page.clock(logRow.modelData.time)
+                                    color: Theme.inkMute
+                                    font.family: Theme.mono
+                                    font.pixelSize: 10
+                                }
+
+                                Tag {
+                                    id: logKind
+
+                                    anchors.left: logTime.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 64
+                                    label: logRow.modelData.kind
+                                    hot: logRow.modelData.hot
+                                }
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    anchors.left: logKind.right
+                                    anchors.leftMargin: 14
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                    text: logRow.modelData.text
+                                    color: logRow.modelData.hot ? Theme.ink : Theme.inkSoft
+                                    font.family: Theme.mono
+                                    font.pixelSize: 11
+                                }
+                            }
                         }
 
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: page.showAllLog ? "SHOW LESS" : "SHOW ALL " + page.logRows.length
-                            color: moreMouse.containsMouse ? Theme.ink : Theme.accent
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: 2
-                        }
+                        // show the rest
+                        Rectangle {
+                            visible: page.logRows.length > 5
+                            width: logCol.width
+                            height: 34
+                            color: moreMouse.containsMouse ? Theme.tint(Theme.ink, 0.04) : "transparent"
 
-                        MouseArea {
-                            id: moreMouse
+                            Rectangle {
+                                width: parent.width
+                                height: 1
+                                color: Theme.line
+                            }
 
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: page.showAllLog = !page.showAllLog
+                            Text {
+                                textFormat: Text.PlainText
+                                anchors.centerIn: parent
+                                text: page.showAllLog ? "SHOW LESS" : "SHOW ALL " + page.logRows.length
+                                color: moreMouse.containsMouse ? Theme.ink : Theme.accent
+                                font.family: Theme.mono
+                                font.pixelSize: 10
+                                font.letterSpacing: 2
+                            }
+
+                            MouseArea {
+                                id: moreMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: page.showAllLog = !page.showAllLog
+                            }
                         }
                     }
                 }
             }
 
-            // ================= APPS =================
-            SectionHead {
-                visible: page.apps.length > 0
-                glyph: String.fromCodePoint(0xF003B)
-                label: "APP SANDBOX"
-                side: page.apps.length + (page.apps.length === 1 ? " Flatpak app reaches out" : " Flatpak apps reach out")
-            }
-
-            // two lines, always: the words change under the pointer, the page does not move
-            Item {
-                visible: page.apps.length > 0
+            Column {
+                visible: page.tab === 2
                 width: parent.width
-                height: 62
 
+                // ================= APPS =================
                 Text {
                     textFormat: Text.PlainText
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                    visible: page.st !== null && page.apps.length === 0
+                    topPadding: 8
+                    width: parent.width
                     wrapMode: Text.WordWrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                    text: page.permHint !== "" ? page.permHint
-                        : "What each app reaches outside its own box. Click one to cut it, click again to give it back. It counts from the app's next start; no password is needed."
-                    color: page.permHint !== "" ? Theme.ink : Theme.inkSoft
+                    text: "No Flatpak app reaches outside its own box (or none is installed)."
+                    color: Theme.inkSoft
                     font.family: Theme.mono
                     font.pixelSize: 11
-                    lineHeight: 1.25
                 }
-            }
 
-            Column {
-                visible: page.apps.length > 0
-                width: parent.width
-                bottomPadding: 8
-                spacing: 12
+                SectionHead {
+                    visible: page.apps.length > 0
+                    lead: true
+                    glyph: String.fromCodePoint(0xF003B)
+                    label: "APP SANDBOX"
+                    side: page.apps.length + (page.apps.length === 1 ? " Flatpak app reaches out" : " Flatpak apps reach out")
+                }
 
-                Repeater {
-                    model: page.apps
+                // two lines, always: the words change under the pointer, the page does not move
+                Item {
+                    visible: page.apps.length > 0
+                    width: parent.width
+                    height: 62
 
-                    delegate: Item {
-                        id: appRow
+                    Text {
+                        textFormat: Text.PlainText
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        text: page.permHint !== "" ? page.permHint
+                            : "What each app reaches outside its own box. Click one to cut it, click again to give it back. It counts from the app's next start; no password is needed."
+                        color: page.permHint !== "" ? Theme.ink : Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                        lineHeight: 1.25
+                    }
+                }
 
-                        required property var modelData
+                Column {
+                    visible: page.apps.length > 0
+                    width: parent.width
+                    bottomPadding: 8
+                    spacing: 12
 
-                        width: body.width
-                        height: Math.max(24, permFlow.implicitHeight)
+                    Repeater {
+                        model: page.apps
 
-                        Text {
-                            id: appName
+                        delegate: Item {
+                            id: appRow
 
-                            textFormat: Text.PlainText
-                            width: 150
-                            anchors.top: parent.top
-                            anchors.topMargin: 5
-                            elide: Text.ElideRight
-                            text: appRow.modelData.name
-                            color: Theme.ink
-                            font.family: Theme.mono
-                            font.pixelSize: 12
-                        }
+                            required property var modelData
 
-                        Flow {
-                            id: permFlow
+                            width: body.width
+                            height: Math.max(24, permFlow.implicitHeight)
 
-                            anchors.left: appName.right
-                            anchors.leftMargin: 12
-                            anchors.right: parent.right
-                            spacing: 6
+                            Text {
+                                id: appName
 
-                            Repeater {
-                                model: appRow.modelData.perms
+                                textFormat: Text.PlainText
+                                width: 150
+                                anchors.top: parent.top
+                                anchors.topMargin: 5
+                                elide: Text.ElideRight
+                                text: appRow.modelData.name
+                                color: Theme.ink
+                                font.family: Theme.mono
+                                font.pixelSize: 12
+                            }
 
-                                delegate: Perm {
-                                    required property var modelData
+                            Flow {
+                                id: permFlow
 
-                                    host: page
-                                    app: appRow.modelData.id
-                                    info: modelData
+                                anchors.left: appName.right
+                                anchors.leftMargin: 12
+                                anchors.right: parent.right
+                                spacing: 6
+
+                                Repeater {
+                                    model: appRow.modelData.perms
+
+                                    delegate: Perm {
+                                        required property var modelData
+
+                                        host: page
+                                        app: appRow.modelData.id
+                                        info: modelData
+                                    }
                                 }
                             }
                         }
@@ -1761,75 +1898,81 @@ Item {
                 }
             }
 
-            // ================= DEEP SCAN =================
-            SectionHead {
-                glyph: String.fromCodePoint(0xF0349)
-                label: "DEEP SCAN"
-                side: page.scan ? "last " + page.ago(page.scan.time) : ""
-            }
-
-            ShieldRow {
-                glyph: String.fromCodePoint(page.scan && page.scanRed === 0 ? 0xF05E0 : 0xF0028)
-                title: page.scan === null ? "Not run yet" : page.scanRed === 0 ? "Every system file matches"
-                    : page.scan.redCount === 0 ? page.scanSuid + (page.scanSuid === 1 ? " program" : " programs") + " with root rights from no package"
-                    : page.scan.redCount + " system files differ"
-                mood: page.scan === null ? "info" : page.scanRed === 0 ? "good" : "bad"
-                text: page.scan === null
-                      ? "Compares every program and library with the copy its package installed, to find anything swapped or patched, and looks for programs with root rights that no package installed. Takes a few minutes; nothing is changed."
-                      : page.scanRed === 0
-                        ? "Every system program and library matches its package"
-                          + (page.scan.suid ? ", and every program with root rights came from one. " : ". ") + page.scan.configs
-                          + " settings files in /etc differ from their defaults"
-                          + (page.scan.caches ? " and " + page.scan.caches + " caches were rebuilt on this computer" : "")
-                          + ", which is normal."
-                      : page.scan.redCount === 0
-                        ? "A program that runs with root rights and belongs to no package is how an intruder keeps the keys. If you did not put it there, look closer before anything else."
-                        : "A broken update can do this too: reinstalling the package (sudo pacman -S <name>) puts the right copy back."
-
-                Button {
-                    host: page
-                    label: page.scan ? "SCAN AGAIN" : "SCAN"
-                    onPressed: page.ask(["scan"], "Your password, to read every system file", "SCAN")
-                }
-            }
-
             Column {
+                visible: page.tab === 3
                 width: parent.width
-                visible: page.scan !== null && page.scanRed > 0
-                leftPadding: 54
-                topPadding: 4
-                bottomPadding: 8
-                spacing: 6
 
-                Repeater {
-                    model: page.scan && page.scan.red ? page.scan.red.slice(0, 20) : []
+                // ================= DEEP SCAN =================
+                SectionHead {
+                    lead: true
+                    glyph: String.fromCodePoint(0xF0349)
+                    label: "DEEP SCAN"
+                    side: page.scan ? "last " + page.ago(page.scan.time) : ""
+                }
 
-                    Text {
-                        required property var modelData
+                ShieldRow {
+                    glyph: String.fromCodePoint(page.scan && page.scanRed === 0 ? 0xF05E0 : 0xF0028)
+                    title: page.scan === null ? "Not run yet" : page.scanRed === 0 ? "Every system file matches"
+                        : page.scan.redCount === 0 ? page.scanSuid + (page.scanSuid === 1 ? " program" : " programs") + " with root rights from no package"
+                        : page.scan.redCount + (page.scan.redCount === 1 ? " system file differs" : " system files differ")
+                    mood: page.scan === null ? "info" : page.scanRed === 0 ? "good" : "bad"
+                    text: page.scan === null
+                          ? "Compares every program and library with the copy its package installed, to find anything swapped or patched, and looks for programs with root rights that no package installed. Takes a few minutes; nothing is changed."
+                          : page.scanRed === 0
+                            ? "Every system program and library matches its package"
+                              + (page.scan.suid ? ", and every program with root rights came from one. " : ". ") + page.scan.configs
+                              + " settings files in /etc differ from their defaults"
+                              + (page.scan.caches ? " and " + page.scan.caches + " caches were rebuilt on this computer" : "")
+                              + ", which is normal."
+                          : page.scan.redCount === 0
+                            ? "A program that runs with root rights and belongs to no package is how an intruder keeps the keys. If you did not put it there, look closer before anything else."
+                            : "A broken update can do this too: reinstalling the package (sudo pacman -S <name>) puts the right copy back."
 
-                        textFormat: Text.PlainText
-                        width: body.width - 54
-                        elide: Text.ElideMiddle
-                        text: modelData.path + "   ·   " + modelData.package + "   ·   " + modelData.why.toLowerCase()
-                        color: Theme.alert
-                        font.family: Theme.mono
-                        font.pixelSize: 11
+                    Button {
+                        host: page
+                        label: page.scan ? "SCAN AGAIN" : "SCAN"
+                        onPressed: page.ask(["scan"], "Your password, to read every system file", "SCAN")
                     }
                 }
 
-                Repeater {
-                    model: page.scan && page.scan.suid ? page.scan.suid.slice(0, 20) : []
+                Column {
+                    width: parent.width
+                    visible: page.scan !== null && page.scanRed > 0
+                    leftPadding: 54
+                    topPadding: 4
+                    bottomPadding: 8
+                    spacing: 6
 
-                    Text {
-                        required property var modelData
+                    Repeater {
+                        model: page.scan && page.scan.red ? page.scan.red.slice(0, 20) : []
 
-                        textFormat: Text.PlainText
-                        width: body.width - 54
-                        elide: Text.ElideMiddle
-                        text: modelData + "   ·   runs with root rights, from no package"
-                        color: Theme.alert
-                        font.family: Theme.mono
-                        font.pixelSize: 11
+                        Text {
+                            required property var modelData
+
+                            textFormat: Text.PlainText
+                            width: body.width - 54
+                            elide: Text.ElideMiddle
+                            text: modelData.path + "   ·   " + modelData.package + "   ·   " + modelData.why.toLowerCase()
+                            color: Theme.alert
+                            font.family: Theme.mono
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    Repeater {
+                        model: page.scan && page.scan.suid ? page.scan.suid.slice(0, 20) : []
+
+                        Text {
+                            required property var modelData
+
+                            textFormat: Text.PlainText
+                            width: body.width - 54
+                            elide: Text.ElideMiddle
+                            text: modelData + "   ·   runs with root rights, from no package"
+                            color: Theme.alert
+                            font.family: Theme.mono
+                            font.pixelSize: 11
+                        }
                     }
                 }
             }

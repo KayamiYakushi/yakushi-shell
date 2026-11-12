@@ -96,7 +96,7 @@ var INDEX = [
         pl: "wyczyść czyszczenie śmieci pamięć podręczna zwolnij miejsce pozostałości" } },
 
     // ---- Security
-    { page: "Security", find: ["Auto lock"], title: "Auto lock", keys: {
+    { page: "Shield", find: ["Auto lock"], title: "Auto lock", keys: {
         en: "auto lock lock screen idle timeout screen lock lock after",
         tr: "otomatik kilit kilitle kilitlenme ekran kilidi bekleme süre zaman aşımı",
         de: "automatische sperre bildschirmsperre sperren leerlauf",
@@ -106,50 +106,50 @@ var INDEX = [
         it: "blocco automatico bloccare schermo inattività",
         ru: "автоблокировка блокировка экрана заблокировать бездействие",
         pl: "automatyczna blokada blokada ekranu zablokuj bezczynność" } },
-    { page: "Security", find: ["Firewall"], title: "Firewall", keys: {
+    { page: "Shield", find: ["Firewall"], title: "Firewall", keys: {
         en: "firewall ufw ports block", tr: "güvenlik duvarı", de: "firewall", es: "cortafuegos",
         fr: "pare-feu", pt: "firewall", it: "firewall", ru: "брандмауэр файрвол", pl: "zapora" } },
-    { page: "Security", find: ["Updates"], title: "System updates", keys: {
+    { page: "Shield", find: ["Updates"], title: "System updates", keys: {
         en: "updates update upgrade system update pacman", tr: "güncelleme güncelle sistem",
         de: "aktualisierung aktualisieren", es: "actualizaciones actualizar", fr: "mises à jour mettre à jour",
         pt: "atualizações atualizar", it: "aggiornamenti aggiornare", ru: "обновления обновить",
         pl: "aktualizacje zaktualizuj" } },
-    { page: "Security", find: ["Hardening"], title: "Hardening (kernel and network)", keys: {
+    { page: "Shield", find: ["Hardening"], title: "Hardening (kernel and network)", keys: {
         en: "hardening harden kernel sysctl llmnr mdns avahi dns over tls protection strengthen secure",
         tr: "sıkılaştırma güçlendirme çekirdek koruma güvenli sertleştirme",
         de: "härtung härten kernel absichern schutz", es: "endurecimiento reforzar núcleo protección",
         fr: "durcissement renforcer noyau protection", pt: "endurecimento reforçar núcleo proteção",
         it: "rafforzamento rafforzare kernel protezione", ru: "усиление защита ядро укрепить",
         pl: "utwardzanie wzmocnienie jądro ochrona" } },
-    { page: "Security", find: ["Disk encryption"], title: "Disk encryption", keys: {
+    { page: "Shield", find: ["Disk encryption"], title: "Disk encryption", keys: {
         en: "disk encryption luks encrypted", tr: "şifreleme şifreli disk", de: "verschlüsselung festplattenverschlüsselung",
         es: "cifrado de disco", fr: "chiffrement du disque", pt: "criptografia de disco", it: "crittografia del disco",
         ru: "шифрование диска", pl: "szyfrowanie dysku" } },
-    { page: "Security", find: ["Secure Boot"], title: "Secure Boot", keys: {
+    { page: "Shield", find: ["Secure Boot"], title: "Secure Boot", keys: {
         en: "secure boot uefi", tr: "güvenli önyükleme", de: "sicherer start", es: "arranque seguro",
         fr: "démarrage sécurisé", pt: "inicialização segura", it: "avvio protetto", ru: "безопасная загрузка",
         pl: "bezpieczny rozruch" } },
-    { page: "Security", find: ["SSH server"], title: "SSH server", keys: {
+    { page: "Shield", find: ["SSH server"], title: "SSH server", keys: {
         en: "ssh server remote access sshd", tr: "uzak erişim sunucu", de: "fernzugriff server",
         es: "acceso remoto servidor", fr: "accès à distance serveur", pt: "acesso remoto servidor",
         it: "accesso remoto server", ru: "удалённый доступ сервер", pl: "zdalny dostęp serwer" } },
-    { page: "Security", find: ["Open to network"], title: "Open ports", keys: {
+    { page: "Shield", find: ["Open to network"], title: "Open ports", keys: {
         en: "open ports network listening exposed", tr: "açık port ağ dinleyen", de: "offene ports netzwerk",
         es: "puertos abiertos red", fr: "ports ouverts réseau", pt: "portas abertas rede", it: "porte aperte rete",
         ru: "открытые порты сеть", pl: "otwarte porty sieć" } },
-    { page: "Security", find: ["PASSWORDS AND LOGINS"], title: "Logins and wrong passwords", keys: {
+    { page: "Guard", find: ["PASSWORDS AND LOGINS"], title: "Logins and wrong passwords", keys: {
         en: "logins login attempts wrong password failed sudo", tr: "giriş denemesi yanlış şifre parola",
         de: "anmeldungen falsches passwort", es: "inicios de sesión contraseña incorrecta",
         fr: "connexions mot de passe incorrect", pt: "logins senha errada", it: "accessi password errata",
         ru: "входы неверный пароль", pl: "logowania błędne hasło" } },
-    { page: "Security", find: ["APP SANDBOX"], title: "App sandbox (Flatpak permissions)", keys: {
+    { page: "Apps", find: ["APP SANDBOX"], title: "App sandbox (Flatpak permissions)", keys: {
         en: "app sandbox flatpak permissions camera devices access files what apps can reach",
         tr: "uygulama izinleri izin kamera erişim korumalı alan dosya aygıt",
         de: "app berechtigungen kamera zugriff sandbox", es: "permisos de aplicaciones cámara acceso",
         fr: "autorisations des applications caméra accès", pt: "permissões de aplicativos câmera acesso",
         it: "permessi delle app fotocamera accesso", ru: "разрешения приложений камера доступ песочница",
         pl: "uprawnienia aplikacji kamera dostęp piaskownica" } },
-    { page: "Security", find: ["DEEP SCAN"], title: "Deep scan (system files)", keys: {
+    { page: "Scan", find: ["DEEP SCAN"], title: "Deep scan (system files)", keys: {
         en: "deep scan virus malware rootkit integrity system files check", tr: "virüs tarama bütünlük kontrol",
         de: "virus überprüfung systemdateien", es: "virus escaneo análisis integridad", fr: "virus analyse intégrité",
         pt: "vírus verificação integridade", it: "virus scansione integrità",

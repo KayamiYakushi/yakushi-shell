@@ -249,7 +249,13 @@ PanelWindow {
             { name: "Programs",         file: "ProgramsPage" },
             { name: "Default Apps",     file: "DefaultAppsPage" }
         ] },
-        { name: "Security",     jp: "セキュリティ",   file: "SecurityPage",    glyph: String.fromCodePoint(0xF0565) },
+        // one file for the whole group: its tabs share what the page has read
+        { name: "Security",     jp: "セキュリティ",   glyph: String.fromCodePoint(0xF0565), tabs: [
+            { name: "Shield",           file: "SecurityPage" },
+            { name: "Guard",            file: "SecurityPage" },
+            { name: "Apps",             file: "SecurityPage" },
+            { name: "Scan",             file: "SecurityPage" }
+        ] },
         { name: "Appearance",   jp: "外観",           file: "AppearancePage",  glyph: "󰏘" },
         { name: "Desktop",      jp: "デスクトップ",   glyph: String.fromCodePoint(0xF0A07), tabs: [
             { name: "Top Bar",          file: "TopBarPage" },

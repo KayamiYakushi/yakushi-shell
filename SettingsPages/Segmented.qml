@@ -35,7 +35,8 @@ Rectangle {
                 required property int index
                 readonly property bool on: seg.current === modelData[0]
 
-                width: optionText.implicitWidth + 30
+                // whole pixels: a strip that ends on half a pixel loses its last border
+                width: Math.ceil(optionText.implicitWidth) + 30
                 height: seg.height - 2
                 color: on ? Theme.tint(Theme.accent, 0.14) : optionMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
 

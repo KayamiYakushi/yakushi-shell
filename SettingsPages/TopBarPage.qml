@@ -3,10 +3,10 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Desktop -> Top Bar
+// Settings -> Appearance -> Top Bar
 //
-// Chooses which modules the island shows and in what order, the
-// clock format and the bar opacity. Every change is saved by
+// Chooses which modules the island shows and in what order (drag a row by
+// its grip), the clock format and the bar opacity. Every change is saved by
 // scripts/yakushi-topbarctl.py and applied to the running bar at once.
 Item {
     id: page
@@ -51,11 +51,21 @@ Item {
         return list
     }
 
-    function moveModule(from, to) {
-        if (to < 0 || to >= orderModel.count || from === to)
-            return
-        orderModel.move(from, to, 1)
-        send("order", currentOrder().join(","))
+    // Dragging a row by its grip: the list reorders under the pointer (`y`
+    // is the pointer's place in the list); the order is saved once, when the
+    // button is let go.
+    property string orderAtPress: ""
+
+    function dragTo(from, y) {
+        var to = Math.max(0, Math.min(orderModel.count - 1, Math.floor(y / orderList.rowHeight)))
+        if (to !== from)
+            orderModel.move(from, to, 1)
+    }
+
+    function dropped() {
+        var now = currentOrder().join(",")
+        if (now !== orderAtPress)
+            send("order", now)
     }
 
     function resetOrder() {
@@ -205,53 +215,24 @@ Item {
                 title: "TOP BAR"
             }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
+            Divider {}
 
             // ---------------- Modules ----------------
-            Item {
-                width: parent.width
-                height: 14
-
-                Text {
-                    textFormat: Text.PlainText
-                    text: "MODULES  ·  LEFT TO RIGHT"
-                    color: Theme.inkSoft
-                    font.family: Theme.mono
-                    font.pixelSize: 11
-                    font.letterSpacing: 2
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.right: parent.right
-                    text: "RESET ORDER"
-                    color: resetMouse.containsMouse ? Theme.accent : Theme.inkMute
-                    font.family: Theme.mono
-                    font.pixelSize: 9
-                    font.letterSpacing: 2
-
-                    MouseArea {
-                        id: resetMouse
-
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: page.resetOrder()
-                    }
-                }
+            SectionHead {
+                text: "MODULES"
+                hint: "left to right on the bar  ·  drag to reorder"
+                action: "RESET ORDER"
+                onActivated: page.resetOrder()
             }
 
-            // Rows in island order (left to right). Arrows move a module.
+            // Rows in island order (left to right). The grip moves a module.
             ListView {
                 id: orderList
 
+                readonly property int rowHeight: 34
+
                 width: parent.width
-                height: count * 32
+                height: count * rowHeight
                 interactive: false
                 model: orderModel
 
@@ -269,62 +250,46 @@ Item {
                     required property string key
                     required property int index
                     readonly property var info: page.infoFor(key)
+                    readonly property bool held: grip.pressed
 
                     width: orderList.width
-                    height: 32
+                    height: orderList.rowHeight
+                    z: held ? 2 : 1
 
-                    Row {
-                        id: arrows
+                    // the row in your hand: a light tint and an accent bar
+                    Rectangle {
+                        anchors.fill: parent
+                        color: moduleRow.held ? Theme.tint(Theme.accent, 0.10)
+                            : grip.containsMouse ? Theme.tint(Theme.ink, 0.04) : "transparent"
 
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.tFast }
+                        }
 
-                        Repeater {
-                            model: [
-                                { glyph: 0xF0143, step: -1 },
-                                { glyph: 0xF0140, step: 1 }
-                            ]
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                readonly property int target: moduleRow.index + modelData.step
-                                readonly property bool usable: true
-                                    && target >= 0 && target < orderList.count
-
-                                width: 20
-                                height: 20
-                                color: arrowMouse.containsMouse && usable
-                                    ? Theme.tint(Theme.accent, 0.14)
-                                    : "transparent"
-                                border.width: 1
-                                border.color: arrowMouse.containsMouse && usable ? Theme.accent : Theme.line
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    anchors.centerIn: parent
-                                    text: String.fromCodePoint(modelData.glyph)
-                                    color: parent.usable ? Theme.inkSoft : Theme.inkMute
-                                    font.family: Theme.glyphs
-                                    font.pixelSize: 13
-                                }
-
-                                MouseArea {
-                                    id: arrowMouse
-
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    enabled: parent.usable
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: page.moveModule(moduleRow.index, parent.target)
-                                }
-                            }
+                        Rectangle {
+                            visible: moduleRow.held
+                            width: 3
+                            height: parent.height
+                            color: Theme.accent
                         }
                     }
 
+                    Text {
+                        id: gripGlyph
+
+                        textFormat: Text.PlainText
+                        width: 30
+                        anchors.verticalCenter: parent.verticalCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        text: String.fromCodePoint(0xF01DD)
+                        color: moduleRow.held ? Theme.accent : grip.containsMouse ? Theme.ink : Theme.inkMute
+                        font.family: Theme.glyphs
+                        font.pixelSize: 16
+                    }
+
                     ToggleRow {
-                        anchors.left: arrows.right
-                        anchors.leftMargin: 12
+                        anchors.left: gripGlyph.right
+                        anchors.leftMargin: 6
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         icon: moduleRow.info.icon
@@ -333,19 +298,37 @@ Item {
                         available: page.loaded
                         onToggled: page.setModule(moduleRow.key, !checked)
                     }
+
+                    MouseArea {
+                        id: grip
+
+                        width: gripGlyph.width
+                        height: parent.height
+                        hoverEnabled: true
+                        preventStealing: true
+                        enabled: page.loaded
+                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                        onPressed: page.orderAtPress = page.currentOrder().join(",")
+                        onPositionChanged: mouse => {
+                            if (pressed)
+                                page.dragTo(moduleRow.index, mapToItem(orderList.contentItem, mouse.x, mouse.y).y)
+                        }
+                        onReleased: page.dropped()
+                        onCanceled: page.dropped()
+                    }
                 }
             }
 
             // Now-playing visualizer mode
             Item {
                 width: parent.width
-                height: 28
+                height: 30
 
                 Text {
                     id: vizIcon
 
                     textFormat: Text.PlainText
-                    anchors.left: parent.left
+                    x: 36
                     anchors.verticalCenter: parent.verticalCenter
                     width: 22
                     text: String.fromCodePoint(0xF0EA2)
@@ -365,75 +348,24 @@ Item {
                     font.letterSpacing: 1
                 }
 
-                Row {
+                Segmented {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 6
-
-                    Repeater {
-                        model: [
-                            { key: "hover", name: "ON HOVER" },
-                            { key: "always", name: "ALWAYS" },
-                            { key: "off", name: "OFF" }
-                        ]
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            readonly property bool selected: page.visualizer === modelData.key
-
-                            width: segText.implicitWidth + 18
-                            height: 20
-                            color: selected ? Theme.tint(Theme.accent, 0.16) : "transparent"
-                            border.width: 1
-                            border.color: selected
-                                ? Theme.accent
-                                : (segMouse.containsMouse ? Theme.lineHot : Theme.line)
-
-                            Text {
-                                id: segText
-
-                                textFormat: Text.PlainText
-                                anchors.centerIn: parent
-                                text: parent.modelData.name
-                                color: parent.selected ? Theme.ink : Theme.inkSoft
-                                font.family: Theme.mono
-                                font.pixelSize: 9
-                                font.letterSpacing: 1
-                            }
-
-                            MouseArea {
-                                id: segMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: page.loaded
-                                cursorShape: Qt.PointingHandCursor
-
-                                onClicked: {
-                                    page.visualizer = parent.modelData.key
-                                    page.send("visualizer", parent.modelData.key)
-                                }
-                            }
-                        }
+                    height: 28
+                    enabled: page.loaded
+                    options: [["hover", "ON HOVER"], ["always", "ALWAYS"], ["off", "OFF"]]
+                    current: page.visualizer
+                    onChose: key => {
+                        page.visualizer = key
+                        page.send("visualizer", key)
                     }
                 }
             }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
+            Divider {}
 
             // ---------------- Clock ----------------
-            Text {
-                textFormat: Text.PlainText
-                text: "CLOCK"
-                color: Theme.inkSoft
-                font.family: Theme.mono
-                font.pixelSize: 11
-                font.letterSpacing: 2
-            }
+            SectionHead { text: "CLOCK" }
 
             Row {
                 width: parent.width
@@ -466,13 +398,11 @@ Item {
                 }
             }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.line
-            }
+            Divider {}
 
             // ---------------- Glass ----------------
+            SectionHead { text: "GLASS" }
+
             Slider {
                 width: parent.width
                 label: "Top bar opacity  " + Math.round(page.barOpacity * 100) + "%"
@@ -492,16 +422,10 @@ Item {
                 }
             }
 
-            Text {
-                textFormat: Text.PlainText
-                width: parent.width
+            Note {
                 text: page.status !== ""
                     ? page.status
                     : "Super + Shift + W hides or shows the bar."
-                color: Theme.inkSoft
-                font.family: Theme.mono
-                font.pixelSize: 9
-                elide: Text.ElideRight
             }
         }
     }

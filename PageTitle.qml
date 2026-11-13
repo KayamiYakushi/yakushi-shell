@@ -3,7 +3,7 @@ import QtQuick
 // Page heading used at the top of each Settings page: an accent block, the
 // title in heavy caps and a hard rule.
 //
-// When the page is one tab of a group in the page list (Programs, Desktop,
+// When the page is one tab of a group in the page list (Programs, Appearance,
 // Input: SettingsWindow `pages[].tabs`), the heading names the group's tabs
 // instead: the open one as the title, its siblings smaller beside it, in
 // the list's order. Click one to open it (Ctrl + Tab does the same).

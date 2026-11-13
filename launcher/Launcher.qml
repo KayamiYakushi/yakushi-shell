@@ -84,13 +84,13 @@ PanelWindow {
             open(mode === "apps" ? "clipboard" : "apps")
     }
 
-    // Opening / closing time, Settings -> Appearance -> Launcher (0 = none)
+    // Opening / closing time, Settings -> Appearance -> Theme (0 = none)
     readonly property int animation: {
         var ms = Config.launcher.animationMs
         return typeof ms === "number" ? Math.max(0, Math.min(1000, Math.round(ms))) : 480
     }
 
-    // Card opacity, Settings -> Appearance -> Launcher; until set there it
+    // Card opacity, Settings -> Appearance -> Theme; until set there it
     // follows the panel opacity (Glass)
     readonly property real backdropOpacity: {
         var o = Config.launcher.opacity

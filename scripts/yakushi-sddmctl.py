@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The login screen (SDDM), for Settings -> Desktop -> Login Screen.
+"""The login screen (SDDM), for Settings -> Environment -> Login Screen.
 
     yakushi-sddmctl.py status
     yakushi-sddmctl.py set <image> [--password-stdin]

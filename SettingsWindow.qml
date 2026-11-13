@@ -41,15 +41,21 @@ PanelWindow {
         showing = true
     }
 
-    // where a page or a tab is, by its name or its file ("keybinds",
-    // "Default Apps"): { page, tab }, or null
+    // where a page or a tab is, by its name, its file or the name it had
+    // before ("keybinds", "Default Apps", "App Look", "desktop"):
+    // { page, tab }, or null. Two tabs share the name Apps: "apps" is
+    // Security's, "app look" is Appearance's.
     function locate(name) {
-        var n = String(name).toLowerCase().replace(/[^a-z&]/g, "")
+        function plain(text) {
+            return String(text).toLowerCase().replace(/[^a-z&]/g, "")
+        }
+        var n = plain(name)
         if (n === "")
             return null
         function same(p) {
-            return p.name.toLowerCase().replace(/[^a-z&]/g, "") === n
+            return plain(p.name) === n
                 || (p.file !== undefined && p.file.toLowerCase() === n + "page")
+                || (p.was !== undefined && plain(p.was) === n)
         }
         for (var i = 0; i < pages.length; i++) {
             if (same(pages[i]))
@@ -73,7 +79,7 @@ PanelWindow {
         return true
     }
 
-    // "DESKTOP · TOP BAR" for a tab, "SOUND" for a page
+    // "APPEARANCE · TOP BAR" for a tab, "SOUND" for a page
     function placeOf(name) {
         var at = locate(name)
         if (!at || at.tab < 0)
@@ -241,7 +247,7 @@ PanelWindow {
 
     // The page list. A page with `tabs` is a group: its tabs are pages of
     // their own, named in the page heading (PageTitle); the first one opens.
-    // Ordered: the computer, how it looks, the devices.
+    // Ordered: the computer, how it looks, what surrounds it, the devices.
     readonly property var pages: [
         { name: "System",       jp: "システム",       file: "SystemPage",      glyph: "󰒓" },
         { name: "Tasks",        jp: "タスク",         file: "TasksPage",       glyph: String.fromCodePoint(0xF04C5) },
@@ -256,9 +262,15 @@ PanelWindow {
             { name: "Apps",             file: "SecurityPage" },
             { name: "Scan",             file: "SecurityPage" }
         ] },
-        { name: "Appearance",   jp: "外観",           file: "AppearancePage",  glyph: "󰏘" },
-        { name: "Desktop",      jp: "デスクトップ",   glyph: String.fromCodePoint(0xF0A07), tabs: [
+        // how everything looks: the shell's own colours, its bar, the
+        // windows, and the apps you open
+        { name: "Appearance",   jp: "外観",           glyph: "󰏘", tabs: [
+            { name: "Theme",            file: "ThemePage" },
             { name: "Top Bar",          file: "TopBarPage" },
+            { name: "Windows",          file: "WindowsPage" },
+            { name: "Apps",             file: "AppLookPage" }
+        ] },
+        { name: "Environment",  jp: "環境",           glyph: String.fromCodePoint(0xF0A07), was: "Desktop", tabs: [
             { name: "Notifications",    file: "NotificationsPage" },
             { name: "Login Screen",     file: "LoginScreenPage" }
         ] },

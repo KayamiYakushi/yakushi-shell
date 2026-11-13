@@ -155,21 +155,21 @@ var INDEX = [
         pt: "vírus verificação integridade", it: "virus scansione integrità",
         ru: "вирус сканирование проверка целостность", pl: "wirus skanowanie integralność" } },
 
-    // ---- Appearance
-    { page: "Appearance", find: ["DARK"], title: "Dark or light apps", keys: {
+    // ---- Appearance: Theme, Windows, Apps ("App Look": Security has an Apps tab too)
+    { page: "App Look", find: ["DARK"], title: "Dark or light apps", keys: {
         en: "dark mode light mode dark theme light theme theme colour scheme night",
         tr: "koyu tema açık tema karanlık mod aydınlık renk şeması",
         de: "dunkler modus heller modus dunkel hell thema", es: "modo oscuro modo claro tema",
         fr: "mode sombre mode clair thème", pt: "modo escuro modo claro tema",
         it: "modalità scura modalità chiara tema", ru: "тёмная тема светлая тема тёмный режим",
         pl: "tryb ciemny tryb jasny motyw" } },
-    { page: "Appearance", find: ["Match app colours"], title: "App colours (GTK, Files)", keys: {
+    { page: "App Look", find: ["Match app colours"], title: "App colours (GTK, Files)", keys: {
         en: "app colours colors gtk nautilus files file manager theme match folder icons accent",
         tr: "uygulama renkleri renk dosya yöneticisi tema uyum klasör simgeleri ikonlar", de: "app farben dateimanager ordner symbole",
         es: "colores de aplicaciones gestor de archivos", fr: "couleurs des applications gestionnaire de fichiers",
         pt: "cores dos aplicativos gerenciador de arquivos", it: "colori delle app file manager",
         ru: "цвета приложений файловый менеджер", pl: "kolory aplikacji menedżer plików" } },
-    { page: "Appearance", find: ["File manager opacity"], title: "File manager transparency", keys: {
+    { page: "App Look", find: ["File manager opacity"], title: "File manager transparency", keys: {
         en: "file manager opacity transparency transparent see through blur nautilus files",
         tr: "dosya yöneticisi saydamlık şeffaflık şeffaf transparan opaklık bulanık",
         de: "dateimanager transparenz durchsichtig deckkraft",
@@ -178,77 +178,77 @@ var INDEX = [
         pt: "gerenciador de arquivos transparência transparente opacidade",
         it: "file manager trasparenza trasparente opacità",
         ru: "файловый менеджер прозрачность прозрачный", pl: "menedżer plików przezroczystość przezroczysty" } },
-    { page: "Appearance", find: ["ACCENT"], title: "Accent colour", keys: {
+    { page: "Theme", find: ["ACCENT"], title: "Accent colour", keys: {
         en: "accent colour color main colour theme colour pink red",
         tr: "vurgu rengi ana renk renk tema rengi pembe kırmızı mavi yeşil", de: "akzentfarbe farbe",
         es: "color de acento color", fr: "couleur d'accent couleur", pt: "cor de destaque cor",
         it: "colore di accento colore", ru: "цвет акцента цвет", pl: "kolor akcentu kolor" } },
-    { page: "Appearance", find: ["Custom colour"], title: "Custom accent colour (hex)", keys: {
+    { page: "Theme", find: ["Custom colour"], title: "Custom accent colour (hex)", keys: {
         en: "custom colour color hex rgb", tr: "özel renk", de: "eigene farbe", es: "color personalizado",
         fr: "couleur personnalisée", pt: "cor personalizada", it: "colore personalizzato", ru: "свой цвет",
         pl: "własny kolor" } },
-    { page: "Appearance", find: ["PANEL OPACITY"], title: "Settings panel opacity", keys: {
+    { page: "Theme", find: ["Panel opacity"], title: "Settings panel opacity", keys: {
         en: "panel opacity glass transparency settings transparent",
         tr: "panel saydamlık şeffaflık cam ayarlar paneli", de: "panel transparenz glas",
         es: "transparencia del panel", fr: "transparence du panneau", pt: "transparência do painel",
         it: "trasparenza del pannello", ru: "прозрачность панели", pl: "przezroczystość panelu" } },
-    { page: "Appearance", find: ["Opening animation"], title: "Launcher animation speed", keys: {
+    { page: "Theme", find: ["Opening animation"], title: "Launcher animation speed", keys: {
         en: "launcher animation speed opening app menu start menu",
         tr: "başlatıcı animasyon hız açılış uygulama menüsü", de: "starter animation geschwindigkeit startmenü",
         es: "lanzador animación velocidad menú de inicio", fr: "lanceur animation vitesse menu démarrer",
         pt: "lançador animação velocidade menu iniciar", it: "launcher animazione velocità menu start",
         ru: "лаунчер анимация скорость меню запуска", pl: "launcher animacja szybkość menu start" } },
-    { page: "Appearance", find: ["Launcher opacity"], title: "Launcher opacity", keys: {
+    { page: "Theme", find: ["Launcher opacity"], title: "Launcher opacity", keys: {
         en: "launcher opacity transparency transparent app menu start menu background",
         tr: "başlatıcı saydamlık şeffaflık opaklık uygulama menüsü arka plan",
         de: "starter transparenz deckkraft startmenü", es: "lanzador transparencia opacidad menú de inicio",
         fr: "lanceur transparence opacité menu démarrer", pt: "lançador transparência opacidade menu iniciar",
         it: "launcher trasparenza opacità menu start", ru: "лаунчер прозрачность непрозрачность меню запуска",
         pl: "launcher przezroczystość krycie menu start" } },
-    { page: "Appearance", find: ["Screen edge gap"], title: "Gap at the screen edges", keys: {
+    { page: "Windows", find: ["Screen edge gap"], title: "Gap at the screen edges", keys: {
         en: "gaps gap edge margin space window spacing", tr: "boşluk kenar pencere aralığı",
         de: "abstand rand fenster", es: "espacio margen bordes ventanas", fr: "espace marge bords fenêtres",
         pt: "espaço margem bordas janelas", it: "spazio margine bordi finestre",
         ru: "отступ край окна промежуток", pl: "odstęp margines krawędź okna" } },
-    { page: "Appearance", find: ["Gap between windows"], title: "Gap between windows", keys: {
+    { page: "Windows", find: ["Gap between windows"], title: "Gap between windows", keys: {
         en: "gaps gap between windows inner spacing", tr: "boşluk pencereler arası aralık",
         de: "abstand zwischen fenstern", es: "espacio entre ventanas", fr: "espace entre fenêtres",
         pt: "espaço entre janelas", it: "spazio tra finestre", ru: "промежуток между окнами",
         pl: "odstęp między oknami" } },
-    { page: "Appearance", find: ["Corner cut"], title: "Window corners", keys: {
+    { page: "Windows", find: ["Corner cut"], title: "Window corners", keys: {
         en: "corners corner rounding radius rounded cut sharp", tr: "köşe köşeler yuvarlak yuvarlama kesik",
         de: "ecken abgerundet radius", es: "esquinas redondeadas radio", fr: "coins arrondis rayon",
         pt: "cantos arredondados raio", it: "angoli arrotondati raggio", ru: "углы скругление радиус",
         pl: "rogi zaokrąglenie promień" } },
-    { page: "Appearance", find: ["Window shadow"], title: "Window shadow", keys: {
+    { page: "Windows", find: ["Window shadow"], title: "Window shadow", keys: {
         en: "shadow window shadow", tr: "gölge pencere gölgesi", de: "schatten fensterschatten", es: "sombra",
         fr: "ombre", pt: "sombra", it: "ombra", ru: "тень", pl: "cień" } },
-    { page: "Appearance", find: ["Window border"], title: "Window border", keys: {
+    { page: "Windows", find: ["Window border"], title: "Window border", keys: {
         en: "border outline frame window border colour", tr: "kenarlık çerçeve pencere kenarı",
         de: "rahmen fensterrahmen", es: "borde marco", fr: "bordure cadre", pt: "borda moldura",
         it: "bordo cornice", ru: "рамка граница окна", pl: "obramowanie ramka" } },
-    { page: "Appearance", find: ["Match terminal colours"], title: "Terminal colours", keys: {
+    { page: "App Look", find: ["Match terminal colours"], title: "Terminal colours", keys: {
         en: "terminal colours colors kitty fish console", tr: "terminal renkleri konsol",
         de: "terminal farben konsole", es: "colores del terminal consola", fr: "couleurs du terminal console",
         pt: "cores do terminal console", it: "colori del terminale console", ru: "цвета терминала консоль",
         pl: "kolory terminala konsola" } },
-    { page: "Appearance", find: ["Terminal opacity"], title: "Terminal transparency", keys: {
+    { page: "App Look", find: ["Terminal opacity"], title: "Terminal transparency", keys: {
         en: "terminal opacity transparency transparent kitty", tr: "terminal saydamlık şeffaflık",
         de: "terminal transparenz", es: "transparencia del terminal", fr: "transparence du terminal",
         pt: "transparência do terminal", it: "trasparenza del terminale", ru: "прозрачность терминала",
         pl: "przezroczystość terminala" } },
-    { page: "Appearance", find: ["Terminal padding"], title: "Terminal padding", keys: {
+    { page: "App Look", find: ["Terminal padding"], title: "Terminal padding", keys: {
         en: "terminal padding space edge margin gap border kitty text inset",
         tr: "terminal kenar boşluk boşluğu kenarlardan iç boşluk dolgu yazı",
         de: "terminal innenabstand abstand rand", es: "relleno espacio margen del terminal",
         fr: "marge intérieure espacement bord du terminal", pt: "preenchimento espaço margem do terminal",
         it: "spaziatura margine bordo del terminale", ru: "отступ поля терминала край",
         pl: "dopełnienie odstęp margines terminala" } },
-    { page: "Appearance", find: ["Background blur"], title: "Terminal blur", keys: {
+    { page: "App Look", find: ["Background blur"], title: "Terminal blur", keys: {
         en: "blur background blur frosted terminal", tr: "bulanıklık bulanık", de: "unschärfe weichzeichnen",
         es: "desenfoque", fr: "flou", pt: "desfoque", it: "sfocatura", ru: "размытие", pl: "rozmycie" } },
 
-    // ---- Top Bar
+    // ---- Appearance: Top Bar
     { page: "Top Bar", find: ["Top bar opacity"], title: "Top bar opacity", keys: {
         en: "top bar bar panel waybar opacity transparency", tr: "üst bar üst panel çubuk saydamlık",
         de: "obere leiste leiste transparenz", es: "barra superior transparencia",
@@ -309,7 +309,8 @@ var INDEX = [
         it: "spegnere riavviare alimentazione", ru: "выключение перезагрузка питание",
         pl: "wyłącz uruchom ponownie zasilanie" } },
     { page: "Top Bar", find: ["MODULES"], title: "Top bar modules and order", keys: {
-        en: "modules order arrange widgets items", tr: "modüller sıra sıralama öğe", de: "module reihenfolge",
+        en: "top bar modules order arrange reorder drag move widgets items",
+        tr: "üst bar modülleri modüller modül sıra sıralama sürükle taşı öğe", de: "module reihenfolge",
         es: "módulos orden", fr: "modules ordre", pt: "módulos ordem", it: "moduli ordine",
         ru: "модули порядок", pl: "moduły kolejność" } },
 

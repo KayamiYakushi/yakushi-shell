@@ -88,7 +88,7 @@ fails until you do.
 The login screen is the lock screen's twin: the package installs it as the
 SDDM theme `yakushi` (`sddm/` here). Turn it on once with
 `printf '[Theme]\nCurrent=yakushi\n' | sudo tee /etc/sddm.conf.d/yakushi-theme.conf`,
-then press MATCH THE SHELL in Settings -> Desktop -> Login Screen: it copies your
+then press MATCH THE SHELL in Settings -> Environment -> Login Screen: it copies your
 accent, 12/24 h clock and profile picture into the theme (the login screen
 runs as the `sddm` user and cannot read your home). The background is chosen
 on the same page. Try the theme without logging out:
@@ -134,7 +134,7 @@ all of it):
 "yakushi unfreeze"            -- SUPER + CTRL + Escape
 ```
 
-The launcher animates itself (Settings -> Appearance -> Launcher), so
+The launcher animates itself (Settings -> Appearance -> Theme), so
 Hyprland's fade is turned off for its layer, with a blur behind the card:
 
 ```lua

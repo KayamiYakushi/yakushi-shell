@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 
-// Settings -> Desktop -> Notifications
+// Settings -> Environment -> Notifications
 //
 // Show notifications or not at all, how long a pop-up stays, and a test.
 // Off never leaves an app waiting: the shell still answers every

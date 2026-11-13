@@ -499,26 +499,15 @@ Item {
             }
         }
 
-        Text {
-            textFormat: Text.PlainText
-            width: parent.width
+        Note {
             text: page.statusMessage !== ""
                 ? page.statusMessage
                 : "Changes appear on the next SDDM login."
             color: Theme.inkSoft
-            font.family: Theme.mono
-            font.pixelSize: 9
-            wrapMode: Text.WordWrap
         }
 
-        Text {
-            textFormat: Text.PlainText
-            width: parent.width
+        Note {
             text: "Pictures are made into clean PNGs as you (never opened as root), then copied into the system SDDM theme with your password. Your files stay untouched. MATCH THE SHELL copies your accent, 12/24 h clock and profile picture: the login screen cannot read your home."
-            color: Theme.inkMute
-            font.family: Theme.mono
-            font.pixelSize: 9
-            wrapMode: Text.WordWrap
         }
     }
 }

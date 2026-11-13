@@ -8,7 +8,7 @@ import "notifications"
 import "launcher"
 
 // Yakushi Shell: the one entry point for the top bar, Settings, the volume
-// pill, notifications, the launcher and auto lock. (The lock screen itself
+// and brightness pill, notifications, the launcher and auto lock. (The lock screen itself
 // is its own process: lock.qml, started by `yakushi lock`.)
 //
 // The bar and the notification server are always loaded. The volume pill
@@ -19,6 +19,7 @@ import "launcher"
 // Everything is driven over IPC, e.g.
 //   qs -p <this dir> ipc call settings toggle
 //   qs -p <this dir> ipc call volumeOsd reveal
+//   qs -p <this dir> ipc call osd brightness 40
 //   qs -p <this dir> ipc call topbar toggle
 // bin/yakushi starts the shell and wraps these calls for keybinds
 // (yakushi settings, yakushi volume up, yakushi bar toggle, ...).
@@ -45,6 +46,23 @@ ShellRoot {
     MediaState {
         id: barMedia
         config: barConfig
+    }
+
+    // The battery, only on a computer that has one (a desktop never starts
+    // the UPower daemon), and the network, only while its module is on.
+    // By file, not by type: neither is even compiled until it is needed.
+    Loader {
+        id: barBattery
+
+        active: barStats.hasBattery
+        source: "topbar/BatteryState.qml"
+    }
+
+    Loader {
+        id: barNetwork
+
+        active: barConfig.modules.network
+        source: "topbar/NetworkState.qml"
     }
 
     // Bumped by the power shortcut (IPC); the bar on the focused monitor
@@ -80,6 +98,8 @@ ShellRoot {
                 clock: barClock
                 media: barMedia
                 power: barPower
+                battery: barBattery.item
+                network: barNetwork.item
             }
         }
     }
@@ -175,6 +195,44 @@ ShellRoot {
             volumeOsd.active = true
             volumeOsd.item.poke()
             volumeOsdUnload.restart()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // The same pill for the brightness keys (yakushi brightness ... tells
+    // us the new level) and for the battery running low
+    // ------------------------------------------------------------------
+    LazyLoader {
+        id: levelOsd
+
+        LevelOsd {}
+    }
+
+    Timer {
+        id: levelOsdUnload
+        onTriggered: levelOsd.active = false
+    }
+
+    function showLevel(kind: string, percent: int): void {
+        levelOsd.active = true
+        levelOsd.item.present(kind, percent)
+        levelOsdUnload.interval = levelOsd.item.hold + 350
+        levelOsdUnload.restart()
+    }
+
+    IpcHandler {
+        target: "osd"
+
+        function brightness(percent: int): void {
+            root.showLevel("brightness", percent)
+        }
+    }
+
+    Connections {
+        target: barBattery.item
+
+        function onWarn(percent) {
+            root.showLevel("battery", percent)
         }
     }
 

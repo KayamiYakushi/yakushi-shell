@@ -218,6 +218,10 @@ yakushi_bind("volume_up", "XF86AudioRaiseVolume", hl.dsp.exec_cmd("yakushi volum
 yakushi_bind("volume_down", "XF86AudioLowerVolume", hl.dsp.exec_cmd("yakushi volume down"), { locked = true, repeating = true })
 -- YAKUSHI_BIND volume_mute|Media|Mute
 yakushi_bind("volume_mute", "XF86AudioMute", hl.dsp.exec_cmd("yakushi volume mute"), { locked = true })
+-- YAKUSHI_BIND brightness_up|Media|Brightness Up
+yakushi_bind("brightness_up", "XF86MonBrightnessUp", hl.dsp.exec_cmd("yakushi brightness up"), { locked = true, repeating = true })
+-- YAKUSHI_BIND brightness_down|Media|Brightness Down
+yakushi_bind("brightness_down", "XF86MonBrightnessDown", hl.dsp.exec_cmd("yakushi brightness down"), { locked = true, repeating = true })
 -- YAKUSHI_BIND media_play|Media|Play / Pause
 yakushi_bind("media_play", "XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 -- YAKUSHI_BIND media_next|Media|Next Track

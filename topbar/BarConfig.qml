@@ -17,7 +17,7 @@ Item {
 
     readonly property var defaultOrder: [
         "workspaces", "ram", "cpu", "cpuTemp", "gpuTemp",
-        "date", "time", "media", "volume", "power"
+        "date", "time", "media", "volume", "network", "battery", "power"
     ]
     property var order: defaultOrder
     property var modules: ({
@@ -28,6 +28,8 @@ Item {
         gpuTemp: true,
         media: true,
         volume: true,
+        network: true,
+        battery: true,
         date: true,
         time: true,
         power: true
@@ -51,14 +53,28 @@ Item {
             visualizer = data.visualizer
 
         if (Array.isArray(data.order)) {
-            var seen = {}
             var list = []
 
-            data.order.concat(defaultOrder).forEach(function(key) {
-                if (defaultOrder.indexOf(key) >= 0 && !seen[key]) {
-                    seen[key] = true
+            data.order.forEach(function(key) {
+                if (defaultOrder.indexOf(key) >= 0 && list.indexOf(key) < 0)
                     list.push(key)
+            })
+
+            // a module the saved order does not know yet (added by an
+            // update) goes where the default order has it: right after the
+            // nearest module that comes before it there
+            defaultOrder.forEach(function(key, index) {
+                if (list.indexOf(key) >= 0)
+                    return
+                var at = 0
+                for (var i = index - 1; i >= 0; i--) {
+                    var before = list.indexOf(defaultOrder[i])
+                    if (before >= 0) {
+                        at = before + 1
+                        break
+                    }
                 }
+                list.splice(at, 0, key)
             })
 
             if (list.join() !== order.join())

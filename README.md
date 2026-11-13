@@ -67,6 +67,7 @@ and most of Settings work; the Settings pages that edit Hyprland itself
 | SUPER + ` | Power menu |
 | SUPER + Escape | What is running, and why |
 | SUPER + CTRL + Escape | Restart a frozen bar or Settings |
+| Volume and brightness keys | Change it, with a pill under the bar showing the new level |
 
 Settings opens with the cursor in its search field: type what you are
 looking for, in English or Turkish, typos and all ("curosr", "mouse imlecini
@@ -80,6 +81,13 @@ görüntüsü nasıl alınır") or keys ("super + c"), and the list also shows t
 keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
 shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
 System to see yourself on the lock screen.
+
+On a laptop the bar shows the battery (red from 15 %, the time left on
+hover; a pill warns at 15 % and at 5 %) and the Wi-Fi strength, or OFFLINE
+when the connection is gone; on a cable the network module stays out of the
+way. Both are modules like the others (Settings -> Appearance -> Top Bar).
+The battery needs `upower`, the brightness keys `brightnessctl`; a desktop
+loads neither.
 
 Adding a shortcut or a window that takes keys: give it words in
 `KeybindsSearch.js`; `scripts/check-keybinds.py` (run by the package build)
@@ -273,3 +281,4 @@ Every setting lives in one file, `~/.config/yakushi/config.json`
    (replacing hyprlock and hypridle)
 5. ✅ PKGBUILD (`packaging/`), next to the user install
 6. ✅ Ready for others: a starter Hyprland config and `yakushi setup-hyprland`
+7. ✅ Laptops: battery and Wi-Fi in the bar, a low battery warning, brightness keys

@@ -10,8 +10,8 @@ import "../"
 // The island: a notch hanging from the top edge of the screen, joined to
 // the edge by 45-degree shoulders, with cut lower corners (Theme.cut).
 // Modules are laid out in the order chosen in Settings -> Top Bar.
-// Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, the system
-// clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
+// Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, UPower,
+// NetworkManager, the system clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
 // seconds are shown).
 PanelWindow {
     id: win
@@ -21,6 +21,8 @@ PanelWindow {
     required property var clock
     required property var media
     required property var power    // shared: { requests } bumped by the shortcut
+    property var battery: null     // BatteryState, on a computer with a battery
+    property var network: null     // NetworkState, while its module is on
 
     readonly property var mods: config.modules
     readonly property int barHeight: 32
@@ -223,7 +225,7 @@ PanelWindow {
         ram: "sys", cpu: "sys", cpuTemp: "sys", gpuTemp: "sys",
         date: "clock", time: "clock",
         media: "media",
-        volume: "ctl", power: "ctl"
+        volume: "ctl", network: "ctl", battery: "ctl", power: "ctl"
     })
 
     function shows(key) {
@@ -237,6 +239,10 @@ PanelWindow {
             return media.trackText !== ""
         if (key === "volume")
             return sinkReady
+        if (key === "battery")
+            return battery !== null && battery.present
+        if (key === "network")
+            return network !== null && network.shown
         return true
     }
 
@@ -356,6 +362,35 @@ PanelWindow {
         }
     }
 
+    // Wi-Fi and its strength (the network's name on hover), or OFFLINE.
+    // On a cable there is nothing to say and the module is not shown.
+    Component {
+        id: cNetwork
+
+        BarModule {
+            interactive: true
+            icon: win.network ? win.network.glyph : ""
+            value: !win.network ? ""
+                : win.network.offline ? "OFFLINE"
+                : hovered ? win.network.name : ""
+            valueColor: win.network && win.network.offline ? Theme.alert : Theme.ink
+            maxValueWidth: 160
+            onClicked: win.run([Paths.shell + "/bin/yakushi", "settings", "network"])
+        }
+    }
+
+    // The charge; red when it runs low, the time left on hover.
+    Component {
+        id: cBattery
+
+        BarModule {
+            icon: win.battery ? win.battery.glyph : ""
+            value: !win.battery ? ""
+                : win.battery.percent + "%" + (hovered && win.battery.timeText !== "" ? "  ·  " + win.battery.timeText : "")
+            valueColor: win.battery && win.battery.low ? Theme.alert : Theme.ink
+        }
+    }
+
     Component {
         id: cPower
 
@@ -380,6 +415,8 @@ PanelWindow {
         time: cTime,
         media: cMedia,
         volume: cVolume,
+        network: cNetwork,
+        battery: cBattery,
         power: cPower
     })
 

@@ -10,7 +10,8 @@ Commands:
                               visualizer   hover | always | off
                               order        comma-separated module ids
                               module.<id>  on | off
-    sensors                 Print the CPU/GPU temperature files as JSON.
+    sensors                 Print the CPU/GPU temperature files and whether
+                            this computer has a battery, as JSON.
     init                    Create the config file if it is missing.
 
 Settings live in the "topbar" section of ~/.config/yakushi/config.json
@@ -35,6 +36,8 @@ MODULES = (
     "gpuTemp",
     "media",
     "volume",
+    "network",
+    "battery",
     "date",
     "time",
     "power",
@@ -51,6 +54,8 @@ DEFAULT_ORDER = [
     "time",
     "media",
     "volume",
+    "network",
+    "battery",
     "power",
 ]
 
@@ -74,6 +79,8 @@ CPU_DRIVERS = ("k10temp", "zenpower", "coretemp", "cpu_thermal")
 CPU_LABEL_PRIORITY = ("Tctl", "Package id 0", "Tdie", "CPU")
 GPU_DRIVERS = ("amdgpu", "radeon", "nouveau", "i915", "xe")
 GPU_LABEL_PRIORITY = ("edge", "junction", "mem")
+
+POWER_ROOT = Path("/sys/class/power_supply")
 
 
 def emit(obj: dict) -> None:
@@ -103,14 +110,22 @@ def on_off(raw: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def clean_order(items) -> list[str]:
-    """Known ids once each, in the given order; missing ones appended."""
+    """Known ids once each, in the given order. A module the saved order
+    does not know yet (added by an update) goes where the default order has
+    it: right after the nearest module that comes before it there."""
     order: list[str] = []
     for item in items:
         if item in MODULES and item not in order:
             order.append(item)
-    for item in DEFAULT_ORDER:
-        if item not in order:
-            order.append(item)
+    for index, item in enumerate(DEFAULT_ORDER):
+        if item in order:
+            continue
+        at = 0
+        for before in reversed(DEFAULT_ORDER[:index]):
+            if before in order:
+                at = order.index(before) + 1
+                break
+        order.insert(at, item)
     return order
 
 
@@ -150,7 +165,7 @@ def load() -> dict:
 # ---------------------------------------------------------------------------
 
 def get() -> None:
-    emit({"ok": True, **load()})
+    emit({"ok": True, **load(), "hasBattery": has_battery()})
 
 
 def set_value(key: str, raw: str) -> None:
@@ -239,11 +254,22 @@ def find_sensor(drivers, label_priority) -> str | None:
     return fallback
 
 
+def has_battery() -> bool:
+    """True when the computer itself runs on a battery (a laptop). The
+    battery of a wireless mouse or keyboard is listed in the same place,
+    marked `scope: Device`; that one does not count."""
+    for supply in POWER_ROOT.glob("*"):
+        if read_text(supply / "type") == "Battery" and read_text(supply / "scope") != "Device":
+            return True
+    return False
+
+
 def sensors() -> None:
     emit({
         "ok": True,
         "cpu": find_sensor(CPU_DRIVERS, CPU_LABEL_PRIORITY),
         "gpu": find_sensor(GPU_DRIVERS, GPU_LABEL_PRIORITY),
+        "battery": has_battery(),
     })
 
 

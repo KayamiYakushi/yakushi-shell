@@ -302,6 +302,19 @@ var INDEX = [
     { page: "Top Bar", find: ["Volume"], title: "Volume in the top bar", weight: 0.9, keys: {
         en: "volume sound", tr: "ses seviyesi", de: "lautstärke", es: "volumen", fr: "volume", pt: "volume",
         it: "volume", ru: "громкость", pl: "głośność" } },
+    { page: "Top Bar", find: ["Battery"], title: "Battery in the top bar", weight: 0.9, keys: {
+        en: "battery charge charging laptop power level percent", tr: "pil batarya şarj dizüstü laptop şarj seviyesi yüzde",
+        de: "akku batterie ladung laptop ladestand", es: "batería carga portátil nivel",
+        fr: "batterie charge ordinateur portable niveau", pt: "bateria carga notebook nível",
+        it: "batteria carica portatile livello", ru: "батарея аккумулятор заряд ноутбук",
+        pl: "bateria ładowanie laptop poziom" } },
+    { page: "Top Bar", find: ["Network"], title: "Wi-Fi in the top bar", weight: 0.9, keys: {
+        en: "wifi wi-fi wireless network signal strength offline internet connection",
+        tr: "wifi kablosuz ağ sinyal çekim gücü çevrimdışı internet bağlantı",
+        de: "wlan netzwerk signalstärke offline internet verbindung", es: "wifi red señal sin conexión internet",
+        fr: "wifi réseau signal hors ligne internet connexion", pt: "wifi rede sinal offline internet conexão",
+        it: "wifi rete segnale offline internet connessione", ru: "вайфай сеть сигнал офлайн интернет подключение",
+        pl: "wifi sieć sygnał offline internet połączenie" } },
     { page: "Top Bar", find: ["Power"], title: "Power button in the top bar", weight: 0.9, keys: {
         en: "power shutdown restart button", tr: "güç yeniden başlat düğme kapatma düğmesi",
         de: "ausschalten herunterfahren neustart", es: "apagar reiniciar energía",

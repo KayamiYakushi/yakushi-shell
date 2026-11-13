@@ -8,6 +8,7 @@
 #   yakushi settings [page]            Toggle Settings, or open it on a page
 #                                      (e.g. tasks, network, topbar).
 #   yakushi volume up|down|mute        Change the volume and show the pill.
+#   yakushi brightness up|down         Change the screen brightness and show the pill.
 #   yakushi bar show|hide|toggle       The top bar.
 #   yakushi launcher [clipboard]       The app launcher, or clipboard history.
 #   yakushi power                      The top bar's power menu.
@@ -257,6 +258,19 @@ case "$cmd" in
             *)    usage ;;
         esac
         ipc volumeOsd reveal ;;
+    brightness)
+        # a laptop's own screen (brightnessctl); nothing to do without one
+        case "${1:-}" in
+            up)   brightnessctl -q -c backlight set 5%+ || exit 1 ;;
+            down) brightnessctl -q -c backlight -n set 5%- || exit 1 ;;   # -n: never fully dark
+            show) ;;
+            *)    usage ;;
+        esac
+        # device,class,now,percent,max
+        level=$(brightnessctl -m -c backlight 2>/dev/null | head -n 1 | cut -d, -f4)
+        level=${level%\%}
+        case "$level" in ''|*[!0-9]*) exit 1 ;; esac
+        ipc osd brightness "$level" ;;
     bar)
         case "${1:-}" in
             show)   ipc topbar reveal ;;

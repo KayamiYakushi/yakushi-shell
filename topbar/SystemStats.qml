@@ -58,6 +58,9 @@ Item {
     property string cpuTempPath: ""
     property string gpuTempPath: ""
 
+    // a laptop: the shell loads the battery (UPower) only then
+    property bool hasBattery: false
+
     property real lastBusy: -1
     property real lastTotal: -1
 
@@ -140,7 +143,8 @@ Item {
         onLoaded: stats.gpuTemp = stats.readTemp(text())
     }
 
-    // Find the temperature sensors once (hwmon numbers change between boots).
+    // Find the temperature sensors once (hwmon numbers change between boots),
+    // and whether there is a battery.
     Process {
         running: true
         command: [
@@ -158,6 +162,7 @@ Item {
                         stats.cpuTempPath = data.cpu
                     if (data.gpu)
                         stats.gpuTempPath = data.gpu
+                    stats.hasBattery = data.battery === true
                 } catch (e) {
                 }
             }

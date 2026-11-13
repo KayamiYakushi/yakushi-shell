@@ -1,48 +1,20 @@
 import QtQuick
 import Quickshell
 import Quickshell.Services.Pipewire
-import Quickshell.Wayland
 
-// The little volume pill that drops in under the bar when you press the
-// volume keys. Click-through; the shell loads it on "ipc call volumeOsd
-// show" (yakushi volume ...) and frees it shortly after the last change.
-PanelWindow {
+// The volume pill: drops in under the bar when you press the volume keys.
+// The shell loads it on "ipc call volumeOsd reveal" (yakushi volume ...)
+// and frees it shortly after the last change.
+OsdPill {
     id: osd
-
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-
-    implicitHeight: 110
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    mask: Region {}
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "yakushi-osd"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     PwObjectTracker {
         objects: [Pipewire.defaultAudioSink]
     }
 
     readonly property var out: Pipewire.defaultAudioSink ? Pipewire.defaultAudioSink.audio : null
-    readonly property real level: out ? out.volume : 0
+    readonly property real volume: out ? out.volume : 0
     readonly property bool silent: out ? out.muted : false
-    property bool up: false
-
-    function poke() {
-        up = true
-        fade.restart()
-    }
-
-    Timer {
-        id: fade
-        interval: 1200
-        onTriggered: osd.up = false
-    }
 
     Connections {
         target: osd.out
@@ -50,84 +22,11 @@ PanelWindow {
         function onMutedChanged() { osd.poke() }
     }
 
-    readonly property color tone: silent ? Theme.alert : Theme.accent
-
-    Item {
-        id: pill
-
-        x: (osd.width - width) / 2
-        y: osd.up ? 46 : 34
-        width: 300
-        height: 46
-        opacity: osd.up ? 1 : 0
-        scale: osd.up ? 1 : 0.94
-
-        Behavior on y { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
-        Behavior on opacity { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
-        Behavior on scale { NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic } }
-
-        CutBox {
-            anchors.fill: parent
-            fill: "#eb050505"
-            stroke: "#12ffffff"
-        }
-
-        // speaker: inset evenly from the pill, its cuts parallel to the
-        // pill's (a 45-degree cut moved in by `inset` shrinks by
-        // inset * (2 - sqrt 2)), so it never reaches past the outline
-        Item {
-            id: dot
-
-            readonly property real inset: 6
-
-            x: inset
-            y: inset
-            width: pill.height - 2 * inset
-            height: pill.height - 2 * inset
-
-            CutBox {
-                anchors.fill: parent
-                fill: Theme.tint(osd.tone, 0.18)
-                cut: Theme.cut - dot.inset * (2 - Math.SQRT2)
-            }
-
-            Text {
-                textFormat: Text.PlainText
-                anchors.centerIn: parent
-                color: osd.tone
-                font.family: Theme.glyphs
-                font.pixelSize: 16
-                text: String.fromCodePoint(osd.silent || osd.level < 0.005 ? 0xF0581
-                    : osd.level < 0.34 ? 0xF057F
-                    : osd.level < 0.67 ? 0xF0580 : 0xF057E)
-            }
-        }
-
-        // level bar
-        SlantBar {
-            x: dot.x + dot.width + 14
-            y: (pill.height - height) / 2
-            width: readout.x - x - 12
-            height: 8
-            trackColor: "#1affffff"
-            value: osd.silent ? 0 : Math.min(1, osd.level)
-
-            Behavior on value { NumberAnimation { duration: 100 } }
-        }
-
-        Text {
-            id: readout
-
-            textFormat: Text.PlainText
-            x: pill.width - width - 16
-            y: (pill.height - height) / 2
-            width: 42
-            horizontalAlignment: Text.AlignRight
-            text: osd.silent ? "Muted" : Math.round(osd.level * 100) + "%"
-            color: osd.silent ? Theme.alert : Theme.ink
-            font.family: Theme.mono
-            font.pixelSize: 12
-            font.bold: true
-        }
-    }
+    tone: silent ? Theme.alert : Theme.accent
+    level: silent ? 0 : volume
+    text: silent ? "Muted" : Math.round(volume * 100) + "%"
+    textColor: silent ? Theme.alert : Theme.ink
+    glyph: String.fromCodePoint(silent || volume < 0.005 ? 0xF0581
+        : volume < 0.34 ? 0xF057F
+        : volume < 0.67 ? 0xF0580 : 0xF057E)
 }

@@ -8,6 +8,7 @@ Item {
 
     property string icon: ""
     property string label: ""
+    property string note: ""           // a quiet remark after the label
     property bool checked: false
     property bool available: true
 
@@ -34,16 +35,33 @@ Item {
     }
 
     Text {
+        id: labelText
+
         textFormat: Text.PlainText
         anchors.left: iconText.right
-        anchors.right: stateText.left
-        anchors.rightMargin: 8
         anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(implicitWidth, stateText.x - 8 - x)
         text: row.label
         elide: Text.ElideRight
         color: Theme.ink
         font.family: Theme.mono
         font.pixelSize: 12
+        font.letterSpacing: 1
+    }
+
+    Text {
+        textFormat: Text.PlainText
+        visible: row.note !== ""
+        anchors.left: labelText.right
+        anchors.leftMargin: 12
+        anchors.right: stateText.left
+        anchors.rightMargin: 8
+        anchors.baseline: labelText.baseline
+        text: row.note
+        elide: Text.ElideRight
+        color: Theme.inkMute
+        font.family: Theme.mono
+        font.pixelSize: 10
         font.letterSpacing: 1
     }
 

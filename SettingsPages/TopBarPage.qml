@@ -21,9 +21,10 @@ Item {
     property real barOpacity: 0.90
     property var modules: ({})
     property string visualizer: "hover"
+    property bool hasBattery: true      // false: the Battery row says there is none
     readonly property var defaultOrder: [
         "workspaces", "ram", "cpu", "cpuTemp", "gpuTemp",
-        "date", "time", "media", "volume", "power"
+        "date", "time", "media", "volume", "network", "battery", "power"
     ]
     property string status: ""
 
@@ -85,6 +86,8 @@ Item {
         { key: "gpuTemp",    label: "GPU temp",     icon: glyph(0xF08AE) },
         { key: "media",      label: "Now playing",  icon: glyph(0xF0387) },
         { key: "volume",     label: "Volume",       icon: glyph(0xF057E) },
+        { key: "network",    label: "Network",      icon: glyph(0xF0928), note: "Wi-Fi or offline; a cable shows nothing" },
+        { key: "battery",    label: "Battery",      icon: glyph(0xF0079) },
         { key: "date",       label: "Date",         icon: glyph(0xF00ED) },
         { key: "time",       label: "Time",         icon: glyph(0xF0150) },
         { key: "power",      label: "Power",        icon: glyph(0xF0425) }
@@ -106,6 +109,8 @@ Item {
             modules = data.modules
         if (typeof data.visualizer === "string")
             visualizer = data.visualizer
+        if (typeof data.hasBattery === "boolean")
+            hasBattery = data.hasBattery
         if (orderModel.count === 0)
             fillOrder(Array.isArray(data.order) ? data.order : defaultOrder)
         loaded = true
@@ -294,6 +299,8 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         icon: moduleRow.info.icon
                         label: moduleRow.info.label
+                        note: moduleRow.key === "battery" && !page.hasBattery ? "this computer has none"
+                            : moduleRow.info.note || ""
                         checked: page.modules[moduleRow.key] !== false
                         available: page.loaded
                         onToggled: page.setModule(moduleRow.key, !checked)

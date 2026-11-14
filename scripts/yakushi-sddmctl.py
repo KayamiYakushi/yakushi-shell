@@ -6,9 +6,10 @@
     yakushi-sddmctl.py reset [--password-stdin]
     yakushi-sddmctl.py sync [--password-stdin]
 
-set / reset: the background. sync: the shell's accent, 12/24 h clock and
-your profile picture, copied into the theme (the greeter runs as the sddm
-user and cannot read your home).
+set / reset: the background. sync: the shell's accent, 12/24 h clock, your
+profile picture and your mouse cursor, copied for the login screen (the
+greeter runs as the sddm user and cannot read your home; the cursor becomes
+the system theme Yakushi-Login).
 
 Every picture is turned into a clean PNG here, as you: an image from the
 internet is never opened as root. Only that PNG goes to the small root
@@ -40,6 +41,7 @@ LOOK = THEME_DIR / "theme.conf.user"
 HELPERS = (Path("/usr/lib/yakushi-shell/yakushi-sddmctl"), Path("/usr/local/libexec/yakushi-sddmctl"))
 ROOT_HELPER = next((h for h in HELPERS if h.is_file()), HELPERS[0])
 CAN_SYNC = ROOT_HELPER == HELPERS[0] and ROOT_HELPER.is_file()
+CURSOR_CONF = Path("/etc/sddm.conf.d/yakushi-cursor.conf")
 ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_BYTES = 100 * 1024 * 1024
 HERE = paths.SCRIPTS
@@ -48,6 +50,31 @@ sys.dont_write_bytecode = True
 _spec = importlib.util.spec_from_file_location("yakushi_taskctl", HERE / "yakushi-taskctl.py")
 tasks = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(tasks)
+
+
+def load(name):
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), HERE / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def helper_copies_cursor():
+    """an installed helper from before the cursor was copied takes no cursor"""
+    try:
+        return b"Yakushi-Login" in ROOT_HELPER.read_bytes()
+    except OSError:
+        return False
+
+
+def shell_cursor():
+    """(the XCursor folder of the cursor in use or None, its size, its name)"""
+    cur = load("yakushi-cursorctl")
+    theme = cur.theme_by_id(cur.current())
+    folder = Path(theme["path"]) / "cursors" if theme else None
+    if folder is None or not folder.is_dir():
+        return None, 24, ""
+    return folder.resolve(), min(128, max(8, cur.size())), theme["name"]
 
 
 def emit(ok=True, **values):
@@ -133,6 +160,7 @@ def status():
         accent=current["accent"],
         clock24=current["clock24"],
         avatar=AVATAR.as_uri() if avatar else "",
+        cursor=CURSOR_CONF.is_file(),
         message="Yakushi SDDM theme is ready." if installed else "Yakushi SDDM theme is not installed.",
     )
 
@@ -194,8 +222,19 @@ def main():
 
         picture = config.PROFILE_PICTURE
         png = clean_png(picture, "sddm-avatar.png", "512x512") if picture.is_file() else None
+        look_args = ["set-look", accent, clock, user, png or "-"]
+        note = ""
+        cursor = False
+        if helper_copies_cursor():
+            folder, size, name = shell_cursor()
+            look_args += [folder or "-", size]
+            cursor = folder is not None
+            if not cursor:
+                note = " Your cursor theme has no XCursor files, so the login screen keeps the system cursor."
+        else:
+            note = " Update the yakushi-shell package to copy your cursor too."
         try:
-            run_root("set-look", accent, clock, user, png or "-")
+            run_root(*look_args)
         finally:
             if png:
                 png.unlink(missing_ok=True)
@@ -204,7 +243,8 @@ def main():
             accent=accent,
             clock24=clock == "24",
             avatar=AVATAR.as_uri() if png else "",
-            message="The login screen now matches the shell. It shows on the next SDDM login.",
+            cursor=cursor,
+            message="The login screen now matches the shell. It shows on the next SDDM login." + note,
         )
         return
 

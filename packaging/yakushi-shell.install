@@ -16,5 +16,5 @@ MSG
 
 post_upgrade() {
     echo "==> Run 'yakushi restart' to load the new version (the lock screen picks it up on its next start)."
-    echo "==> The login screen (SDDM) changes on the next login; Settings -> Login Screen -> MATCH THE SHELL copies your accent, clock and picture into it."
+    echo "==> The login screen (SDDM) changes on the next login; Settings -> Login Screen -> MATCH THE SHELL copies your accent, clock, picture and cursor into it."
 }

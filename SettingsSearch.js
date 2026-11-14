@@ -341,7 +341,7 @@ var INDEX = [
 
     // ---- Login Screen
     { page: "Login Screen", find: ["MATCH THE SHELL"], title: "Login screen (SDDM)", keys: {
-        en: "login screen sddm greeter sign in log in login background",
+        en: "login screen sddm greeter sign in log in login background cursor",
         tr: "giriş ekranı oturum açma karşılama arka plan", de: "anmeldebildschirm anmeldung hintergrund",
         es: "pantalla de inicio de sesión fondo", fr: "écran de connexion fond", pt: "tela de login fundo",
         it: "schermata di accesso sfondo", ru: "экран входа фон", pl: "ekran logowania tło" } },

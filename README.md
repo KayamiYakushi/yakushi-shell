@@ -97,8 +97,9 @@ The login screen is the lock screen's twin: the package installs it as the
 SDDM theme `yakushi` (`sddm/` here). Turn it on once with
 `printf '[Theme]\nCurrent=yakushi\n' | sudo tee /etc/sddm.conf.d/yakushi-theme.conf`,
 then press MATCH THE SHELL in Settings -> Environment -> Login Screen: it copies your
-accent, 12/24 h clock and profile picture into the theme (the login screen
-runs as the `sddm` user and cannot read your home). The background is chosen
+accent, 12/24 h clock and profile picture into the theme, and your mouse
+cursor into `/usr/share/icons/Yakushi-Login` (the login screen runs as the
+`sddm` user and cannot read your home; press it again after changing one). The background is chosen
 on the same page. Try the theme without logging out:
 `sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/yakushi`.
 

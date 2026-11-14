@@ -507,7 +507,7 @@ Item {
         }
 
         Note {
-            text: "Pictures are made into clean PNGs as you (never opened as root), then copied into the system SDDM theme with your password. Your files stay untouched. MATCH THE SHELL copies your accent, 12/24 h clock and profile picture: the login screen cannot read your home."
+            text: "Pictures are made into clean PNGs as you (never opened as root), then copied into the system SDDM theme with your password. Your files stay untouched. MATCH THE SHELL copies your accent, 12/24 h clock, profile picture and mouse cursor: the login screen cannot read your home. Press it again after you change one of them."
         }
     }
 }

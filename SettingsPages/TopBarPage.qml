@@ -434,6 +434,45 @@ Item {
                     ? page.status
                     : "Super + Shift + W hides or shows the bar."
             }
+
+            Divider {}
+
+            // ---------------- Privacy dots ----------------
+            SectionHead { text: "PRIVACY DOTS" }
+
+            Repeater {
+                model: [
+                    { tone: Theme.alert, text: "Red: your screen is being recorded or shared." },
+                    { tone: Theme.good, text: "Green: a program is listening to your microphone." }
+                ]
+
+                delegate: Row {
+                    id: legend
+
+                    required property var modelData
+
+                    spacing: 10
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 5
+                        height: 5
+                        color: legend.modelData.tone
+                    }
+
+                    Text {
+                        textFormat: Text.PlainText
+                        text: legend.modelData.text
+                        color: Theme.inkSoft
+                        font.family: Theme.mono
+                        font.pixelSize: 11
+                    }
+                }
+            }
+
+            Note {
+                text: "The last two small dots between the bar's groups light up by themselves; both can be lit at once. They are always on and cannot be switched off. A screenshot does not light the red one."
+            }
         }
     }
 }

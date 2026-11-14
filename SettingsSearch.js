@@ -254,6 +254,16 @@ var INDEX = [
         de: "obere leiste leiste transparenz", es: "barra superior transparencia",
         fr: "barre supérieure transparence", pt: "barra superior transparência",
         it: "barra superiore trasparenza", ru: "верхняя панель прозрачность", pl: "górny pasek przezroczystość" } },
+    { page: "Top Bar", find: ["PRIVACY DOTS"], title: "Privacy dots (screen recorded, microphone heard)", keys: {
+        en: "privacy dots red dot green dot indicator screen recording sharing microphone mic listening",
+        tr: "gizlilik noktaları kırmızı nokta yeşil nokta ekran kaydı paylaşımı mikrofon dinleniyor",
+        de: "privatsphäre punkte roter punkt grüner punkt bildschirmaufnahme mikrofon",
+        es: "privacidad puntos punto rojo punto verde grabación de pantalla micrófono",
+        fr: "confidentialité points point rouge point vert enregistrement écran microphone",
+        pt: "privacidade pontos ponto vermelho ponto verde gravação de tela microfone",
+        it: "privacy punti punto rosso punto verde registrazione schermo microfono",
+        ru: "приватность точки красная точка зелёная точка запись экрана микрофон",
+        pl: "prywatność kropki czerwona kropka zielona kropka nagrywanie ekranu mikrofon" } },
     { page: "Top Bar", find: ["24-hour clock"], title: "24-hour clock", keys: {
         en: "clock 24 hour 12 hour am pm time format", tr: "saat 24 saat 12 saat biçimi",
         de: "uhr 24 stunden zeitformat", es: "reloj 24 horas formato de hora", fr: "horloge 24 heures format de l'heure",

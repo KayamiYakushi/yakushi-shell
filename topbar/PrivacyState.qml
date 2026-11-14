@@ -1,4 +1,3 @@
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Services.Pipewire
 import QtQuick
@@ -23,37 +22,18 @@ Item {
     visible: false
 
     // ---- microphone
-    readonly property var micStreams: {
-        var out = []
+    // One yes or no, worked out again only when PipeWire makes or drops a
+    // link; the bar hears of it only when the answer changes.
+    readonly property bool mic: {
         var groups = Pipewire.linkGroups.values
         for (var i = 0; i < groups.length; i++) {
             var from = groups[i].source
             var to = groups[i].target
-            if (!from || !to || from.isStream || from.isSink || !to.isStream)
-                continue
-            if ((from.type & PwNodeType.Audio) && out.indexOf(to) < 0)
-                out.push(to)
+            if (from && to && to.isStream && !from.isStream && !from.isSink
+                    && (from.type & PwNodeType.Audio))
+                return true
         }
-        return out
-    }
-
-    readonly property bool mic: micStreams.length > 0
-
-    // who is listening, for the hover text
-    readonly property string micApps: {
-        var names = []
-        for (var i = 0; i < micStreams.length; i++) {
-            var node = micStreams[i]
-            var name = (node.properties && node.properties["application.name"]) || node.description || node.name || ""
-            if (name !== "" && names.indexOf(name) < 0)
-                names.push(name)
-        }
-        return names.join(", ")
-    }
-
-    // a stream tells its program's name only while it is tracked
-    PwObjectTracker {
-        objects: privacy.micStreams
+        return false
     }
 
     // ---- screen
@@ -84,11 +64,13 @@ Item {
         if (cut < 0)
             return
         var on = data.substring(0, cut) === "1"
-        var what = data.substring(cut + 1)
         if (name === "screencast") {
-            castPlain = on
+            // said again, with the name, by the event that follows it
+            if (!namedEvents)
+                castPlain = on
             return
         }
+        var what = data.substring(cut + 1)
         namedEvents = true
         var next = casts.filter(function(entry) { return entry !== what })
         if (on)

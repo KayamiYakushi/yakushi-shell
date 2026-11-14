@@ -553,10 +553,17 @@ PanelWindow {
                     }
                 }
 
-                // Only on a bar too bare to have two dots between its groups.
-                PrivacyDots {
-                    privacy: win.ownMarks ? win.privacy : null
-                    barHeight: win.barHeight
+                // Only on a bar too bare to have two dots between its groups;
+                // by file, so the usual bar never even compiles it.
+                Loader {
+                    active: win.ownMarks && win.privacy !== null
+                    height: win.barHeight
+                    source: "PrivacyDots.qml"
+
+                    onLoaded: {
+                        item.barHeight = win.barHeight
+                        item.privacy = Qt.binding(function() { return win.privacy })
+                    }
                 }
             }
         }

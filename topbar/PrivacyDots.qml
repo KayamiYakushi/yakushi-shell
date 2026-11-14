@@ -6,13 +6,14 @@ import "../"
 // small marks at the end of the island, red while the screen is being
 // recorded or shared, green while a program listens to the microphone
 // (PrivacyState.qml). With neither there is nothing here, not even a gap.
-// Hover a mark to read what it means and who it is. Nothing animates while
-// they are lit: they fade in and then stand still.
+// Hover a mark to read what it means. Nothing animates while they are lit:
+// they fade in and then stand still. The bar loads this file only when it
+// needs it.
 Item {
     id: dots
 
-    required property var privacy
-    required property int barHeight
+    property var privacy: null      // set by the bar once this is loaded
+    property int barHeight: 32
 
     readonly property bool screenOn: privacy !== null && privacy.screen
     readonly property bool micOn: privacy !== null && privacy.mic
@@ -144,7 +145,6 @@ Item {
             lit: dots.micOn
             tone: Theme.good
             label: "MIC"
-            detail: dots.privacy ? dots.privacy.micApps : ""
         }
     }
 }

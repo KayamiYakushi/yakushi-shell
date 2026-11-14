@@ -9,7 +9,9 @@ import "../"
 
 // The island: a notch hanging from the top edge of the screen, joined to
 // the edge by 45-degree shoulders, with cut lower corners (Theme.cut).
-// Modules are laid out in the order chosen in Settings -> Top Bar.
+// Modules are laid out in the order chosen in Settings -> Top Bar; after
+// them two marks light up while the screen is recorded or the microphone
+// is heard (PrivacyDots.qml).
 // Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, UPower,
 // NetworkManager, the system clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
 // seconds are shown).
@@ -23,6 +25,7 @@ PanelWindow {
     required property var power    // shared: { requests } bumped by the shortcut
     property var battery: null     // BatteryState, on a computer with a battery
     property var network: null     // NetworkState, while its module is on
+    property var privacy: null     // PrivacyState: is the screen watched, the microphone heard
 
     readonly property var mods: config.modules
     readonly property int barHeight: 32
@@ -521,6 +524,13 @@ PanelWindow {
                             value: island.x + win.ear + content.x + slot.x + slot.lead + loader.width / 2
                         }
                     }
+                }
+
+                // Always last and not one of the modules: it cannot be
+                // switched off or moved, and it takes no room while dark.
+                PrivacyDots {
+                    privacy: win.privacy
+                    barHeight: win.barHeight
                 }
             }
         }

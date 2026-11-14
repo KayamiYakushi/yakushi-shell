@@ -82,6 +82,12 @@ keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
 shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
 System to see yourself on the lock screen.
 
+Two small marks light up at the end of the bar: red while the screen is
+being recorded or shared (not for a screenshot), green while a program
+listens to the microphone. Hover one to read who. They are not modules:
+they cannot be switched off, and take no room while dark. A recording that
+was already running when the shell started shows from its next start on.
+
 On a laptop the bar shows the battery (red from 15 %, the time left on
 hover; a pill warns at 15 % and at 5 %) and the Wi-Fi strength, or OFFLINE
 when the connection is gone; on a cable the network module stays out of the

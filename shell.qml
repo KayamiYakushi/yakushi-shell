@@ -65,6 +65,12 @@ ShellRoot {
         source: "topbar/NetworkState.qml"
     }
 
+    // Is the screen being recorded, the microphone heard: the two marks at
+    // the end of the bar.
+    PrivacyState {
+        id: barPrivacy
+    }
+
     // Bumped by the power shortcut (IPC); the bar on the focused monitor
     // opens its power menu.
     QtObject {
@@ -100,6 +106,7 @@ ShellRoot {
                 power: barPower
                 battery: barBattery.item
                 network: barNetwork.item
+                privacy: barPrivacy
             }
         }
     }

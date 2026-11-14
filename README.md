@@ -82,10 +82,11 @@ keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
 shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
 System to see yourself on the lock screen.
 
-Two small marks light up at the end of the bar: red while the screen is
-being recorded or shared (not for a screenshot), green while a program
-listens to the microphone. Hover one to read who. They are not modules:
-they cannot be switched off, and take no room while dark. A recording that
+The last two dots between the bar's module groups are also its privacy
+marks: one turns red while the screen is being recorded or shared (not for
+a screenshot), the other green while a program listens to the microphone.
+They cannot be switched off; a bar with fewer than two dots gets two small
+marks at its end instead. A recording that
 was already running when the shell started shows from its next start on.
 
 On a laptop the bar shows the battery (red from 15 %, the time left on

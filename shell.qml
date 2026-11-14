@@ -65,8 +65,8 @@ ShellRoot {
         source: "topbar/NetworkState.qml"
     }
 
-    // Is the screen being recorded, the microphone heard: the two marks at
-    // the end of the bar.
+    // Is the screen being recorded, the microphone heard: two of the bar's
+    // dots light up.
     PrivacyState {
         id: barPrivacy
     }

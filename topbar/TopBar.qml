@@ -9,9 +9,9 @@ import "../"
 
 // The island: a notch hanging from the top edge of the screen, joined to
 // the edge by 45-degree shoulders, with cut lower corners (Theme.cut).
-// Modules are laid out in the order chosen in Settings -> Top Bar; after
-// them two marks light up while the screen is recorded or the microphone
-// is heard (PrivacyDots.qml).
+// Modules are laid out in the order chosen in Settings -> Top Bar; the
+// last two dots between them turn red while the screen is recorded and
+// green while the microphone is heard.
 // Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, UPower,
 // NetworkManager, the system clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
 // seconds are shown).
@@ -257,6 +257,24 @@ PanelWindow {
         return list
     }
 
+    // The faint dots between module groups double as the privacy marks: the
+    // last two light up, red while the screen is recorded or shared, green
+    // while a program listens to the microphone (PrivacyState.qml). A bar
+    // with fewer than two of them gets marks of its own at its end instead
+    // (PrivacyDots.qml), so the warning can never be arranged away.
+    readonly property var separators: {
+        var list = []
+        for (var i = 1; i < visibleKeys.length; i++)
+            if (categories[visibleKeys[i - 1]] !== categories[visibleKeys[i]])
+                list.push(i)
+        return list
+    }
+    readonly property bool ownMarks: separators.length < 2
+    readonly property int screenSep: ownMarks ? -1 : separators[separators.length - 2]
+    readonly property int micSep: ownMarks ? -1 : separators[separators.length - 1]
+    readonly property bool screenLit: privacy !== null && privacy.screen
+    readonly property bool micLit: privacy !== null && privacy.mic
+
     // -------------------------
     // Module components
     // -------------------------
@@ -496,13 +514,22 @@ PanelWindow {
                         width: lead + (loader.item ? loader.item.implicitWidth : 0)
                         height: win.barHeight
 
+                        // lit: this dot is one of the two privacy marks, and on
+                        readonly property bool lit: (win.screenLit && index === win.screenSep)
+                            || (win.micLit && index === win.micSep)
+
                         Rectangle {
                             visible: slot.separated
                             x: slot.lead / 2 - width / 2
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 3
-                            height: 3
-                            color: Theme.tint(Theme.ink, 0.22)
+                            width: slot.lit ? 4 : 3
+                            height: width
+                            color: !slot.lit ? Theme.tint(Theme.ink, 0.22)
+                                : slot.index === win.screenSep ? Theme.alert : Theme.good
+
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.tSlow }
+                            }
                         }
 
                         Loader {
@@ -526,10 +553,9 @@ PanelWindow {
                     }
                 }
 
-                // Always last and not one of the modules: it cannot be
-                // switched off or moved, and it takes no room while dark.
+                // Only on a bar too bare to have two dots between its groups.
                 PrivacyDots {
-                    privacy: win.privacy
+                    privacy: win.ownMarks ? win.privacy : null
                     barHeight: win.barHeight
                 }
             }

@@ -1,7 +1,9 @@
 import QtQuick
 import "../"
 
-// Two small marks at the end of the island: red while the screen is being
+// The privacy marks for a bar with fewer than two dots between its module
+// groups (otherwise those dots light up themselves, see TopBar.qml): two
+// small marks at the end of the island, red while the screen is being
 // recorded or shared, green while a program listens to the microphone
 // (PrivacyState.qml). With neither there is nothing here, not even a gap.
 // Hover a mark to read what it means and who it is. Nothing animates while

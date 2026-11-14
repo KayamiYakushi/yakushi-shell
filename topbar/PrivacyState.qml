@@ -4,7 +4,7 @@ import Quickshell.Services.Pipewire
 import QtQuick
 
 // Is something watching the screen or listening to the microphone? For the
-// two marks at the end of the bar (PrivacyDots.qml). Nothing polls: PipeWire
+// two dots in the bar that light up (TopBar.qml). Nothing polls: PipeWire
 // reports its links, Hyprland says when a screen or window is being copied.
 //
 // Microphone: a program's stream that PipeWire has linked to a real input (a

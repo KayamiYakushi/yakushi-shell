@@ -85,9 +85,9 @@ System to see yourself on the lock screen.
 The last two dots between the bar's module groups are also its privacy
 marks: one turns red while the screen is being recorded or shared (not for
 a screenshot), the other green while a program listens to the microphone.
-They cannot be switched off (Settings -> Appearance -> Top Bar says what
-they mean); a bar with fewer than two dots gets two small marks at its end
-instead. A recording that
+Settings -> Appearance -> Top Bar says what they mean and switches them
+off (Privacy dots; nothing of it runs then). A bar with fewer than two dots
+gets two small marks at its end instead. A recording that
 was already running when the shell started shows from its next start on.
 
 On a laptop the bar shows the battery (red from 15 %, the time left on

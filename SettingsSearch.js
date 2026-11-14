@@ -254,7 +254,7 @@ var INDEX = [
         de: "obere leiste leiste transparenz", es: "barra superior transparencia",
         fr: "barre supérieure transparence", pt: "barra superior transparência",
         it: "barra superiore trasparenza", ru: "верхняя панель прозрачность", pl: "górny pasek przezroczystość" } },
-    { page: "Top Bar", find: ["PRIVACY DOTS"], title: "Privacy dots (screen recorded, microphone heard)", keys: {
+    { page: "Top Bar", find: ["Privacy dots"], title: "Privacy dots (screen recorded, microphone heard)", keys: {
         en: "privacy dots red dot green dot indicator screen recording sharing microphone mic listening",
         tr: "gizlilik noktaları kırmızı nokta yeşil nokta ekran kaydı paylaşımı mikrofon dinleniyor",
         de: "privatsphäre punkte roter punkt grüner punkt bildschirmaufnahme mikrofon",

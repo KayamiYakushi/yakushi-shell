@@ -25,7 +25,7 @@ PanelWindow {
     required property var power    // shared: { requests } bumped by the shortcut
     property var battery: null     // BatteryState, on a computer with a battery
     property var network: null     // NetworkState, while its module is on
-    property var privacy: null     // PrivacyState: is the screen watched, the microphone heard
+    property var privacy: null     // PrivacyState (screen watched, microphone heard), while it is on
 
     readonly property var mods: config.modules
     readonly property int barHeight: 32
@@ -261,7 +261,7 @@ PanelWindow {
     // last two light up, red while the screen is recorded or shared, green
     // while a program listens to the microphone (PrivacyState.qml). A bar
     // with fewer than two of them gets marks of its own at its end instead
-    // (PrivacyDots.qml), so the warning can never be arranged away.
+    // (PrivacyDots.qml), so the warning is not lost by rearranging the bar.
     readonly property var separators: {
         var list = []
         for (var i = 1; i < visibleKeys.length; i++)

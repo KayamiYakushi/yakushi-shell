@@ -9,7 +9,7 @@ Commands:
                               opacity      0.40 .. 1.00
                               visualizer   hover | always | off
                               order        comma-separated module ids
-                              module.<id>  on | off
+                              module.<id>  on | off   (privacy: the red / green dots)
     sensors                 Print the CPU/GPU temperature files and whether
                             this computer has a battery, as JSON.
     init                    Create the config file if it is missing.
@@ -41,6 +41,7 @@ MODULES = (
     "date",
     "time",
     "power",
+    "privacy",      # the two dots that light up; it has no place of its own in the order
 )
 
 # Default left-to-right order on the island
@@ -115,7 +116,7 @@ def clean_order(items) -> list[str]:
     it: right after the nearest module that comes before it there."""
     order: list[str] = []
     for item in items:
-        if item in MODULES and item not in order:
+        if item in DEFAULT_ORDER and item not in order:
             order.append(item)
     for index, item in enumerate(DEFAULT_ORDER):
         if item in order:

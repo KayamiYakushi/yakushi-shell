@@ -32,7 +32,8 @@ Item {
         battery: true,
         date: true,
         time: true,
-        power: true
+        power: true,
+        privacy: true      // the red / green dots; not in the order, it has no place of its own
     })
 
     function reload() {

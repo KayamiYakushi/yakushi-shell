@@ -66,9 +66,12 @@ ShellRoot {
     }
 
     // Is the screen being recorded, the microphone heard: two of the bar's
-    // dots light up.
-    PrivacyState {
+    // dots light up. Switched off in Settings -> Top Bar, nothing of it runs.
+    Loader {
         id: barPrivacy
+
+        active: barConfig.modules.privacy
+        source: "topbar/PrivacyState.qml"
     }
 
     // Bumped by the power shortcut (IPC); the bar on the focused monitor
@@ -106,7 +109,7 @@ ShellRoot {
                 power: barPower
                 battery: barBattery.item
                 network: barNetwork.item
-                privacy: barPrivacy
+                privacy: barPrivacy.item
             }
         }
     }

@@ -20,6 +20,15 @@ What it writes, only while colours are on:
     and one @import line, between yakushi markers, at the top of gtk.css
     in both folders. Whatever else you keep in gtk.css is left alone; off
     removes exactly what was added.
+    The GTK 3 sheet also draws the file dialog (the "save as" window of
+    Discord, browsers...) like Files: same tint, opacity and accent. For it
+    the GTK theme "Adwaita-dark" is renamed "Adwaita" when no such theme is
+    installed: GTK 3 would otherwise show the dialog in light Adwaita.
+    When Files (Nautilus 47+) is installed it also becomes the "open / save"
+    dialog of other apps, so they get its grid of large previews:
+    ~/.local/share/xdg-desktop-portal/portals/nautilus.portal and
+    ~/.config/xdg-desktop-portal/<desktop>-portals.conf (only if you have
+    none of your own there). Off removes both.
     ~/.local/share/icons/Yakushi-Folders: Adwaita's folder icons in the
     accent colour (Adwaita draws them blue, and CSS cannot reach into an
     icon), everything else inherited from Adwaita; made the GTK icon theme
@@ -66,7 +75,8 @@ GOOD = "#2ee6a0"
 WARN = "#ffc857"
 
 # window classes of the GTK file managers the opacity applies to
-FILE_MANAGERS_GTK4 = (".nautilus-window",)
+# (.nautilus-file-chooser: Files answering an app's "open / save" dialog)
+FILE_MANAGERS_GTK4 = (".nautilus-window", ".nautilus-file-chooser")
 FILE_MANAGERS_GTK3 = (".nemo-window", ".thunar")
 
 
@@ -175,6 +185,100 @@ def gtk4_css(acc: str, opacity: float) -> str:
     return "\n".join(out) + "\n"
 
 
+def chooser_css(acc: str, opacity: float) -> str:
+    """The GTK 3 file dialog (the one apps show through the portal to open or
+    save a file) drawn like Files: same tint and opacity, same accent, the
+    soft tiles of libadwaita. GTK 3 has no CSS variables, and Adwaita's GTK 3
+    colours are fixed, so every part is spelled out."""
+    fg = readable_on(acc)
+
+    def white(alpha: float) -> str:
+        return rgba("#ffffff", alpha)
+
+    window = rgba(SURFACE, opacity) if opacity < 1.0 else SURFACE
+    clear = ", ".join(f"filechooser {part}" for part in (
+        "paned", "scrolledwindow", "viewport", "stack", "box", "list", "frame", "border",
+        ".view", "treeview.view", "placessidebar", "actionbar", "actionbar > revealer > box",
+        ".action-bar", ".search-bar", "header", "#pathbarbox"))
+    button = "dialog headerbar button, filechooser button"
+    entry = "dialog headerbar entry, filechooser entry"
+    row = "filechooser placessidebar row"
+    tree = "filechooser treeview.view"
+    rules = [
+        # the window: one tint, everything on top of it clear (alphas would add up)
+        f"dialog.background.csd:not(.message-dialog), filechooser {{ color: {INK}; }}",
+        f"dialog.background.csd:not(.message-dialog) {{ background-color: {window}; }}",
+        "dialog headerbar, dialog headerbar:backdrop, dialog .dialog-vbox, filechooser, "
+        f"{clear} {{ background-color: transparent; background-image: none; "
+        "border-color: transparent; box-shadow: none; }",
+        f"dialog headerbar {{ color: {INK}; padding: 6px; }}",
+        f"dialog headerbar .title {{ color: {INK}; }}",
+
+        # sidebar: a faint lighter pane, as in Files
+        f"filechooser placessidebar {{ background-color: {white(0.03)}; border-style: none; }}",
+        # Adwaita widens the divider's grab area with padding: colour the 1 px line only
+        "filechooser paned > separator { background-color: transparent; "
+        f"background-image: image({rgba('#000000', 0.36)}); }}",
+        f"{row} {{ margin: 1px 6px; padding: 0 4px; min-height: 34px; border-radius: 6px; color: {INK}; }}",
+        f"{row}:hover {{ background-color: {white(0.07)}; }}",
+        f"{row}:selected {{ background-color: {white(0.10)}; color: {INK}; }}",
+        f"{row}:selected:hover {{ background-color: {white(0.13)}; }}",
+        f"{row} image, {row} label, {row}:selected image, {row}:selected label {{ color: {INK}; }}",
+        f"{row}:disabled label, {row}:disabled image {{ color: {white(0.4)}; }}",
+        f"filechooser placessidebar separator {{ background-color: {white(0.10)}; margin: 6px 8px; min-height: 1px; }}",
+
+        # the list
+        f"{tree} {{ color: {INK}; border-style: none; }}",
+        f"{tree}:hover {{ background-color: {white(0.04)}; }}",
+        f"{tree}:selected, {tree}:selected:focus, {tree}:selected:hover "
+        f"{{ background-color: {rgba(acc, 0.30)}; color: {INK}; }}",
+        f"{tree}.separator {{ color: {white(0.08)}; }}",
+        f"{tree} header button, {tree} header button:hover, {tree} header button:active "
+        f"{{ background-color: transparent; background-image: none; border-style: none; box-shadow: none; "
+        f"border-radius: 0; padding: 4px 6px; color: {white(0.55)}; font-weight: bold; }}",
+        f"{tree} header button:hover {{ color: {INK}; }}",
+        f"filechooser .dim-label, filechooser label.dim-label {{ color: {white(0.55)}; opacity: 1; }}",
+
+        # buttons and fields: libadwaita's soft tiles
+        f"{button} {{ background-color: {white(0.10)}; background-image: none; border-style: none; "
+        f"box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; border-radius: 9px; "
+        f"padding: 4px 10px; min-height: 26px; color: {INK}; }}",
+        f"{button}:hover {{ background-color: {white(0.15)}; }}",
+        f"{button}:active, {button}:checked {{ background-color: {white(0.24)}; }}",
+        f"{button}:disabled {{ background-color: {white(0.05)}; color: {white(0.4)}; }}",
+        f"{button} label, {button} image {{ color: inherit; }}",
+        f"dialog headerbar button.suggested-action {{ background-color: {acc}; color: {fg}; font-weight: bold; }}",
+        f"dialog headerbar button.suggested-action:hover {{ background-color: shade({acc}, 1.08); }}",
+        f"dialog headerbar button.suggested-action:active {{ background-color: shade({acc}, 0.90); }}",
+        f"dialog headerbar button.suggested-action:disabled {{ background-color: {rgba(acc, 0.35)}; color: {rgba(fg, 0.6)}; }}",
+        f"dialog headerbar button.destructive-action {{ background-color: {ALERT}; color: #ffffff; }}",
+        f"{entry} {{ background-color: {white(0.10)}; background-image: none; border-style: none; "
+        f"box-shadow: none; border-radius: 9px; min-height: 34px; padding: 0 10px; "
+        f"color: {INK}; caret-color: {INK}; }}",
+        f"{entry}:focus {{ box-shadow: inset 0 0 0 2px {rgba(acc, 0.65)}; }}",
+        f"{entry} image {{ color: {white(0.7)}; }}",
+        f"dialog headerbar entry selection, filechooser entry selection, filechooser label selection "
+        f"{{ background-color: {rgba(acc, 0.45)}; color: {INK}; }}",
+
+        # the path: one bar, as the location bar of Files
+        "filechooser .path-bar button { border-radius: 0; margin: 0; padding: 4px 10px; "
+        f"background-color: {white(0.08)}; }}",
+        f"filechooser .path-bar button:hover {{ background-color: {white(0.14)}; }}",
+        f"filechooser .path-bar button:checked {{ background-color: {white(0.08)}; font-weight: bold; }}",
+        "filechooser .path-bar button:first-child { border-radius: 9px 0 0 9px; }",
+        "filechooser .path-bar button:last-child { border-radius: 0 9px 9px 0; }",
+        "filechooser .path-bar button:only-child { border-radius: 9px; }",
+
+        # scrollbars
+        "filechooser scrollbar { background-color: transparent; border-style: none; }",
+        f"filechooser scrollbar slider {{ background-color: {white(0.30)}; border-radius: 99px; min-width: 6px; min-height: 6px; }}",
+        f"filechooser scrollbar slider:hover {{ background-color: {white(0.50)}; }}",
+        f"filechooser scrollbar slider:active {{ background-color: {acc}; }}",
+        "filechooser overshoot, filechooser undershoot { background-image: none; box-shadow: none; }",
+    ]
+    return "\n".join(["", "/* the file dialog, drawn like Files */"] + rules)
+
+
 def gtk3_css(acc: str, opacity: float) -> str:
     fg = readable_on(acc)
     colours = {
@@ -208,6 +312,7 @@ def gtk3_css(acc: str, opacity: float) -> str:
                                        "statusbar", "paned"))
         out += ["", f"{win} {{ background-color: {tint}; }}",
                 f"{inner} {{ background-color: transparent; }}"]
+    out.append(chooser_css(acc, opacity))
     return "\n".join(out) + "\n"
 
 
@@ -349,8 +454,102 @@ def set_icons(acc: str, wanted: bool) -> None:
             pass
 
 
+def fix_gtk3_theme() -> None:
+    """GTK 3 only ships "Adwaita"; "Adwaita-dark" came with gnome-themes-extra.
+    Named without being installed, GTK 3 falls back to *light* Adwaita (white
+    file dialogs). The dark variant is chosen by gtk-application-prefer-dark-theme
+    in settings.ini, so the plain name is the one that gives dark."""
+    name = gsettings("get", "org.gnome.desktop.interface", "gtk-theme")
+    if not name.lower().endswith("-dark"):
+        return
+    roots = (paths.DATA_HOME / "themes", Path.home() / ".themes", Path("/usr/share/themes"))
+    if any((root / name / "gtk-3.0").is_dir() for root in roots):
+        return                                  # really installed: leave it
+    gsettings("set", "org.gnome.desktop.interface", "gtk-theme", name[:-len("-dark")])
+
+
+# ---------------------------------------------------------------------------
+# Files as the "open / save" dialog of other apps
+# ---------------------------------------------------------------------------
+
+PORTAL_MARK = "# yakushi (Settings -> Appearance -> Apps): Files is the file dialog"
+PORTAL_IFACE = "org.freedesktop.impl.portal.FileChooser"
+PORTAL_DEF = paths.DATA_HOME / "xdg-desktop-portal" / "portals" / "nautilus.portal"
+PORTAL_SYSTEM = Path("/usr/share/xdg-desktop-portal")
+
+
+def portal_conf() -> tuple[Path, str]:
+    """The portals.conf xdg-desktop-portal reads for this desktop, and the system's defaults for it."""
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")[0].strip().lower()
+    name = f"{desktop}-portals.conf" if re.fullmatch(r"[a-z0-9_-]+", desktop) else "portals.conf"
+    default = "gtk"
+    try:
+        for line in (PORTAL_SYSTEM / name).read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("default="):
+                default = line.split("=", 1)[1].strip() or default
+    except OSError:
+        pass
+    return paths.CONFIG_HOME / "xdg-desktop-portal" / name, default
+
+
+def files_has_dialog() -> bool:
+    """Nautilus 47 and newer answer the file dialog portal themselves."""
+    binary = shutil.which("nautilus")
+    if not binary:
+        return False
+    try:
+        with open(binary, "rb") as handle:
+            return PORTAL_IFACE.encode() in handle.read()
+    except OSError:
+        return False
+
+
+def ours(path: Path) -> bool | None:
+    """True: written by us. False: someone else's. None: not there."""
+    try:
+        return path.read_text(encoding="utf-8").startswith(PORTAL_MARK)
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def set_file_dialog(wanted: bool) -> None:
+    conf, default = portal_conf()
+    wanted = wanted and files_has_dialog()
+    targets = {
+        PORTAL_DEF: f"{PORTAL_MARK}\n[portal]\nDBusName=org.gnome.Nautilus\nInterfaces={PORTAL_IFACE};\n",
+        conf: f"{PORTAL_MARK}\n[preferred]\ndefault={default}\n{PORTAL_IFACE}=nautilus\n",
+    }
+    if wanted and ours(conf) is False:
+        return                                  # the user's own portals.conf: theirs to decide
+    changed = False
+    for path, text in targets.items():
+        mine = ours(path)
+        if wanted and mine is not False:
+            try:
+                same = path.read_text(encoding="utf-8") == text
+            except OSError:
+                same = False
+            if not same:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                write_atomic(path, text)
+                changed = True
+        elif not wanted and mine:
+            path.unlink()
+            changed = True
+    if changed:                                 # read once, when the portal starts
+        try:
+            subprocess.run(["systemctl", "--user", "try-restart", "xdg-desktop-portal.service"],
+                           capture_output=True, timeout=15)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
 def apply(state: dict) -> None:
     acc = accent()
+    if state["colours"]:
+        fix_gtk3_theme()
     for folder, build in zip(GTK_DIRS, (gtk4_css, gtk3_css)):
         own = folder / "yakushi.css"
         if state["colours"]:
@@ -364,6 +563,7 @@ def apply(state: dict) -> None:
             except FileNotFoundError:
                 pass
     set_icons(acc, state["colours"])
+    set_file_dialog(state["colours"])
 
 
 def files_running() -> bool:

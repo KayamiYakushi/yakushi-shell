@@ -6,9 +6,9 @@ import Quickshell.Widgets
 import QtQuick
 
 // Screen-share picker for xdg-desktop-portal-hyprland (share-picker.sh is
-// its custom_picker_binary). Built from the Settings pieces: the same card,
-// header strip, numbered list, page title, switch and buttons, so it looks
-// and behaves like a Settings page. Previews are live.
+// its custom_picker_binary). A plain window, drawn like the file manager
+// and its file dialog (Settings -> Appearance -> Apps): header bar, sidebar,
+// grid, in the same surface, opacity and accent. Previews are live.
 //
 // The choice is written to $YAKUSHI_PICK_OUT in xdph's format and the
 // process quits; writing nothing means "cancelled".
@@ -27,16 +27,46 @@ PanelWindow {
     readonly property string outPath: Quickshell.env("YAKUSHI_PICK_OUT") || ""
 
     readonly property var pages: [
-        { name: "Screens", jp: "画面",       glyph: String.fromCodePoint(0xF0379),
-          hint: "Share an entire display. Everything shown on it will be visible." },
-        { name: "Windows", jp: "ウィンドウ", glyph: String.fromCodePoint(0xF05B0),
-          hint: "Share a single window. Other windows and notifications stay private." },
-        { name: "Region",  jp: "範囲",       glyph: String.fromCodePoint(0xF0489),
-          hint: "Share a fixed area of one display. Drag a rectangle to choose it." }
+        { name: "Screens", glyph: String.fromCodePoint(0xF0379) },
+        { name: "Windows", glyph: String.fromCodePoint(0xF05AF) },
+        { name: "Area",    glyph: String.fromCodePoint(0xF0489) }
     ]
 
-    function two(n) {
-        return n < 10 ? "0" + n : String(n)
+    // The look of the file manager (Settings -> Appearance -> Apps). While
+    // GTK apps wear the shell's colours: the same surface at the same
+    // opacity, with the sidebar a faint lighter pane, as yakushi-gtkctl.py
+    // writes them for Files; Hyprland blurs what shows through (the layer
+    // rule in hypr/rules.lua), with the one blur it uses for every window.
+    // Otherwise: Adwaita dark, as Files is then.
+    readonly property bool likeFiles: Config.apps.colours === true
+    readonly property real filesOpacity: {
+        var o = Config.apps.filesOpacity
+        return typeof o === "number" ? Math.max(0.30, Math.min(1.0, o)) : 1.0
+    }
+    readonly property color cardFill: likeFiles ? Theme.tint(Theme.surface, filesOpacity) : "#222226"
+    readonly property color sideFill: !likeFiles ? "#2e2e32" : filesOpacity < 1.0 ? white(0.03) : Theme.card
+    readonly property string sans: "Adwaita Sans"
+
+    function white(alpha) {
+        return Qt.rgba(1, 1, 1, alpha)
+    }
+
+    // the corner cut Hyprland gives windows, so the picker has their shape
+    property real windowCut: Theme.cutLarge
+
+    Process {
+        command: ["hyprctl", "getoption", "decoration:rounding", "-j"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var n = JSON.parse(text)["int"]
+                    if (typeof n === "number" && n >= 0)
+                        picker.windowCut = Math.min(n, 40)
+                } catch (e) {
+                }
+            }
+        }
     }
 
     readonly property color onAccent: 0.299 * Theme.accent.r + 0.587 * Theme.accent.g + 0.114 * Theme.accent.b > 0.55
@@ -316,7 +346,7 @@ PanelWindow {
 
     Timer {
         id: quitTimer
-        interval: Theme.tSlow + 160      // the card closes back into its notches first
+        interval: Theme.tFast + 40       // the window fades out first
         onTriggered: Qt.quit()
     }
 
@@ -325,7 +355,7 @@ PanelWindow {
         Hyprland.refreshMonitors()
         showing = true
         // YAKUSHI_PICK_PAGE=screens|windows|region opens on that page
-        var start = String(Quickshell.env("YAKUSHI_PICK_PAGE") || "").toLowerCase()
+        var start = String(Quickshell.env("YAKUSHI_PICK_PAGE") || "").toLowerCase().replace("region", "area")
         var at = 0
         for (var i = 0; i < pages.length; i++)
             if (pages[i].name.toLowerCase() === start)
@@ -366,7 +396,52 @@ PanelWindow {
     }
 
 
-    // A source tile: live preview, number, name, details.
+    // ------------------------------------------------------------------
+    // Pieces, drawn as GTK draws them in Files and its file dialog
+    // (the "soft tiles" of chooser_css in yakushi-gtkctl.py)
+    // ------------------------------------------------------------------
+    component Label: Text {
+        textFormat: Text.PlainText
+        color: Theme.ink
+        font.family: picker.sans
+        font.pixelSize: 14
+        elide: Text.ElideRight
+    }
+
+    component PlainButton: Rectangle {
+        id: button
+
+        property string label: ""
+        property bool suggested: false
+        signal clicked()
+
+        width: Math.max(86, buttonLabel.implicitWidth + 28)
+        height: 34
+        radius: 9
+        opacity: enabled ? 1 : 0.4
+        color: suggested
+            ? (buttonMouse.pressed ? Qt.darker(Theme.accent, 1.1) : buttonMouse.containsMouse ? Qt.lighter(Theme.accent, 1.08) : Theme.accent)
+            : picker.white(buttonMouse.pressed ? 0.24 : buttonMouse.containsMouse ? 0.15 : 0.10)
+
+        Label {
+            id: buttonLabel
+
+            anchors.centerIn: parent
+            text: button.label
+            color: button.suggested ? picker.onAccent : Theme.ink
+            font.bold: button.suggested
+        }
+
+        MouseArea {
+            id: buttonMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: button.clicked()
+        }
+    }
+
+    // A source: live preview, name under it, as a file in the grid of Files.
     component SourceTile: Item {
         id: tile
 
@@ -380,26 +455,19 @@ PanelWindow {
         height: grid.cellHeight
 
         Rectangle {
-            id: box
-
             anchors.fill: parent
-            anchors.rightMargin: 12
-            anchors.bottomMargin: 12
-            color: tile.here ? Theme.tint(Theme.accent, 0.07)
-                : tileMouse.containsMouse ? Theme.tint(Theme.ink, 0.04) : Theme.card
-            border.width: 1
-            border.color: tile.here ? Theme.accent : tileMouse.containsMouse ? Theme.lineHot : Theme.line
-
-            Behavior on color { ColorAnimation { duration: Theme.tFast } }
-            Behavior on border.color { ColorAnimation { duration: Theme.tFast } }
+            anchors.margins: 4
+            radius: 9
+            color: tile.here ? Theme.tint(Theme.accent, 0.30)
+                : tileMouse.containsMouse ? picker.white(0.07) : "transparent"
 
             Rectangle {
                 id: shot
 
-                x: 8
-                y: 8
-                width: parent.width - 16
-                height: parent.height - 16 - info.height
+                x: 10
+                y: 10
+                width: parent.width - 20
+                height: parent.height - 20 - info.height
                 color: "#000000"
                 clip: true
 
@@ -415,123 +483,47 @@ PanelWindow {
                     visible: hasContent
                 }
 
-                // nothing to show (yet)
-                Column {
+                // nothing to show (yet): the app's icon
+                IconImage {
                     anchors.centerIn: parent
-                    spacing: 10
-                    visible: !view.hasContent
-
-                    IconImage {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        visible: tile.modelData.icon !== ""
-                        source: tile.modelData.icon
-                        implicitSize: 40
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        visible: tile.modelData.kind === "window" && tile.modelData.icon === ""
-                        text: String.fromCodePoint(0xF05B0)
-                        color: Theme.inkSoft
-                        font.family: Theme.glyphs
-                        font.pixelSize: 34
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "NO PREVIEW"
-                        color: Theme.inkMute
-                        font.family: Theme.mono
-                        font.pixelSize: 9
-                        font.letterSpacing: 2
-                    }
+                    visible: !view.hasContent && tile.modelData.icon !== ""
+                    source: tile.modelData.icon
+                    implicitSize: 48
                 }
 
-                // workspace tag
-                Rectangle {
-                    visible: tile.modelData.badge !== ""
-                    x: 6
-                    y: 6
-                    width: badgeText.implicitWidth + 12
-                    height: 16
-                    color: tile.modelData.live ? Theme.accent : Theme.tint("#000000", 0.75)
-                    border.width: tile.modelData.live ? 0 : 1
-                    border.color: Theme.line
-
-                    Text {
-                        id: badgeText
-
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: tile.modelData.badge
-                        color: tile.modelData.live ? picker.onAccent : Theme.inkSoft
-                        font.family: Theme.mono
-                        font.pixelSize: 8
-                        font.bold: true
-                        font.letterSpacing: 1
-                    }
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.centerIn: parent
+                    visible: !view.hasContent && tile.modelData.icon === ""
+                    text: picker.pages[tile.modelData.kind === "window" ? 1 : 0].glyph
+                    color: picker.white(0.55)
+                    font.family: Theme.glyphs
+                    font.pixelSize: 34
                 }
             }
 
-            Item {
+            Column {
                 id: info
 
-                anchors.bottom: parent.bottom
-                width: parent.width
+                anchors.top: shot.bottom
+                anchors.topMargin: 8
+                x: 10
+                width: parent.width - 20
                 height: 44
+                spacing: 2
 
-                Text {
-                    id: num
-
-                    textFormat: Text.PlainText
-                    x: 10
-                    y: 8
-                    text: picker.two(tile.index + 1)
-                    color: tile.here ? Theme.accent : Theme.inkSoft
-                    font.family: Theme.mono
-                    font.pixelSize: 11
-                    font.bold: true
-                }
-
-                IconImage {
-                    id: appIcon
-
-                    visible: tile.modelData.icon !== ""
-                    anchors.left: num.right
-                    anchors.leftMargin: 10
-                    y: 7
-                    source: tile.modelData.icon
-                    implicitSize: 14
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    anchors.left: appIcon.visible ? appIcon.right : num.right
-                    anchors.leftMargin: appIcon.visible ? 8 : 12
-                    anchors.right: parent.right
-                    anchors.rightMargin: 10
-                    y: 7
+                Label {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
                     text: tile.modelData.title
-                    elide: Text.ElideRight
-                    color: tile.here ? Theme.ink : Theme.tint(Theme.ink, 0.86)
-                    font.family: Theme.mono
-                    font.pixelSize: 11
-                    font.bold: true
-                    font.letterSpacing: 0.5
                 }
 
-                Text {
-                    textFormat: Text.PlainText
-                    x: 10
-                    y: 25
-                    width: parent.width - 20
+                Label {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
                     text: tile.modelData.detail
-                    elide: Text.ElideRight
-                    color: Theme.inkMute
-                    font.family: Theme.mono
-                    font.pixelSize: 9
+                    color: picker.white(0.55)
+                    font.pixelSize: 12
                 }
             }
 
@@ -540,7 +532,6 @@ PanelWindow {
 
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
                 onClicked: picker.select(picker.page, tile.index)
                 onDoubleClicked: {
                     picker.select(picker.page, tile.index)
@@ -551,7 +542,7 @@ PanelWindow {
     }
 
     // ------------------------------------------------------------------
-    // Outside the card: click or Esc cancels
+    // Outside the window: click or Esc cancels
     // ------------------------------------------------------------------
     Item {
         id: outside
@@ -593,601 +584,359 @@ PanelWindow {
     }
 
     // ------------------------------------------------------------------
-    // The card
+    // The window: a header bar (Cancel, title, Share), the kinds of source
+    // in a sidebar, the sources in a grid. The file dialog's layout.
     // ------------------------------------------------------------------
-    TiltCard {
+    Item {
         id: card
 
+        readonly property bool shown: picker.showing && !picker.regionActive
+
         anchors.centerIn: parent
-        width: Math.min(1020, picker.width - 40)
-        height: Math.min(660, picker.height - 40)
-        shown: picker.showing && !picker.regionActive
+        width: Math.min(920, picker.width - 40)
+        height: Math.min(620, picker.height - 40)
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity { NumberAnimation { duration: Theme.tFast } }
 
         MouseArea {
             anchors.fill: parent
         }
 
-        SakuraPetals {
+        // the shape Hyprland gives every window (decoration:rounding)
+        CutBox {
             anchors.fill: parent
-            z: 10
-            active: Qt.colorEqual(Theme.accent, "#ff7a9d")
-            tint: Theme.accent
+            fill: picker.cardFill
+            cut: picker.windowCut
         }
 
-        // the card's shape, its corner marks and its opening are TiltCard's
+        // ============ header bar ============
         Item {
-            id: frame
+            id: header
 
-            anchors.fill: parent
+            width: parent.width
+            height: 50
 
-            // ============ header strip ============
+            PlainButton {
+                x: Math.max(8, picker.windowCut)
+                anchors.verticalCenter: parent.verticalCenter
+                label: "Cancel"
+                onClicked: picker.close()
+            }
+
+            Label {
+                anchors.centerIn: parent
+                text: "Share Screen"
+                font.bold: true
+            }
+
+            PlainButton {
+                anchors.right: parent.right
+                anchors.rightMargin: Math.max(8, picker.windowCut)
+                anchors.verticalCenter: parent.verticalCenter
+                label: picker.page === 2 ? "Select Area" : "Share"
+                suggested: true
+                enabled: picker.canShare
+                onClicked: picker.share()
+            }
+        }
+
+        // ============ sidebar ============
+        CutBox {
+            id: side
+
+            anchors.top: header.bottom
+            anchors.bottom: parent.bottom
+            width: 190
+            fill: picker.sideFill
+            cut: picker.windowCut
+            cutTopLeft: false
+            cutTopRight: false
+            cutBottomRight: false
+
+            Column {
+                y: 6
+                width: parent.width
+
+                Repeater {
+                    model: picker.pages
+
+                    delegate: Item {
+                        id: row
+
+                        required property var modelData
+                        required property int index
+                        readonly property bool here: picker.page === index
+
+                        width: side.width
+                        height: 36
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.leftMargin: 6
+                            anchors.rightMargin: 6
+                            anchors.topMargin: 1
+                            anchors.bottomMargin: 1
+                            radius: 6
+                            color: row.here ? picker.white(rowMouse.containsMouse ? 0.13 : 0.10)
+                                : rowMouse.containsMouse ? picker.white(0.07) : "transparent"
+
+                            Text {
+                                textFormat: Text.PlainText
+                                x: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: row.modelData.glyph
+                                color: Theme.ink
+                                font.family: Theme.glyphs
+                                font.pixelSize: 16
+                            }
+
+                            Label {
+                                x: 38
+                                width: parent.width - x - 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: row.modelData.name
+                            }
+
+                            MouseArea {
+                                id: rowMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: picker.setPage(row.index)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.left: side.right
+            anchors.top: side.top
+            anchors.bottom: side.bottom
+            width: 1
+            color: Theme.tint("#000000", 0.36)
+        }
+
+        // ============ sources ============
+        Item {
+            id: main
+
+            anchors.left: side.right
+            anchors.leftMargin: 1
+            anchors.right: parent.right
+            anchors.top: header.bottom
+            anchors.bottom: parent.bottom
+
             Item {
-                id: strip
+                id: body
 
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 8
+                anchors.bottomMargin: footer.height
+                clip: true
+
+                // ---- screens
+                GridView {
+                    id: screenGrid
+
+                    anchors.fill: parent
+                    visible: picker.page === 0
+                    model: picker.screenItems
+                    cellWidth: Math.floor(width / (picker.screenItems.length > 2 ? 3 : 2))
+                    cellHeight: Math.round((cellWidth - 28) * 9 / 16) + 80
+                    currentIndex: -1
+                    boundsBehavior: Flickable.StopAtBounds
+                    delegate: SourceTile { grid: screenGrid; selected: picker.screenIndex }
+                }
+
+                // ---- windows
+                Item {
+                    anchors.fill: parent
+                    visible: picker.page === 1
+
+                    Rectangle {
+                        id: searchBox
+
+                        x: 4
+                        width: parent.width - 8
+                        height: 34
+                        radius: 9
+                        color: picker.white(0.10)
+                        border.width: search.activeFocus ? 2 : 0
+                        border.color: Theme.tint(Theme.accent, 0.65)
+
+                        Text {
+                            textFormat: Text.PlainText
+                            x: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: String.fromCodePoint(0xF0349)
+                            color: picker.white(0.7)
+                            font.family: Theme.glyphs
+                            font.pixelSize: 15
+                        }
+
+                        Label {
+                            x: 34
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: search.text === ""
+                            text: "Search windows"
+                            color: picker.white(0.55)
+                        }
+
+                        TextInput {
+                            id: search
+
+                            anchors.fill: parent
+                            anchors.leftMargin: 34
+                            anchors.rightMargin: 10
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: Theme.ink
+                            selectionColor: Theme.tint(Theme.accent, 0.45)
+                            selectedTextColor: Theme.ink
+                            font.family: picker.sans
+                            font.pixelSize: 14
+                            clip: true
+                            onTextChanged: picker.query = text
+                            Keys.onPressed: event => {
+                                var k = event.key
+                                if (k === Qt.Key_Left || k === Qt.Key_Right)
+                                    return          // move the text cursor
+                                event.accepted = outside.handleKey(event)
+                            }
+                        }
+                    }
+
+                    GridView {
+                        id: windowGrid
+
+                        anchors.top: searchBox.bottom
+                        anchors.topMargin: 8
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        model: picker.windowItems
+                        cellWidth: Math.floor(width / 3)
+                        cellHeight: Math.round((cellWidth - 28) * 9 / 16) + 80
+                        currentIndex: -1
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        delegate: SourceTile { grid: windowGrid; selected: picker.windowIndex }
+                    }
+
+                    Label {
+                        anchors.centerIn: windowGrid
+                        visible: picker.windowItems.length === 0
+                        text: picker.query !== "" ? "No matching windows" : "No windows to share"
+                        color: picker.white(0.55)
+                    }
+                }
+
+                // ---- region: the monitor layout, live
+                Item {
+                    id: regionPage
+
+                    anchors.fill: parent
+                    visible: picker.page === 2
+
+                    readonly property var bounds: {
+                        var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
+                        for (var i = 0; i < Quickshell.screens.length; i++) {
+                            var s = Quickshell.screens[i]
+                            x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y)
+                            x1 = Math.max(x1, s.x + s.width); y1 = Math.max(y1, s.y + s.height)
+                        }
+                        return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) }
+                    }
+                    readonly property real k: Math.min((width - 40) / bounds.w, (height - 80) / bounds.h)
+
+                    Item {
+                        id: layoutMap
+
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 14
+                        width: regionPage.bounds.w * regionPage.k
+                        height: regionPage.bounds.h * regionPage.k
+
+                        Repeater {
+                            model: Quickshell.screens
+
+                            delegate: Rectangle {
+                                required property var modelData
+
+                                x: (modelData.x - regionPage.bounds.x) * regionPage.k
+                                y: (modelData.y - regionPage.bounds.y) * regionPage.k
+                                width: modelData.width * regionPage.k - 6
+                                height: modelData.height * regionPage.k - 6
+                                color: "#000000"
+
+                                ScreencopyView {
+                                    anchors.fill: parent
+                                    captureSource: picker.page === 2 ? parent.modelData : null
+                                    live: true
+                                }
+                            }
+                        }
+                    }
+
+                    Label {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: layoutMap.bottom
+                        anchors.topMargin: 18
+                        width: Math.min(implicitWidth, parent.width)
+                        text: "Choose Select Area, then drag over the part of the screen to share."
+                        color: picker.white(0.55)
+                    }
+                }
+            }
+
+            // ---- may the app share this again without asking
+            Item {
+                id: footer
+
+                anchors.bottom: parent.bottom
                 width: parent.width
                 height: 46
 
                 Row {
-                    x: 20
+                    x: 16
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 12
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "薬"
-                        color: Theme.alert
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 24
-                        font.bold: true
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "SHARE SCREEN"
-                        color: Theme.ink
-                        font.family: Theme.mono
-                        font.pixelSize: 14
-                        font.bold: true
-                        font.letterSpacing: 6
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "画面共有"
-                        color: Theme.inkSoft
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 13
-                        font.letterSpacing: 3
-                    }
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 14
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: picker.pages[picker.page].jp
-                        color: Theme.inkSoft
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 12
-                        font.letterSpacing: 2
-                    }
+                    spacing: 10
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 1
-                        height: 14
-                        color: Theme.tint(Theme.ink, 0.18)
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: picker.two(picker.page + 1) + " / " + picker.two(picker.pages.length)
-                        color: Theme.accent
-                        font.family: Theme.mono
-                        font.pixelSize: 11
-                        font.bold: true
-                        font.letterSpacing: 2
-                    }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Theme.tint(Theme.ink, 0.12)
-                }
-            }
-
-            // ============ numbered source list ============
-            Item {
-                id: list
-
-                y: strip.height
-                width: 256
-                height: parent.height - strip.height
-
-                Rectangle {
-                    anchors.right: parent.right
-                    width: 1
-                    height: parent.height
-                    color: Theme.tint(Theme.ink, 0.12)
-                }
-
-                Column {
-                    id: pageList
-
-                    y: 14
-                    width: parent.width - 1
-
-                    Repeater {
-                        model: picker.pages
-
-                        delegate: Rectangle {
-                            id: line
-
-                            required property var modelData
-                            required property int index
-                            readonly property bool here: picker.page === index
-                            readonly property color ink: here ? picker.onAccent : Theme.ink
-                            readonly property int count: index === 0 ? picker.screenItems.length
-                                : index === 1 ? picker.windowItems.length : -1
-
-                            width: parent.width
-                            height: 36
-                            color: here ? Theme.accent : lineMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation { duration: Theme.tFast }
-                            }
-
-                            Rectangle {
-                                visible: lineMouse.containsMouse && !line.here
-                                width: 3
-                                height: parent.height
-                                color: Theme.accent
-                            }
-
-                            Text {
-                                id: number
-
-                                textFormat: Text.PlainText
-                                x: 20
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: picker.two(line.index + 1)
-                                color: line.here ? line.ink : Theme.inkSoft
-                                font.family: Theme.mono
-                                font.pixelSize: 11
-                                font.bold: line.here
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                anchors.left: number.right
-                                anchors.leftMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: line.modelData.name.toUpperCase()
-                                color: line.here || lineMouse.containsMouse ? line.ink : Theme.tint(Theme.ink, 0.78)
-                                font.family: Theme.mono
-                                font.pixelSize: 12
-                                font.bold: true
-                                font.letterSpacing: 1.5
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                anchors.right: parent.right
-                                anchors.rightMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: line.modelData.jp
-                                color: line.here ? Theme.tint(line.ink, 0.8) : Theme.inkSoft
-                                font.family: "Noto Sans CJK JP"
-                                font.pixelSize: 11
-                                font.letterSpacing: 1
-                            }
-
-                            MouseArea {
-                                id: lineMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: picker.setPage(line.index)
-                            }
-                        }
-                    }
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    x: 18
-                    visible: y >= pageList.y + pageList.height + 8
-                    anchors.bottom: listFoot.top
-                    anchors.bottomMargin: 10
-                    text: "薬\n師"
-                    lineHeight: 0.92
-                    color: Theme.tint(Theme.ink, 0.09)
-                    font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 58
-                    font.bold: true
-                }
-
-                Item {
-                    id: listFoot
-
-                    anchors.bottom: parent.bottom
-                    width: parent.width - 1
-                    height: 40
-
-                    Rectangle {
-                        width: parent.width
-                        height: 1
-                        color: Theme.tint(Theme.ink, 0.12)
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        x: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "ESC ── CANCEL"
-                        color: Theme.inkSoft
-                        font.family: Theme.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 2
-                    }
-                }
-            }
-
-            // ============ the page ============
-            Item {
-                id: content
-
-                x: list.width + 28
-                y: strip.height + 20
-                width: parent.width - x - 28
-                height: parent.height - y - 16
-
-                PageTitle {
-                    id: title
-
-                    width: parent.width
-                    title: picker.pages[picker.page].name.toUpperCase()
-                }
-
-                Text {
-                    id: hint
-
-                    textFormat: Text.PlainText
-                    anchors.top: title.bottom
-                    anchors.topMargin: 10
-                    width: parent.width
-                    text: picker.pages[picker.page].hint
-                    color: Theme.inkSoft
-                    font.family: Theme.mono
-                    font.pixelSize: 10
-                    elide: Text.ElideRight
-                }
-
-                Item {
-                    id: body
-
-                    anchors.top: hint.bottom
-                    anchors.topMargin: 16
-                    anchors.bottom: footer.top
-                    anchors.bottomMargin: 12
-                    width: parent.width
-                    clip: true
-
-                    // ---- 01 screens
-                    GridView {
-                        id: screenGrid
-
-                        anchors.fill: parent
-                        anchors.rightMargin: -12
-                        visible: picker.page === 0
-                        model: picker.screenItems
-                        cellWidth: Math.floor(width / (picker.screenItems.length > 2 ? 3 : 2))
-                        cellHeight: Math.round((cellWidth - 12 - 16) * 9 / 16) + 16 + 44 + 12
-                        currentIndex: -1
-                        boundsBehavior: Flickable.StopAtBounds
-                        delegate: SourceTile { grid: screenGrid; selected: picker.screenIndex }
-                    }
-
-                    // ---- 02 windows
-                    Item {
-                        anchors.fill: parent
-                        visible: picker.page === 1
-
-                        Rectangle {
-                            id: searchBox
-
-                            width: parent.width
-                            height: 38
-                            color: Theme.card
-                            border.width: 1
-                            border.color: search.activeFocus ? Theme.accent : Theme.line
-
-                            Text {
-                                textFormat: Text.PlainText
-                                anchors.left: parent.left
-                                anchors.leftMargin: 13
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: String.fromCodePoint(0xF0349)
-                                color: search.activeFocus ? Theme.accent : Theme.inkSoft
-                                font.family: Theme.glyphs
-                                font.pixelSize: 14
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                visible: search.text === ""
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.left: parent.left
-                                anchors.leftMargin: 36
-                                text: "Filter by window title or application..."
-                                color: Theme.inkMute
-                                font.family: Theme.mono
-                                font.pixelSize: 10
-                            }
-
-                            TextInput {
-                                id: search
-
-                                anchors.fill: parent
-                                anchors.leftMargin: 36
-                                anchors.rightMargin: 12
-                                verticalAlignment: TextInput.AlignVCenter
-                                color: Theme.ink
-                                selectionColor: Theme.accent
-                                selectedTextColor: Theme.surface
-                                font.family: Theme.mono
-                                font.pixelSize: 10
-                                clip: true
-                                onTextChanged: picker.query = text
-                                Keys.onPressed: event => {
-                                    var k = event.key
-                                    if (k === Qt.Key_Left || k === Qt.Key_Right)
-                                        return          // move the text cursor
-                                    event.accepted = outside.handleKey(event)
-                                }
-                            }
-                        }
-
-                        GridView {
-                            id: windowGrid
-
-                            anchors.top: searchBox.bottom
-                            anchors.topMargin: 14
-                            anchors.bottom: parent.bottom
-                            width: parent.width + 12
-                            model: picker.windowItems
-                            cellWidth: Math.floor(width / 3)
-                            cellHeight: Math.round((cellWidth - 12 - 16) * 9 / 16) + 16 + 44 + 12
-                            currentIndex: -1
-                            boundsBehavior: Flickable.StopAtBounds
-                            delegate: SourceTile { grid: windowGrid; selected: picker.windowIndex }
-                        }
+                        width: 20
+                        height: 20
+                        radius: 6
+                        color: picker.reuse ? Theme.accent : picker.white(reuseMouse.containsMouse ? 0.15 : 0.10)
 
                         Text {
                             textFormat: Text.PlainText
-                            anchors.centerIn: windowGrid
-                            visible: picker.windowItems.length === 0
-                            text: picker.query !== "" ? "NO MATCHING WINDOWS" : "NO WINDOWS TO SHARE"
-                            color: Theme.inkMute
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: 2
+                            anchors.centerIn: parent
+                            visible: picker.reuse
+                            text: String.fromCodePoint(0xF012C)
+                            color: picker.onAccent
+                            font.family: Theme.glyphs
+                            font.pixelSize: 14
                         }
                     }
 
-                    // ---- 03 region: the monitor layout, live
-                    Item {
-                        id: regionPage
-
-                        anchors.fill: parent
-                        visible: picker.page === 2
-
-                        readonly property var bounds: {
-                            var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
-                            for (var i = 0; i < Quickshell.screens.length; i++) {
-                                var s = Quickshell.screens[i]
-                                x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y)
-                                x1 = Math.max(x1, s.x + s.width); y1 = Math.max(y1, s.y + s.height)
-                            }
-                            return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) }
-                        }
-                        readonly property real k: Math.min((width - 40) / bounds.w, (height - 90) / bounds.h)
-
-                        Item {
-                            id: layoutMap
-
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: 10
-                            width: regionPage.bounds.w * regionPage.k
-                            height: regionPage.bounds.h * regionPage.k
-
-                            Repeater {
-                                model: Quickshell.screens
-
-                                delegate: Rectangle {
-                                    required property var modelData
-
-                                    x: (modelData.x - regionPage.bounds.x) * regionPage.k
-                                    y: (modelData.y - regionPage.bounds.y) * regionPage.k
-                                    width: modelData.width * regionPage.k - 6
-                                    height: modelData.height * regionPage.k - 6
-                                    color: "#000000"
-                                    border.width: 1
-                                    border.color: Theme.line
-
-                                    ScreencopyView {
-                                        anchors.fill: parent
-                                        anchors.margins: 1
-                                        captureSource: picker.page === 2 ? parent.modelData : null
-                                        live: true
-                                        opacity: 0.55
-                                    }
-
-                                    Rectangle {
-                                        x: 6
-                                        y: 6
-                                        width: monName.implicitWidth + 12
-                                        height: 16
-                                        color: Theme.tint("#000000", 0.75)
-                                        border.width: 1
-                                        border.color: Theme.line
-
-                                        Text {
-                                            id: monName
-
-                                            textFormat: Text.PlainText
-                                            anchors.centerIn: parent
-                                            text: parent.parent.modelData.name
-                                            color: Theme.inkSoft
-                                            font.family: Theme.mono
-                                            font.pixelSize: 8
-                                            font.bold: true
-                                            font.letterSpacing: 1
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Text {
-                            textFormat: Text.PlainText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.top: layoutMap.bottom
-                            anchors.topMargin: 22
-                            text: "SELECT REGION, THEN DRAG ON ANY SCREEN  ──  ESC RETURNS HERE"
-                            color: Theme.inkMute
-                            font.family: Theme.mono
-                            font.pixelSize: 9
-                            font.letterSpacing: 2
-                        }
+                    Label {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Let the app share this again without asking"
                     }
                 }
 
-                // ============ footer: reuse switch, actions ============
-                Item {
-                    id: footer
+                MouseArea {
+                    id: reuseMouse
 
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 44
-
-                    Rectangle {
-                        width: parent.width
-                        height: 1
-                        color: Theme.tint(Theme.ink, 0.12)
-                    }
-
-                    Column {
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: 4
-                        spacing: 3
-
-                        Text {
-                            textFormat: Text.PlainText
-                            text: "REMEMBER THIS CHOICE"
-                            color: Theme.ink
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                            font.bold: true
-                            font.letterSpacing: 1.5
-                        }
-
-                        Text {
-                            textFormat: Text.PlainText
-                            text: "The app may share the same source again without asking."
-                            color: Theme.inkMute
-                            font.family: Theme.mono
-                            font.pixelSize: 9
-                        }
-                    }
-
-                    Row {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: 4
-                        spacing: 10
-
-                        Switch {
-                            anchors.verticalCenter: parent.verticalCenter
-                            checked: picker.reuse
-                            onToggled: picker.reuse = !picker.reuse
-                        }
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 1
-                            height: 18
-                            color: Theme.tint(Theme.ink, 0.12)
-                        }
-
-                        HeaderButton {
-                            anchors.verticalCenter: parent.verticalCenter
-                            icon: String.fromCodePoint(0xF0156)
-                            label: "CANCEL"
-                            onActivated: picker.close()
-                        }
-
-                        Rectangle {
-                            id: shareBtn
-
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: shareRow.implicitWidth + 28
-                            height: 30
-                            opacity: picker.canShare ? 1 : 0.4
-                            color: shareMouse.containsMouse && picker.canShare ? Theme.tint(Theme.accent, 0.85) : Theme.accent
-
-                            Row {
-                                id: shareRow
-
-                                anchors.centerIn: parent
-                                spacing: 7
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: picker.page === 2 ? String.fromCodePoint(0xF0489) : String.fromCodePoint(0xF0379)
-                                    color: picker.onAccent
-                                    font.family: Theme.glyphs
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: picker.page === 2 ? "SELECT REGION" : "SHARE"
-                                    color: picker.onAccent
-                                    font.family: Theme.mono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    font.letterSpacing: 1
-                                }
-                            }
-
-                            MouseArea {
-                                id: shareMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: picker.canShare
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: picker.share()
-                            }
-                        }
-                    }
+                    anchors.fill: parent
+                    anchors.rightMargin: parent.width - 360
+                    hoverEnabled: true
+                    onClicked: picker.reuse = !picker.reuse
                 }
             }
         }

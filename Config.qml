@@ -26,6 +26,7 @@ Singleton {
     property var notifications: ({})
     property var launcher: ({})
     property var lock: ({})
+    property var apps: ({})
 
     // Read the file again now (e.g. after a helper saved it).
     function reload() {
@@ -74,6 +75,9 @@ Singleton {
         next = section(data.lock)
         if (JSON.stringify(next) !== JSON.stringify(lock))
             lock = next
+        next = section(data.apps)
+        if (JSON.stringify(next) !== JSON.stringify(apps))
+            apps = next
         loaded = true
     }
 

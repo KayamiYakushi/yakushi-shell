@@ -6,6 +6,9 @@
 hl.layer_rule({ match = { namespace = "yakushi-launcher" }, blur = true, ignore_alpha = 0.15, no_anim = true })
 -- The same for the wallpaper picker card (SUPER + W).
 hl.layer_rule({ match = { namespace = "yakushi-wallpaper" }, blur = true, ignore_alpha = 0.15, no_anim = true })
+-- And for the screen-share picker card, which takes the file manager's
+-- opacity (Settings -> Appearance -> Apps) and so needs the same blur behind it.
+hl.layer_rule({ match = { namespace = "yakushi-share-picker" }, blur = true, ignore_alpha = 0.15, no_anim = true })
 -- The colour picker (SUPER + SHIFT + C) holds the screen still under it:
 -- no fade, or the frozen picture would blink in.
 hl.layer_rule({ match = { namespace = "yakushi-colorpicker" }, no_anim = true })

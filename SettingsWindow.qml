@@ -496,10 +496,18 @@ PanelWindow {
                 id: handle
 
                 width: parent.width
-                height: 46
+                height: nav.height
                 cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                 preventStealing: true
-                onPressed: mouse => resizer.begin(handle, mouse, "move", 0, 0)
+                // the page icons and the search field take their own clicks
+                onPressed: mouse => {
+                    var at = handle.mapToItem(nav, mouse.x, mouse.y)
+                    if (nav.covers(at.x, at.y)) {
+                        mouse.accepted = false
+                        return
+                    }
+                    resizer.begin(handle, mouse, "move", 0, 0)
+                }
                 onPositionChanged: mouse => resizer.drag(handle, mouse)
                 onReleased: resizer.finish()
                 onCanceled: resizer.finish()
@@ -577,7 +585,7 @@ PanelWindow {
                 color: Theme.ink
                 selectionColor: Theme.tint(Theme.accent, 0.4)
                 font.family: Theme.mono
-                font.pixelSize: 11
+                font.pixelSize: 13
                 clip: true
                 selectByMouse: true
 
@@ -614,7 +622,7 @@ PanelWindow {
                     text: SearchLanguages.placeholder(settings.searchLanguages)
                     color: Theme.inkMute
                     font.family: Theme.mono
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                     font.letterSpacing: 2
                 }
             }

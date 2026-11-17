@@ -24,12 +24,18 @@ Item {
     property bool searchOpen: false
     readonly property bool searching: host.searchQuery.trim() !== ""
 
-    readonly property int cell: 34
-    readonly property int gap: 6
+    readonly property int cell: 42
+    readonly property int gap: 8
     readonly property int step: cell + gap
-    readonly property int searchWidth: 250
+    readonly property int searchWidth: 240
 
-    height: 46
+    height: 56
+
+    // true over the icons (and the open search field): the card's drag
+    // handle under the strip lets those clicks through
+    function covers(x, y) {
+        return x >= icons.x - 4 && x <= icons.x + icons.width + 4 && y >= 0 && y <= height
+    }
 
     // ------------------------------------------------------------------
     // Order
@@ -222,17 +228,23 @@ Item {
     // The strip
     // ------------------------------------------------------------------
     Text {
+        id: mark
+
         textFormat: Text.PlainText
-        x: 20
+        x: 22
         anchors.verticalCenter: parent.verticalCenter
         text: "薬"
         color: Theme.alert
         font.family: "Noto Sans CJK JP"
-        font.pixelSize: 24
+        font.pixelSize: 26
         font.bold: true
     }
 
     Row {
+        id: where
+
+        // steps out of the way of a wide open search on a narrow card
+        opacity: icons.x + icons.width < x - 16 ? 1 : 0
         anchors.right: parent.right
         anchors.rightMargin: 20
         anchors.verticalCenter: parent.verticalCenter
@@ -244,14 +256,14 @@ Item {
             text: nav.host.pages[nav.host.page].jp
             color: Theme.inkSoft
             font.family: "Noto Sans CJK JP"
-            font.pixelSize: 12
+            font.pixelSize: 13
             font.letterSpacing: 2
         }
 
         Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 1
-            height: 14
+            height: 16
             color: Theme.tint(Theme.ink, 0.18)
         }
 
@@ -264,7 +276,7 @@ Item {
             text: nav.host.two(at) + " / " + nav.host.two(nav.host.pages.length)
             color: Theme.accent
             font.family: Theme.mono
-            font.pixelSize: 11
+            font.pixelSize: 12
             font.bold: true
             font.letterSpacing: 2
         }
@@ -281,7 +293,8 @@ Item {
     Row {
         id: icons
 
-        anchors.horizontalCenter: parent.horizontalCenter
+        // centred, but never over 薬
+        x: Math.max(mark.x + mark.width + 18, (nav.width - width) / 2)
         anchors.verticalCenter: parent.verticalCenter
         spacing: nav.gap
 
@@ -302,7 +315,7 @@ Item {
                 readonly property bool hot: mouse.containsMouse || lifted
 
                 width: open ? nav.searchWidth : nav.cell
-                height: nav.cell - 4
+                height: nav.cell - 6
                 z: lifted ? 5 : 0
                 clip: isSearch
 
@@ -339,7 +352,7 @@ Item {
                     id: glyph
 
                     textFormat: Text.PlainText
-                    x: icon.open ? 11 : (nav.cell - width) / 2
+                    x: icon.open ? 13 : (nav.cell - width) / 2
                     anchors.verticalCenter: parent.verticalCenter
                     text: icon.isSearch ? String.fromCodePoint(0xF0349)
                         : icon.pageIndex >= 0 ? nav.host.pages[icon.pageIndex].glyph : ""
@@ -347,7 +360,7 @@ Item {
                         : icon.hot || (icon.open && nav.host.searchFocused) ? Theme.accent
                         : Theme.inkSoft
                     font.family: Theme.glyphs
-                    font.pixelSize: 15
+                    font.pixelSize: 19
 
                     Behavior on x {
                         NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic }
@@ -501,7 +514,7 @@ Item {
         readonly property string jp: nav.tipJp(nav.tipKey)
 
         z: 2
-        width: 34 + 2 * ear
+        width: 40 + 2 * ear
         x: nav.tipX - width / 2
         fullHeight: words.implicitHeight + 30
         openness: nav.tipOpen && !nav.searching && !(nav.tipKey === "search" && nav.searchOpen) ? 1 : 0
@@ -528,24 +541,24 @@ Item {
                     required property string modelData
 
                     width: parent.width
-                    height: 13
+                    height: 16
                     horizontalAlignment: Text.AlignHCenter
                     textFormat: Text.PlainText
                     text: modelData
                     color: Theme.ink
                     font.family: Theme.mono
-                    font.pixelSize: 11
+                    font.pixelSize: 14
                     font.bold: true
                 }
             }
 
             Item {
                 width: parent.width
-                height: 15
+                height: 18
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 8
+                    width: 10
                     height: 2
                     color: Theme.accent
                 }
@@ -558,13 +571,13 @@ Item {
                     required property string modelData
 
                     width: parent.width
-                    height: 15
+                    height: 18
                     horizontalAlignment: Text.AlignHCenter
                     textFormat: Text.PlainText
                     text: modelData
                     color: Theme.inkSoft
                     font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                 }
             }
         }
@@ -577,7 +590,7 @@ Item {
         readonly property Item anchorIcon: nav.fieldSlot ? nav.fieldSlot.parent : null
 
         z: 3
-        width: 360
+        width: 400
         x: {
             if (!anchorIcon)
                 return 0
@@ -609,7 +622,7 @@ Item {
                     readonly property color ink: here ? nav.host.onAccent : Theme.ink
 
                     width: parent.width
-                    height: 44
+                    height: 50
                     color: here ? Theme.accent : hitMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
 
                     Behavior on color {
@@ -617,10 +630,10 @@ Item {
                     }
 
                     Column {
-                        x: 16
-                        width: parent.width - 32
+                        x: 18
+                        width: parent.width - 36
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 3
+                        spacing: 4
 
                         Text {
                             textFormat: Text.PlainText
@@ -629,7 +642,7 @@ Item {
                             text: hit.modelData.entry.title
                             color: hit.ink
                             font.family: Theme.mono
-                            font.pixelSize: 11
+                            font.pixelSize: 13
                             font.bold: true
                         }
 
@@ -640,7 +653,7 @@ Item {
                             text: hit.modelData.entry.page ? nav.host.placeOf(hit.modelData.entry.page) : "OPENS ON ITS OWN"
                             color: hit.here ? Theme.tint(hit.ink, 0.75) : Theme.inkSoft
                             font.family: Theme.mono
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.letterSpacing: 1.5
                         }
                     }
@@ -668,7 +681,7 @@ Item {
                 text: "No setting matches. Try other words."
                 color: Theme.inkSoft
                 font.family: Theme.mono
-                font.pixelSize: 10
+                font.pixelSize: 12
             }
         }
     }

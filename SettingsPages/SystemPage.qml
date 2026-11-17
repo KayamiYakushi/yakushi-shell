@@ -829,7 +829,8 @@ Item {
         // face each other their edges run parallel, one `gutter` apart, and
         // a link crosses it. The three links stand around the pocket under
         // the GPU block, and the name sits in that pocket. It all grows
-        // with the card: taller blocks, a bigger picture.
+        // with the card (taller blocks, a bigger picture), up to 800 px
+        // wide; past that it stays centred.
         Item {
             id: council
 
@@ -847,7 +848,7 @@ Item {
                 Math.max(110, Math.min(146, room - gutter - sideCut - 40)),
                 Math.min(200, cornerWidth - 3, 146 + 0.4 * (room - 320))))
             readonly property int rowY: cornerHeight + gutter          // top of the CPU and memory blocks
-            readonly property int sideHeight: Math.floor(Math.max(sideCut + 40, Math.min(330, room - rowY)))
+            readonly property int sideHeight: Math.floor(Math.max(sideCut + 40, Math.min(290, room - rowY)))
             readonly property int figure: Math.max(26, Math.min(56, Math.round(sideHeight * 0.18)))
             readonly property int title: Math.max(13, Math.min(16, Math.round(sideHeight * 0.052)))
             // the pocket: as wide as this under the GPU block, 2 px
@@ -855,7 +856,9 @@ Item {
             readonly property real pocket: topWidth - 2 * topCut + 2 * channel
             readonly property int linkWidth: 5
 
-            width: parent.width
+            // kept in proportion on a wide card: centred, no wider than this
+            width: Math.min(parent.width, 800)
+            anchors.horizontalCenter: parent.horizontalCenter
             height: rowY + sideHeight
 
             // ---- top left: your picture

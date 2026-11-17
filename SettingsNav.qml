@@ -462,7 +462,7 @@ Item {
             preferredRendererType: Shape.CurveRenderer
 
             ShapePath {
-                fillColor: Theme.tint(Theme.surface, Math.max(0.96, Theme.glass))
+                fillColor: Theme.tint(Theme.surface, 0.98)
                 strokeColor: "transparent"
                 strokeWidth: 0
 
@@ -514,9 +514,9 @@ Item {
         readonly property string jp: nav.tipJp(nav.tipKey)
 
         z: 2
-        width: 40 + 2 * ear
+        width: 44 + 2 * ear
         x: nav.tipX - width / 2
-        fullHeight: words.implicitHeight + 30
+        fullHeight: words.implicitHeight + 34
         openness: nav.tipOpen && !nav.searching && !(nav.tipKey === "search" && nav.searchOpen) ? 1 : 0
 
         Behavior on openness {
@@ -530,31 +530,35 @@ Item {
         Column {
             id: words
 
-            y: 14
+            y: 16
             width: parent.width
             spacing: 0
 
             Repeater {
                 model: tip.name.split("")
 
+                // one letter a line, upright, with air between the lines;
+                // the first in the accent, where reading starts
                 delegate: Text {
                     required property string modelData
+                    required property int index
 
                     width: parent.width
-                    height: 16
+                    height: 19
                     horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                     textFormat: Text.PlainText
                     text: modelData
-                    color: Theme.ink
+                    color: index === 0 ? Theme.accent : Theme.ink
                     font.family: Theme.mono
-                    font.pixelSize: 14
+                    font.pixelSize: 15
                     font.bold: true
                 }
             }
 
             Item {
                 width: parent.width
-                height: 18
+                height: 16
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -571,13 +575,14 @@ Item {
                     required property string modelData
 
                     width: parent.width
-                    height: 18
+                    height: 13
                     horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                     textFormat: Text.PlainText
                     text: modelData
-                    color: Theme.inkSoft
+                    color: Theme.inkMute
                     font.family: "Noto Sans CJK JP"
-                    font.pixelSize: 13
+                    font.pixelSize: 10
                 }
             }
         }

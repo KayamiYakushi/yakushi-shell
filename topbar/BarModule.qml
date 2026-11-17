@@ -2,8 +2,7 @@ import QtQuick
 import "../"
 
 // One island module: optional icon, small label and a value.
-// Hover grows it slightly (a transform, so the island never re-lays out)
-// and tints interactive modules with the accent colour.
+// Hover tints interactive modules with the accent colour; nothing moves.
 Item {
     id: m
 
@@ -29,12 +28,6 @@ Item {
 
         anchors.verticalCenter: parent.verticalCenter
         spacing: 6
-        scale: m.hovered ? 1.08 : 1.0
-        transformOrigin: Item.Center
-
-        Behavior on scale {
-            NumberAnimation { duration: Theme.tFast; easing.type: Easing.OutCubic }
-        }
 
         Text {
             textFormat: Text.PlainText
@@ -93,6 +86,10 @@ Item {
         onClicked: function(event) {
             m.clicked(event.button)
         }
+
+        // the second click of a double-click is the island's (it starts
+        // moving the module, TopBar.qml), not the module's
+        onDoubleClicked: {}
 
         onWheel: function(event) {
             m.scrolled(event.angleDelta.y)

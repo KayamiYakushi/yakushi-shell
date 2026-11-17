@@ -4,10 +4,11 @@ import QtQuick
 import "SettingsPages"
 import "SearchLanguages.js" as SearchLanguages
 
-// The Settings panel (SUPER + I): a card in the middle of the screen with
-// the page list on the left and the chosen page on the right: a header strip
-// and a numbered page list. The card leans toward the pointer
-// (TiltCard). Clicking outside the card or Esc closes it.
+// The Settings panel (SUPER + I): a card in the middle of the screen. Its
+// header strip is the page list, one icon per page (SettingsNav: the name
+// hangs below an icon on hover, icons can be moved), with the chosen page
+// below it. The card leans toward the pointer (TiltCard). Clicking outside
+// the card or Esc closes it.
 PanelWindow {
     id: settings
 
@@ -32,6 +33,7 @@ PanelWindow {
         tab = 0
         go(start || "")
         searchField.text = ""
+        nav.searchOpen = false
         Qt.callLater(function() { searchField.forceActiveFocus() })   // type to search; Esc works right away
         // always opens at its default size, in the middle
         Theme.settingsWidth = 0
@@ -121,6 +123,7 @@ PanelWindow {
         if (!r)
             return
         searchField.text = ""
+        nav.searchOpen = false
         if (r.entry.run) {                       // not a page (the wallpaper picker)
             hide()
             if (r.entry.wait)                    // once the card has closed (the colour picker)
@@ -188,6 +191,12 @@ PanelWindow {
             flashAnim.restart()
         })
     }
+
+    // the keyboard to the search field (closed or open)
+    function focusSearch() {
+        searchField.forceActiveFocus()
+    }
+    readonly property bool searchFocused: searchField.activeFocus
 
     function hide() {
         if (!showing)
@@ -278,10 +287,10 @@ PanelWindow {
             { name: "Keyboard & Mouse", file: "InputPage" },
             { name: "Keybinds",         file: "KeybindsPage" }
         ] },
-        { name: "Sound",        jp: "サウンド",       file: "SoundPage",       glyph: "" },
-        { name: "Monitors",     jp: "モニター",       file: "MonitorsPage",    glyph: "" },
+        { name: "Sound",        jp: "サウンド",       file: "SoundPage",       glyph: String.fromCodePoint(0xF057E) },
+        { name: "Monitors",     jp: "モニター",       file: "MonitorsPage",    glyph: String.fromCodePoint(0xF0379) },
         // these two keep their own right margin
-        { name: "Network",      jp: "ネットワーク",   file: "NetworkPage",     glyph: "", ownMargin: true },
+        { name: "Network",      jp: "ネットワーク",   file: "NetworkPage",     glyph: String.fromCodePoint(0xF05A9), ownMargin: true },
         { name: "Bluetooth",    jp: "ブルートゥース", file: "BluetoothPage",   glyph: "󰂯", ownMargin: true }
     ]
 
@@ -546,364 +555,67 @@ PanelWindow {
 
             anchors.fill: parent
 
-            // ============ header strip ============
-            Item {
-                id: strip
+            // ============ header strip: one icon per page ============
+            // (SettingsNav: hover names, search, moving icons)
+            SettingsNav {
+                id: nav
 
+                z: 30                      // over the drag handle and the petals
                 width: parent.width
-                height: 46
-
-                Row {
-                    x: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 12
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "薬"
-                        color: Theme.alert
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 24
-                        font.bold: true
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "SETTINGS"
-                        color: Theme.ink
-                        font.family: Theme.mono
-                        font.pixelSize: 14
-                        font.bold: true
-                        font.letterSpacing: 6
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "設定"
-                        color: Theme.inkSoft
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 13
-                        font.letterSpacing: 3
-                    }
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 20
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 14
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: settings.pages[settings.page].jp
-                        color: Theme.inkSoft
-                        font.family: "Noto Sans CJK JP"
-                        font.pixelSize: 12
-                        font.letterSpacing: 2
-                    }
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 1
-                        height: 14
-                        color: Theme.tint(Theme.ink, 0.18)
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: settings.two(settings.page + 1) + " / " + settings.two(settings.pages.length)
-                        color: Theme.accent
-                        font.family: Theme.mono
-                        font.pixelSize: 11
-                        font.bold: true
-                        font.letterSpacing: 2
-                    }
-                }
-
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Theme.tint(Theme.ink, 0.12)
-                }
+                host: settings
             }
 
-            // ============ numbered page list ============
-            Item {
-                id: list
+            // the search field: it lives in the search icon, and keeps the
+            // keyboard while that is closed, so typing opens it
+            TextInput {
+                id: searchField
 
-                y: strip.height
-                width: 256
-                height: parent.height - strip.height
+                parent: nav.fieldSlot
+                anchors.left: parent ? parent.left : undefined
+                anchors.right: parent ? parent.right : undefined
+                anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+                color: Theme.ink
+                selectionColor: Theme.tint(Theme.accent, 0.4)
+                font.family: Theme.mono
+                font.pixelSize: 11
+                clip: true
+                selectByMouse: true
 
-                Rectangle {
-                    anchors.right: parent.right
-                    width: 1
-                    height: parent.height
-                    color: Theme.tint(Theme.ink, 0.12)
+                onTextChanged: {
+                    settings.searchQuery = text
+                    if (text !== "")
+                        nav.searchOpen = true
                 }
+                onActiveFocusChanged: if (!activeFocus && text === "") nav.searchOpen = false
 
-                // ---- search
-                CutBox {
-                    id: searchBox
-
-                    x: 16
-                    y: 14
-                    width: parent.width - 33
-                    height: 32
-                    cut: Theme.cutSmall
-                    fill: Theme.tint(Theme.ink, 0.03)
-                    stroke: searchField.activeFocus ? Theme.accent : Theme.line
-
-                    Text {
-                        id: searchGlyph
-
-                        textFormat: Text.PlainText
-                        x: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: String.fromCodePoint(0xF0349)
-                        color: searchField.activeFocus ? Theme.accent : Theme.inkSoft
-                        font.family: Theme.glyphs
-                        font.pixelSize: 13
-                    }
-
-                    TextInput {
-                        id: searchField
-
-                        anchors.left: searchGlyph.right
-                        anchors.leftMargin: 9
-                        anchors.right: parent.right
-                        anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: Theme.ink
-                        selectionColor: Theme.tint(Theme.accent, 0.4)
-                        font.family: Theme.mono
-                        font.pixelSize: 11
-                        clip: true
-                        selectByMouse: true
-
-                        onTextChanged: settings.searchQuery = text
-
-                        Keys.onEscapePressed: {
-                            if (text !== "")
-                                text = ""
-                            else if (picker.opened)
-                                picker.dismiss()
-                            else
-                                settings.hide()
-                        }
-                        Keys.onDownPressed: settings.searchIndex = Math.min(settings.searchResults.length - 1, settings.searchIndex + 1)
-                        Keys.onUpPressed: settings.searchIndex = Math.max(0, settings.searchIndex - 1)
-                        Keys.onReturnPressed: settings.openResult(settings.searchIndex)
-                        Keys.onEnterPressed: settings.openResult(settings.searchIndex)
-
-                        Text {
-                            textFormat: Text.PlainText
-                            visible: searchField.text === ""
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: SearchLanguages.placeholder(settings.searchLanguages)
-                            color: Theme.inkMute
-                            font.family: Theme.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: 2
-                        }
+                Keys.onEscapePressed: {
+                    if (text !== "") {
+                        text = ""
+                        nav.searchOpen = false
+                    } else if (nav.searchOpen) {
+                        nav.searchOpen = false
+                    } else if (picker.opened) {
+                        picker.dismiss()
+                    } else {
+                        settings.hide()
                     }
                 }
+                Keys.onDownPressed: settings.searchIndex = Math.min(settings.searchResults.length - 1, settings.searchIndex + 1)
+                Keys.onUpPressed: settings.searchIndex = Math.max(0, settings.searchIndex - 1)
+                Keys.onReturnPressed: settings.openResult(settings.searchIndex)
+                Keys.onEnterPressed: settings.openResult(settings.searchIndex)
 
-                // ---- results, in place of the page list while you search
-                Column {
-                    id: resultList
-
-                    visible: settings.searchQuery.trim() !== ""
-                    y: searchBox.y + searchBox.height + 10
-                    width: parent.width - 1
-
-                    Repeater {
-                        model: settings.searchResults
-
-                        delegate: Rectangle {
-                            id: hit
-
-                            required property var modelData
-                            required property int index
-                            readonly property bool here: settings.searchIndex === index
-                            readonly property color ink: here ? settings.onAccent : Theme.ink
-
-                            width: parent.width
-                            height: 46
-                            color: here ? Theme.accent : hitMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation { duration: Theme.tFast }
-                            }
-
-                            Column {
-                                x: 20
-                                width: parent.width - 36
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 3
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    width: parent.width
-                                    elide: Text.ElideRight
-                                    text: hit.modelData.entry.title
-                                    color: hit.ink
-                                    font.family: Theme.mono
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                }
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    width: parent.width
-                                    elide: Text.ElideRight
-                                    text: hit.modelData.entry.page ? settings.placeOf(hit.modelData.entry.page) : "OPENS ON ITS OWN"
-                                    color: hit.here ? Theme.tint(hit.ink, 0.75) : Theme.inkSoft
-                                    font.family: Theme.mono
-                                    font.pixelSize: 9
-                                    font.letterSpacing: 1.5
-                                }
-                            }
-
-                            MouseArea {
-                                id: hitMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onEntered: settings.searchIndex = hit.index
-                                onClicked: settings.openResult(hit.index)
-                            }
-                        }
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        visible: settings.searchResults.length === 0
-                        x: 20
-                        width: parent.width - 36
-                        topPadding: 8
-                        wrapMode: Text.Wrap
-                        text: "No setting matches. Try other words."
-                        color: Theme.inkSoft
-                        font.family: Theme.mono
-                        font.pixelSize: 10
-                    }
-                }
-
-                Column {
-                    id: pageList
-
-                    visible: !resultList.visible
-                    y: searchBox.y + searchBox.height + 10
-                    width: parent.width - 1
-
-                    Repeater {
-                        model: settings.pages
-
-                        delegate: Rectangle {
-                            id: line
-
-                            required property var modelData
-                            required property int index
-                            readonly property bool here: settings.page === index
-                            readonly property color ink: here ? settings.onAccent : Theme.ink
-
-                            width: parent.width
-                            height: 33
-                            color: here ? Theme.accent : lineMouse.containsMouse ? Theme.tint(Theme.ink, 0.05) : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation { duration: Theme.tFast }
-                            }
-
-                            // hover tick on the left edge
-                            Rectangle {
-                                visible: lineMouse.containsMouse && !line.here
-                                width: 3
-                                height: parent.height
-                                color: Theme.accent
-                            }
-
-                            Text {
-                                id: number
-
-                                textFormat: Text.PlainText
-                                x: 20
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: settings.two(line.index + 1)
-                                color: line.here ? line.ink : Theme.inkSoft
-                                font.family: Theme.mono
-                                font.pixelSize: 11
-                                font.bold: line.here
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                anchors.left: number.right
-                                anchors.leftMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: line.modelData.name.toUpperCase()
-                                color: line.here || lineMouse.containsMouse ? line.ink : Theme.tint(Theme.ink, 0.78)
-                                font.family: Theme.mono
-                                font.pixelSize: 12
-                                font.bold: true
-                                font.letterSpacing: 1.5
-                            }
-
-                            Text {
-                                textFormat: Text.PlainText
-                                anchors.right: parent.right
-                                anchors.rightMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: line.modelData.jp
-                                color: line.here ? Theme.tint(line.ink, 0.8) : Theme.inkSoft
-                                font.family: "Noto Sans CJK JP"
-                                font.pixelSize: 11
-                                font.letterSpacing: 1
-                            }
-
-                            MouseArea {
-                                id: lineMouse
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: settings.page = line.index
-                            }
-                        }
-                    }
-                }
-
-                Item {
-                    id: listFoot
-
-                    anchors.bottom: parent.bottom
-                    width: parent.width - 1
-                    height: 40
-
-                    Rectangle {
-                        width: parent.width
-                        height: 1
-                        color: Theme.tint(Theme.ink, 0.12)
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        x: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "ESC ── CLOSE"
-                        color: Theme.inkSoft
-                        font.family: Theme.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 2
-                    }
+                Text {
+                    textFormat: Text.PlainText
+                    visible: searchField.text === ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width
+                    elide: Text.ElideRight
+                    text: SearchLanguages.placeholder(settings.searchLanguages)
+                    color: Theme.inkMute
+                    font.family: Theme.mono
+                    font.pixelSize: 10
+                    font.letterSpacing: 2
                 }
             }
 
@@ -911,8 +623,8 @@ PanelWindow {
             Item {
                 id: pageArea
 
-                x: list.width + 28
-                y: strip.height + 20
+                x: 32
+                y: nav.height + 22
                 width: parent.width - x
                 height: parent.height - y - 16
                 clip: true

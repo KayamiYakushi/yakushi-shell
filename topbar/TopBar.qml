@@ -12,6 +12,11 @@ import "../"
 // Modules are laid out in the order chosen in Settings -> Top Bar; the
 // last two dots between them turn red while the screen is recorded and
 // green while the microphone is heard.
+//
+// On the island itself: double-click a module and keep the button down to
+// move it (let go to drop it); right-click one for its own small settings
+// card (and to put other modules on or take it off); hover the date for
+// the month.
 // Everything is event-driven (Hyprland IPC, MPRIS, PipeWire, UPower,
 // NetworkManager, the system clock); only SystemStats ticks, every 2 seconds (on the clock's tick when
 // seconds are shown).
@@ -66,7 +71,244 @@ PanelWindow {
         onTriggered: if (!win.mediaHot && !mediaDrop.hovered) win.mediaOpen = false
     }
 
-    onMediaOpenChanged: if (!mediaOpen) closeDelay.stop()
+    onMediaOpenChanged: {
+        if (!mediaOpen) {
+            closeDelay.stop()
+        } else {
+            calOpen = false
+            editOpen = false
+        }
+    }
+
+    // -------------------------
+    // The month under the date (hover it)
+    // -------------------------
+    readonly property int calHeight: 214
+    property bool dateHot: false
+    property bool calOpen: false
+    property real dateCenterX: width / 2
+
+    onDateHotChanged: {
+        if (dateHot) {
+            calClose.stop()
+            calDelay.restart()
+        } else {
+            calDelay.stop()
+            if (calOpen)
+                calClose.restart()
+        }
+    }
+
+    onCalOpenChanged: {
+        if (calOpen) {
+            mediaOpen = false
+            editOpen = false
+        } else {
+            calClose.stop()
+        }
+    }
+
+    Timer {
+        id: calDelay
+        interval: 220
+        onTriggered: if (win.dateHot && !win.powerOpen && win.dragKey === "") win.calOpen = true
+    }
+
+    Timer {
+        id: calClose
+        interval: 300
+        onTriggered: if (!win.dateHot && !calDrop.hovered) win.calOpen = false
+    }
+
+    // -------------------------
+    // A module's own settings (right-click it)
+    // -------------------------
+    property bool editOpen: false
+    property string editKey: ""          // "" = the island itself
+    property bool editTouched: false     // pointer has been inside the card
+    property real editCenterX: width / 2
+
+    function toggleEdit(key) {
+        if (editOpen && editKey === key) {
+            editOpen = false
+            return
+        }
+        editKey = key
+        editTouched = false
+        mediaOpen = false
+        powerOpen = false
+        calOpen = false
+        editOpen = true
+        editIdle.restart()
+    }
+
+    onEditOpenChanged: if (!editOpen) { editLeave.stop(); editIdle.stop() }
+
+    // Left alone it closes by itself; once used, leaving it closes it.
+    Timer {
+        id: editIdle
+        interval: 8000
+        onTriggered: if (!editDrop.hovered) win.editOpen = false
+    }
+
+    Timer {
+        id: editLeave
+        interval: 500
+        onTriggered: if (!editDrop.hovered && !islandHover.hovered) win.editOpen = false
+    }
+
+    function editPointerChanged() {
+        if (!editOpen)
+            return
+        if (editDrop.hovered) {
+            editTouched = true
+            editLeave.stop()
+            editIdle.stop()
+        } else if (editTouched && !islandHover.hovered) {
+            editLeave.restart()
+        }
+    }
+
+    function saveSetting(name, value) {
+        run(["python3", Paths.script("yakushi-topbarctl.py"), "set", name, value])
+    }
+
+    // the whole order (shown and hidden modules), applied at once and saved
+    function saveOrder(full) {
+        config.order = full
+        saveSetting("order", full.join(","))
+    }
+
+    function setModule(key, on) {
+        var next = {}
+        for (var k in config.modules)
+            next[k] = config.modules[k]
+        next[key] = on
+        config.modules = next
+        saveSetting("module." + key, on ? "on" : "off")
+    }
+
+    // a module put on the bar goes right after the one whose card it is
+    function addModule(key) {
+        var full = config.order.filter(function(k) { return k !== key })
+        var at = editKey !== "" ? full.indexOf(editKey) + 1 : full.length
+        full.splice(at > 0 ? at : full.length, 0, key)
+        saveOrder(full)
+        setModule(key, true)
+        editKey = key
+    }
+
+    function removeModule() {
+        var key = editKey
+        editOpen = false
+        if (key !== "")
+            setModule(key, false)
+    }
+
+    // -------------------------
+    // Moving a module: double-click it, keep the button down, drag
+    // -------------------------
+    // The module itself still gets both clicks (the island never delays a
+    // click), so a switch flipped by the first one is flipped back by the
+    // second.
+    property string tapKey: ""
+    property real tapAt: 0
+    property real tapX: 0
+    property string dragKey: ""
+    property int dragFrom: -1
+    property real dragStartX: 0
+    property real dragDx: 0
+
+    function gesturePress(key, index, x) {
+        var now = Date.now()
+        if (key === tapKey && now - tapAt < 400 && Math.abs(x - tapX) < 12) {
+            tapKey = ""
+            netClick.stop()
+            mediaOpen = false
+            powerOpen = false
+            calOpen = false
+            editOpen = false
+            dragFrom = index
+            dragStartX = x
+            dragDx = 0
+            dragKey = key
+        } else {
+            tapKey = key
+            tapAt = now
+            tapX = x
+        }
+    }
+
+    function gestureMove(key, x) {
+        if (dragKey !== key)
+            return
+        var me = slots.itemAt(dragFrom)
+        if (!me)
+            return
+        // not past either end of the row
+        dragDx = Math.max(-me.x, Math.min(content.width - me.x - me.width, x - dragStartX))
+    }
+
+    // where the module being moved would land, among the others
+    readonly property int dragTo: {
+        if (dragKey === "")
+            return -1
+        var me = slots.itemAt(dragFrom)
+        if (!me)
+            return dragFrom
+        var centre = me.x + me.lead + me.moduleWidth / 2 + dragDx
+        var to = 0
+        for (var i = 0; i < slots.count; i++) {
+            var other = slots.itemAt(i)
+            if (i !== dragFrom && other && other.x + other.lead + other.moduleWidth / 2 < centre)
+                to++
+        }
+        return to
+    }
+
+    // how far the module at `i` steps aside for the one being moved
+    function shiftOf(i) {
+        if (dragKey === "" || i === dragFrom || dragTo < 0)
+            return 0
+        var me = slots.itemAt(dragFrom)
+        var w = me ? me.width : 0
+        if (dragFrom < dragTo && i > dragFrom && i <= dragTo)
+            return -w
+        if (dragTo < dragFrom && i >= dragTo && i < dragFrom)
+            return w
+        return 0
+    }
+
+    function gestureRelease() {
+        if (dragKey === "")
+            return
+        var key = dragKey
+        var from = dragFrom
+        var to = dragTo
+        if (to >= 0 && to !== from) {
+            var shown = visibleKeys.slice()
+            shown.splice(from, 1)
+            shown.splice(to, 0, key)
+            // the hidden modules keep their places in the whole order
+            var full = config.order.slice()
+            var j = 0
+            for (var i = 0; i < full.length; i++)
+                if (visibleKeys.indexOf(full[i]) >= 0)
+                    full[i] = shown[j++]
+            saveOrder(full)
+        }
+        dragKey = ""
+        dragFrom = -1
+        dragDx = 0
+    }
+
+    // Network opens Settings on a click: a moment later, so a double-click
+    // that moves it does not open Settings too.
+    Timer {
+        id: netClick
+        interval: 260
+        onTriggered: win.run([Paths.shell + "/bin/yakushi", "settings", "network"])
+    }
 
     Connections {
         target: win.media
@@ -84,7 +326,7 @@ PanelWindow {
 
     // The surface is tall enough for the open card, but only the bar row
     // reserves space and only the island itself takes input.
-    implicitHeight: barHeight + cardHeight
+    implicitHeight: barHeight + 300
     exclusiveZone: barHeight
     color: "transparent"
 
@@ -105,6 +347,14 @@ PanelWindow {
         Region {
             item: powerDrop.visible ? powerDrop : null
         }
+
+        Region {
+            item: calDrop.visible ? calDrop : null
+        }
+
+        Region {
+            item: editDrop.visible ? editDrop : null
+        }
     }
 
     // -------------------------
@@ -119,6 +369,8 @@ PanelWindow {
         powerTouched = false
         if (powerOpen) {
             mediaOpen = false
+            calOpen = false
+            editOpen = false
             powerIdle.restart()
         } else {
             powerIdle.stop()
@@ -332,7 +584,9 @@ PanelWindow {
 
         BarModule {
             value: win.clock.date.toLocaleDateString(Qt.locale("en_US"), "ddd d MMM")
-            valueColor: Theme.inkSoft
+            valueColor: win.calOpen ? Theme.ink : Theme.inkSoft
+            onHoveredChanged: win.dateHot = hovered
+            Component.onDestruction: win.dateHot = false
         }
     }
 
@@ -396,7 +650,7 @@ PanelWindow {
                 : hovered ? win.network.name : ""
             valueColor: win.network && win.network.offline ? Theme.alert : Theme.ink
             maxValueWidth: 160
-            onClicked: win.run([Paths.shell + "/bin/yakushi", "settings", "network"])
+            onClicked: button => { if (button === Qt.LeftButton) netClick.restart() }
         }
     }
 
@@ -459,6 +713,19 @@ PanelWindow {
             NumberAnimation { duration: Theme.tMid + 40; easing.type: Easing.OutCubic }
         }
 
+        HoverHandler {
+            id: islandHover
+
+            onHoveredChanged: win.editPointerChanged()
+        }
+
+        // right-click an empty part: put modules on the bar
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.RightButton
+            onClicked: win.toggleEdit("")
+        }
+
         Shape {
             anchors.fill: parent
             preferredRendererType: Shape.CurveRenderer
@@ -497,6 +764,8 @@ PanelWindow {
                 height: win.barHeight
 
                 Repeater {
+                    id: slots
+
                     model: win.visibleKeys
 
                     delegate: Item {
@@ -504,6 +773,27 @@ PanelWindow {
 
                         required property string modelData
                         required property int index
+
+                        readonly property real moduleWidth: loader.item ? loader.item.implicitWidth : 0
+                        readonly property bool lifted: win.dragKey === modelData
+                        readonly property real centerX: island.x + win.ear + content.x + slot.x + slot.lead + loader.width / 2
+
+                        z: lifted ? 5 : 0
+                        // the others step back a little while one is moved
+                        opacity: win.dragKey === "" || lifted ? 1 : 0.55
+
+                        Behavior on opacity {
+                            NumberAnimation { duration: Theme.tFast }
+                        }
+
+                        transform: Translate {
+                            x: slot.lifted ? win.dragDx : win.shiftOf(slot.index)
+
+                            Behavior on x {
+                                enabled: !slot.lifted
+                                NumberAnimation { duration: Theme.tMid; easing.type: Easing.OutCubic }
+                            }
+                        }
 
                         readonly property string prevKey: index > 0 ? win.visibleKeys[index - 1] : ""
                         // A faint dot between module groups, a plain gap inside one.
@@ -542,13 +832,68 @@ PanelWindow {
                             sourceComponent: win.componentFor[slot.modelData]
                         }
 
-                        // Where the song / power button sit, so their cards can
-                        // hang right below them.
+                        // the module being moved: an accent mark under it
+                        SlantBar {
+                            visible: slot.lifted
+                            x: slot.lead
+                            y: win.barHeight - 5
+                            width: loader.width
+                            height: 3
+                            value: 1
+                        }
+
+                        // Double-click and hold: move it. It only watches the
+                        // pointer (a passive grab), so the module's own clicks,
+                        // hover and slider are untouched. Right-click: its card.
+                        Item {
+                            x: slot.lead
+                            z: 2
+                            width: loader.width
+                            height: win.barHeight
+
+                            PointHandler {
+                                acceptedButtons: Qt.LeftButton
+
+                                onActiveChanged: {
+                                    if (active)
+                                        win.gesturePress(slot.modelData, slot.index, point.scenePosition.x)
+                                    else
+                                        win.gestureRelease()
+                                }
+                                onPointChanged: if (active) win.gestureMove(slot.modelData, point.scenePosition.x)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.leftMargin: -5
+                                anchors.rightMargin: -5
+                                acceptedButtons: Qt.RightButton
+                                onClicked: win.toggleEdit(slot.modelData)
+                            }
+                        }
+
+                        // Where the song / power button / date sit, and the
+                        // module whose card is open, so their cards can hang
+                        // right below them.
                         Binding {
                             when: slot.modelData === "media" || slot.modelData === "power"
                             target: win
                             property: slot.modelData === "power" ? "powerCenterX" : "mediaCenterX"
-                            value: island.x + win.ear + content.x + slot.x + slot.lead + loader.width / 2
+                            value: slot.centerX
+                        }
+
+                        Binding {
+                            when: slot.modelData === "date"
+                            target: win
+                            property: "dateCenterX"
+                            value: slot.centerX
+                        }
+
+                        Binding {
+                            when: slot.modelData === win.editKey
+                            target: win
+                            property: "editCenterX"
+                            value: slot.centerX
                         }
                     }
                 }
@@ -625,6 +970,69 @@ PanelWindow {
             onCloseRequested: win.powerOpen = false
             onActivity: if (!win.powerTouched) powerIdle.restart()
             onRun: function(args) { win.run(args) }
+        }
+    }
+
+    DropCard {
+        id: calDrop
+
+        island: island
+        islandEar: win.ear
+        islandCorner: island.cornerRadius
+        fillOpacity: win.config.barOpacity
+        open: win.calOpen
+        anchorX: win.dateCenterX
+        cardWidth: 290
+        cardHeight: win.calHeight
+        minWidth: 290
+
+        onHoveredChanged: {
+            if (hovered)
+                calClose.stop()
+            else if (win.calOpen && !win.dateHot)
+                calClose.restart()
+        }
+
+        CalendarCard {
+            x: 20
+            y: 16
+            width: parent.width - 40
+            today: win.clock.date
+            open: win.calOpen
+        }
+    }
+
+    DropCard {
+        id: editDrop
+
+        island: island
+        islandEar: win.ear
+        islandCorner: island.cornerRadius
+        fillOpacity: win.config.barOpacity
+        open: win.editOpen
+        anchorX: win.editKey === "" ? island.x + island.width / 2 : win.editCenterX
+        cardWidth: 330
+        cardHeight: moduleCard.wantedHeight + 32
+        minWidth: 330
+
+        onHoveredChanged: win.editPointerChanged()
+
+        ModuleCard {
+            id: moduleCard
+
+            x: 20
+            y: 16
+            width: parent.width - 40
+            config: win.config
+            key: win.editKey
+
+            onSetValue: (name, value) => win.saveSetting(name, value)
+            onAddModule: key => win.addModule(key)
+            onRemoveModule: win.removeModule()
+            onRun: args => {
+                win.editOpen = false
+                win.run(args)
+            }
         }
     }
 }

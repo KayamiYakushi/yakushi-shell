@@ -82,6 +82,16 @@ keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
 shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
 System to see yourself on the lock screen.
 
+Settings lists its pages as icons along its top edge; hold the pointer on
+one and its name hangs below it. Double-click an icon and keep the button
+down to move it (System stays first; the order is kept).
+
+The bar is arranged on the bar itself: double-click a module and keep the
+button down to move it; right-click it for a small card with only its own
+settings, to take it off the bar or to put others on next to it
+(right-click an empty part of the island to put modules on an empty bar).
+Hover the date for the month.
+
 The last two dots between the bar's module groups are also its privacy
 marks: one turns red while the screen is being recorded or shared (not for
 a screenshot), the other green while a program listens to the microphone.

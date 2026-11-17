@@ -4,6 +4,8 @@
 Commands:
     get                               Print the saved state as JSON.
     set <opacity> <#rrggbb>           Save the state.
+    order <key,key,...>               Save the order of the Settings icons
+                                      (appearance.settingsOrder; system stays first).
 
 State lives in the "appearance" section of ~/.config/yakushi/config.json
 (see yakushi_config.py). Runs only when called: no daemon, no timers.
@@ -88,6 +90,29 @@ def set_state(opacity_raw: str, accent: str) -> None:
     emit({"ok": True})
 
 
+ORDER_KEY = re.compile(r"^[a-z]{1,24}$")
+
+
+def set_order(raw: str) -> None:
+    """The icons' order in the Settings header. Only the shape of each key
+    is checked here; Settings drops keys it does not know when it reads."""
+    keys: list[str] = ["system"]
+    for key in raw.split(","):
+        if ORDER_KEY.match(key) and key not in keys:
+            keys.append(key)
+    if len(keys) > 40:
+        fail("Too many entries.")
+
+    def change(state: dict) -> None:
+        state["settingsOrder"] = keys
+
+    try:
+        config.update("appearance", change)
+    except config.NewerConfig as error:
+        fail(str(error))
+    emit({"ok": True, "order": keys})
+
+
 def main() -> None:
     args = sys.argv[1:]
 
@@ -95,8 +120,10 @@ def main() -> None:
         get()
     elif args[:1] == ["set"] and len(args) >= 3:               # older extra words are ignored
         set_state(args[1], args[2])
+    elif len(args) == 2 and args[0] == "order":
+        set_order(args[1])
     else:
-        fail("Usage: get | set <opacity> <#rrggbb>")
+        fail("Usage: get | set <opacity> <#rrggbb> | order <key,key,...>")
 
 
 if __name__ == "__main__":

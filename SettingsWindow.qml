@@ -378,9 +378,9 @@ PanelWindow {
         // the default size, in the middle.
         property real offsetX: 0
         property real offsetY: 0
-        readonly property int minW: Math.min(860, settings.width - 40)
+        readonly property int minW: Math.min(780, settings.width - 40)
         readonly property int minH: Math.min(560, settings.height - 40)
-        width: Math.max(minW, Math.min(Theme.settingsWidth > 0 ? Theme.settingsWidth : 1020, settings.width - 40))
+        width: Math.max(minW, Math.min(Theme.settingsWidth > 0 ? Theme.settingsWidth : 870, settings.width - 40))   // the System page fits exactly
         height: Math.max(minH, Math.min(Theme.settingsHeight > 0 ? Theme.settingsHeight : 660, settings.height - 40))
         still: resizer.active || resizer.hovering > 0
 

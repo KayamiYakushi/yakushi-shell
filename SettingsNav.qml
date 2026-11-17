@@ -293,8 +293,8 @@ Item {
     Row {
         id: icons
 
-        // centred, but never over 薬
-        x: Math.max(mark.x + mark.width + 18, (nav.width - width) / 2)
+        // right after 薬, System first
+        x: mark.x + mark.width + 22
         anchors.verticalCenter: parent.verticalCenter
         spacing: nav.gap
 

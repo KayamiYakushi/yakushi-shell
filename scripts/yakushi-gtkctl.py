@@ -24,11 +24,10 @@ What it writes, only while colours are on:
     Discord, browsers...) like Files: same tint, opacity and accent. For it
     the GTK theme "Adwaita-dark" is renamed "Adwaita" when no such theme is
     installed: GTK 3 would otherwise show the dialog in light Adwaita.
-    When Files (Nautilus 47+) is installed it also becomes the "open / save"
-    dialog of other apps, so they get its grid of large previews:
-    ~/.local/share/xdg-desktop-portal/portals/nautilus.portal and
-    ~/.config/xdg-desktop-portal/<desktop>-portals.conf (only if you have
-    none of your own there). Off removes both.
+    Files (Nautilus) is not made the file dialog: as a portal backend it
+    stalled xdg-desktop-portal for ~2 minutes at every login (each waited on
+    the other), and every Flatpak app opened meanwhile started slowly or
+    without the portal. The two files that did it are removed when found.
     ~/.local/share/icons/Yakushi-Folders: Adwaita's folder icons in the
     accent colour (Adwaita draws them blue, and CSS cannot reach into an
     icon), everything else inherited from Adwaita; made the GTK icon theme
@@ -469,73 +468,36 @@ def fix_gtk3_theme() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Files as the "open / save" dialog of other apps
+# Files is no longer the "open / save" dialog of other apps
 # ---------------------------------------------------------------------------
+# Earlier versions wrote these to make Nautilus the file dialog. At login
+# xdg-desktop-portal started Nautilus, Nautilus waited on the portal, and the
+# portal hung ~2 minutes; Flatpak apps opened then were slow or fell back to
+# their own empty, light dialog. The GTK 3 dialog (chooser_css) is used.
 
 PORTAL_MARK = "# yakushi (Settings -> Appearance -> Apps): Files is the file dialog"
-PORTAL_IFACE = "org.freedesktop.impl.portal.FileChooser"
 PORTAL_DEF = paths.DATA_HOME / "xdg-desktop-portal" / "portals" / "nautilus.portal"
-PORTAL_SYSTEM = Path("/usr/share/xdg-desktop-portal")
 
 
-def portal_conf() -> tuple[Path, str]:
-    """The portals.conf xdg-desktop-portal reads for this desktop, and the system's defaults for it."""
+def portal_conf() -> Path:
+    """The portals.conf xdg-desktop-portal reads for this desktop."""
     desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").split(":")[0].strip().lower()
     name = f"{desktop}-portals.conf" if re.fullmatch(r"[a-z0-9_-]+", desktop) else "portals.conf"
-    default = "gtk"
-    try:
-        for line in (PORTAL_SYSTEM / name).read_text(encoding="utf-8").splitlines():
-            if line.strip().startswith("default="):
-                default = line.split("=", 1)[1].strip() or default
-    except OSError:
-        pass
-    return paths.CONFIG_HOME / "xdg-desktop-portal" / name, default
+    return paths.CONFIG_HOME / "xdg-desktop-portal" / name
 
 
-def files_has_dialog() -> bool:
-    """Nautilus 47 and newer answer the file dialog portal themselves."""
-    binary = shutil.which("nautilus")
-    if not binary:
-        return False
-    try:
-        with open(binary, "rb") as handle:
-            return PORTAL_IFACE.encode() in handle.read()
-    except OSError:
-        return False
-
-
-def ours(path: Path) -> bool | None:
-    """True: written by us. False: someone else's. None: not there."""
+def ours(path: Path) -> bool:
     try:
         return path.read_text(encoding="utf-8").startswith(PORTAL_MARK)
-    except FileNotFoundError:
-        return None
     except (OSError, UnicodeDecodeError):
         return False
 
 
-def set_file_dialog(wanted: bool) -> None:
-    conf, default = portal_conf()
-    wanted = wanted and files_has_dialog()
-    targets = {
-        PORTAL_DEF: f"{PORTAL_MARK}\n[portal]\nDBusName=org.gnome.Nautilus\nInterfaces={PORTAL_IFACE};\n",
-        conf: f"{PORTAL_MARK}\n[preferred]\ndefault={default}\n{PORTAL_IFACE}=nautilus\n",
-    }
-    if wanted and ours(conf) is False:
-        return                                  # the user's own portals.conf: theirs to decide
+def drop_files_dialog() -> None:
+    """Remove what earlier versions wrote; never a file of the user's own."""
     changed = False
-    for path, text in targets.items():
-        mine = ours(path)
-        if wanted and mine is not False:
-            try:
-                same = path.read_text(encoding="utf-8") == text
-            except OSError:
-                same = False
-            if not same:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                write_atomic(path, text)
-                changed = True
-        elif not wanted and mine:
+    for path in (PORTAL_DEF, portal_conf()):
+        if ours(path):
             path.unlink()
             changed = True
     if changed:                                 # read once, when the portal starts
@@ -563,7 +525,7 @@ def apply(state: dict) -> None:
             except FileNotFoundError:
                 pass
     set_icons(acc, state["colours"])
-    set_file_dialog(state["colours"])
+    drop_files_dialog()
 
 
 def files_running() -> bool:

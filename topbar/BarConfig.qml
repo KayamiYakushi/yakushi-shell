@@ -20,6 +20,7 @@ Item {
         "date", "time", "media", "tray", "volume", "network", "battery", "power"
     ]
     property var order: defaultOrder
+    property var trayOrder: []     // tray program ids, as their icons were dragged
     property var modules: ({
         workspaces: true,
         ram: true,
@@ -81,6 +82,14 @@ Item {
 
             if (list.join() !== order.join())
                 order = list
+        }
+
+        if (Array.isArray(data.trayOrder)) {
+            var ids = data.trayOrder.filter(function(id, i) {
+                return typeof id === "string" && id !== "" && data.trayOrder.indexOf(id) === i
+            })
+            if (ids.join("\n") !== trayOrder.join("\n"))
+                trayOrder = ids
         }
 
         if (data.modules && typeof data.modules === "object") {

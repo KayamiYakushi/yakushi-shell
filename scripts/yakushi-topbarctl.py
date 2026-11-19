@@ -9,6 +9,8 @@ Commands:
                               opacity      0.40 .. 1.00
                               visualizer   hover | always | off
                               order        comma-separated module ids
+                              trayOrder    JSON list of tray program ids, in the
+                                           order their icons are dragged to
                               module.<id>  on | off   (privacy: the red / green dots)
     sensors                 Print the CPU/GPU temperature files and whether
                             this computer has a battery, as JSON.
@@ -74,7 +76,11 @@ DEFAULTS: dict = {
     "visualizer": "hover",
     "order": DEFAULT_ORDER,
     "modules": {name: name not in DEFAULT_OFF for name in MODULES},
+    "trayOrder": [],
 }
+
+TRAY_ORDER_MAX = 64      # remembered programs
+TRAY_ID_MAX = 200        # characters in one program id
 
 OPACITY_MIN = 0.40
 OPACITY_MAX = 1.00
@@ -135,6 +141,17 @@ def clean_order(items) -> list[str]:
     return order
 
 
+def clean_tray_order(items) -> list[str]:
+    """Program ids (StatusNotifierItem Id) once each, in the given order."""
+    order: list[str] = []
+    if not isinstance(items, list):
+        return order
+    for item in items:
+        if isinstance(item, str) and 0 < len(item) <= TRAY_ID_MAX and item not in order:
+            order.append(item)
+    return order[:TRAY_ORDER_MAX]
+
+
 def sanitize(saved: dict) -> dict:
     """The saved section, with defaults filled in and bad values dropped."""
     state = json.loads(json.dumps(DEFAULTS))
@@ -152,6 +169,8 @@ def sanitize(saved: dict) -> dict:
 
     if isinstance(saved.get("order"), list):
         state["order"] = clean_order(saved["order"])
+
+    state["trayOrder"] = clean_tray_order(saved.get("trayOrder"))
 
     modules = saved.get("modules")
     if isinstance(modules, dict):
@@ -208,6 +227,12 @@ def set_value(key: str, raw: str) -> None:
                 state["order"] = list(DEFAULT_ORDER)
             else:
                 state["order"] = clean_order(raw.split(","))
+
+        elif key == "trayOrder":
+            try:
+                state["trayOrder"] = clean_tray_order(json.loads(raw))
+            except ValueError:
+                fail("trayOrder must be a JSON list of program ids.")
 
         elif key.startswith("module.") and key[7:] in MODULES:
             state["modules"][key[7:]] = on_off(raw)

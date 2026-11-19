@@ -746,15 +746,23 @@ PanelWindow {
         }
     }
 
-    // The tray's icons; right-click one for that program's menu.
+    // The tray's icons; right-click one for that program's menu, drag one
+    // to move it among the others (the order is kept by program id).
     Component {
         id: cTray
 
         TrayModule {
             tray: win.tray
             barHeight: win.barHeight
+            order: win.config.trayOrder
+            moduleMoving: win.dragKey !== ""
             openItem: win.trayOpen ? win.trayItem : null
             onMenuRequested: (item, centerX) => win.toggleTrayMenu(item, centerX)
+            onDragStarted: win.trayOpen = false
+            onReordered: ids => {
+                win.config.trayOrder = ids
+                win.saveSetting("trayOrder", JSON.stringify(ids))
+            }
         }
     }
 

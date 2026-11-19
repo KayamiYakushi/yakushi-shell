@@ -5,11 +5,9 @@ import Quickshell.Services.SystemTray
 // (StatusNotifierItem). Loaded by file from shell.qml only while the tray
 // module is on, so with it off nothing listens on D-Bus for them.
 //
-// Programs that ask to be hidden for now (Passive) are left out; the rest
-// keep the order they arrived in.
+// Every program is shown, in the order it arrived. "Passive" ones are not
+// hidden: Spotify, for one, reports itself Passive all the time.
 QtObject {
-    readonly property var items: SystemTray.items.values.filter(function(item) {
-        return item.status !== Status.Passive
-    })
+    readonly property var items: SystemTray.items.values
     readonly property int count: items.length
 }

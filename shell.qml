@@ -74,6 +74,15 @@ ShellRoot {
         source: "topbar/PrivacyState.qml"
     }
 
+    // The system tray, only while its module is on (off by default): with
+    // it off, nothing listens for the programs' tray icons at all.
+    Loader {
+        id: barTray
+
+        active: barConfig.modules.tray
+        source: "topbar/TrayState.qml"
+    }
+
     // Bumped by the power shortcut (IPC); the bar on the focused monitor
     // opens its power menu.
     QtObject {
@@ -110,6 +119,7 @@ ShellRoot {
                 battery: barBattery.item
                 network: barNetwork.item
                 privacy: barPrivacy.item
+                tray: barTray.item
             }
         }
     }

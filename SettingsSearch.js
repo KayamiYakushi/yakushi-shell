@@ -312,6 +312,12 @@ var INDEX = [
     { page: "Top Bar", find: ["Volume"], title: "Volume in the top bar", weight: 0.9, keys: {
         en: "volume sound", tr: "ses seviyesi", de: "lautstärke", es: "volumen", fr: "volume", pt: "volume",
         it: "volume", ru: "громкость", pl: "głośność" } },
+    { page: "Top Bar", find: ["Tray"], title: "System tray in the top bar", weight: 0.9, keys: {
+        en: "tray system tray app icons status notifier background programs",
+        tr: "tepsi sistem tepsisi uygulama simgeleri arka plan programlar",
+        de: "tray infobereich systemleiste symbole", es: "bandeja del sistema iconos aplicaciones",
+        fr: "zone de notification barre d'état icônes", pt: "bandeja do sistema ícones aplicativos",
+        it: "area di notifica vassoio icone", ru: "трей системный лоток значки", pl: "zasobnik systemowy tray ikony" } },
     { page: "Top Bar", find: ["Battery"], title: "Battery in the top bar", weight: 0.9, keys: {
         en: "battery charge charging laptop power level percent", tr: "pil batarya şarj dizüstü laptop şarj seviyesi yüzde",
         de: "akku batterie ladung laptop ladestand", es: "batería carga portátil nivel",

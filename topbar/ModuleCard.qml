@@ -33,6 +33,7 @@ Item {
         cpuTemp:    { name: "CPU TEMP",    jp: "温度",             icon: glyph(0xF050F), short: "CPU °C" },
         gpuTemp:    { name: "GPU TEMP",    jp: "温度",             icon: glyph(0xF08AE), short: "GPU °C" },
         media:      { name: "NOW PLAYING", jp: "再生中",           icon: glyph(0xF0387), short: "MUSIC" },
+        tray:       { name: "TRAY",        jp: "トレイ",           icon: glyph(0xF003B), short: "TRAY" },
         volume:     { name: "VOLUME",      jp: "音量",             icon: glyph(0xF057E), short: "VOLUME" },
         network:    { name: "NETWORK",     jp: "ネットワーク",     icon: glyph(0xF0928), short: "WI-FI" },
         battery:    { name: "BATTERY",     jp: "バッテリー",       icon: glyph(0xF0079), short: "BATTERY" },

@@ -35,6 +35,7 @@ MODULES = (
     "cpuTemp",
     "gpuTemp",
     "media",
+    "tray",
     "volume",
     "network",
     "battery",
@@ -54,11 +55,15 @@ DEFAULT_ORDER = [
     "date",
     "time",
     "media",
+    "tray",
     "volume",
     "network",
     "battery",
     "power",
 ]
+
+# Modules a fresh config starts without (put on in Settings -> Top Bar)
+DEFAULT_OFF = ("tray",)
 
 VISUALIZER_MODES = ("hover", "always", "off")
 
@@ -68,7 +73,7 @@ DEFAULTS: dict = {
     "opacity": 0.90,
     "visualizer": "hover",
     "order": DEFAULT_ORDER,
-    "modules": {name: True for name in MODULES},
+    "modules": {name: name not in DEFAULT_OFF for name in MODULES},
 }
 
 OPACITY_MIN = 0.40

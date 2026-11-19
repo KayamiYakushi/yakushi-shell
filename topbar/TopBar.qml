@@ -31,6 +31,7 @@ PanelWindow {
     property var battery: null     // BatteryState, on a computer with a battery
     property var network: null     // NetworkState, while its module is on
     property var privacy: null     // PrivacyState (screen watched, microphone heard), while it is on
+    property var tray: null        // TrayState, while the tray module is on
 
     readonly property var mods: config.modules
     readonly property int barHeight: 32
@@ -77,6 +78,7 @@ PanelWindow {
         } else {
             calOpen = false
             editOpen = false
+            trayOpen = false
         }
     }
 
@@ -103,6 +105,7 @@ PanelWindow {
         if (calOpen) {
             mediaOpen = false
             editOpen = false
+            trayOpen = false
         } else {
             calClose.stop()
         }
@@ -138,6 +141,7 @@ PanelWindow {
         mediaOpen = false
         powerOpen = false
         calOpen = false
+        trayOpen = false
         editOpen = true
         editIdle.restart()
     }
@@ -206,6 +210,59 @@ PanelWindow {
     }
 
     // -------------------------
+    // A tray program's menu (right-click its icon)
+    // -------------------------
+    property bool trayOpen: false
+    property var trayItem: null          // the SystemTrayItem whose menu is open
+    property bool trayTouched: false     // pointer has been inside the card
+    property real trayCenterX: width / 2
+
+    function toggleTrayMenu(item, centerX) {
+        if (trayOpen && trayItem === item) {
+            trayOpen = false
+            return
+        }
+        trayItem = item
+        trayCenterX = centerX
+        trayTouched = false
+        mediaOpen = false
+        powerOpen = false
+        calOpen = false
+        editOpen = false
+        trayOpen = true
+        trayIdle.restart()
+    }
+
+    onTrayOpenChanged: if (!trayOpen) { trayLeave.stop(); trayIdle.stop() }
+
+    // the program went away with its menu open
+    onTrayItemChanged: if (trayItem === null) trayOpen = false
+
+    Timer {
+        id: trayIdle
+        interval: 8000
+        onTriggered: if (!trayDrop.hovered) win.trayOpen = false
+    }
+
+    Timer {
+        id: trayLeave
+        interval: 450
+        onTriggered: if (!trayDrop.hovered && !islandHover.hovered) win.trayOpen = false
+    }
+
+    function trayPointerChanged() {
+        if (!trayOpen)
+            return
+        if (trayDrop.hovered) {
+            trayTouched = true
+            trayLeave.stop()
+            trayIdle.stop()
+        } else if (trayTouched && !islandHover.hovered) {
+            trayLeave.restart()
+        }
+    }
+
+    // -------------------------
     // Moving a module: double-click it, keep the button down, drag
     // -------------------------
     // The module itself still gets both clicks (the island never delays a
@@ -228,6 +285,7 @@ PanelWindow {
             powerOpen = false
             calOpen = false
             editOpen = false
+            trayOpen = false
             dragFrom = index
             dragStartX = x
             dragDx = 0
@@ -355,6 +413,10 @@ PanelWindow {
         Region {
             item: editDrop.visible ? editDrop : null
         }
+
+        Region {
+            item: trayDrop.visible ? trayDrop : null
+        }
     }
 
     // -------------------------
@@ -371,6 +433,7 @@ PanelWindow {
             mediaOpen = false
             calOpen = false
             editOpen = false
+            trayOpen = false
             powerIdle.restart()
         } else {
             powerIdle.stop()
@@ -480,6 +543,7 @@ PanelWindow {
         ram: "sys", cpu: "sys", cpuTemp: "sys", gpuTemp: "sys",
         date: "clock", time: "clock",
         media: "media",
+        tray: "tray",
         volume: "ctl", network: "ctl", battery: "ctl", power: "ctl"
     })
 
@@ -498,6 +562,8 @@ PanelWindow {
             return battery !== null && battery.present
         if (key === "network")
             return network !== null && network.shown
+        if (key === "tray")
+            return tray !== null && tray.count > 0
         return true
     }
 
@@ -680,6 +746,18 @@ PanelWindow {
         }
     }
 
+    // The tray's icons; right-click one for that program's menu.
+    Component {
+        id: cTray
+
+        TrayModule {
+            tray: win.tray
+            barHeight: win.barHeight
+            openItem: win.trayOpen ? win.trayItem : null
+            onMenuRequested: (item, centerX) => win.toggleTrayMenu(item, centerX)
+        }
+    }
+
     readonly property var componentFor: ({
         workspaces: cWorkspaces,
         ram: cRam,
@@ -691,6 +769,7 @@ PanelWindow {
         media: cMedia,
         volume: cVolume,
         network: cNetwork,
+        tray: cTray,
         battery: cBattery,
         power: cPower
     })
@@ -716,7 +795,10 @@ PanelWindow {
         HoverHandler {
             id: islandHover
 
-            onHoveredChanged: win.editPointerChanged()
+            onHoveredChanged: {
+                win.editPointerChanged()
+                win.trayPointerChanged()
+            }
         }
 
         // right-click an empty part: put modules on the bar
@@ -863,10 +945,13 @@ PanelWindow {
                                 onPointChanged: if (active) win.gestureMove(slot.modelData, point.scenePosition.x)
                             }
 
+                            // (the tray's icons keep right-click for their
+                            // own menus; the tray is taken off in Settings)
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.leftMargin: -5
                                 anchors.rightMargin: -5
+                                enabled: slot.modelData !== "tray"
                                 acceptedButtons: Qt.RightButton
                                 onClicked: win.toggleEdit(slot.modelData)
                             }
@@ -1033,6 +1118,34 @@ PanelWindow {
                 win.editOpen = false
                 win.run(args)
             }
+        }
+    }
+
+    DropCard {
+        id: trayDrop
+
+        island: island
+        islandEar: win.ear
+        islandCorner: island.cornerRadius
+        fillOpacity: win.config.barOpacity
+        open: win.trayOpen
+        anchorX: win.trayCenterX
+        cardWidth: 280
+        cardHeight: trayMenu.wantedHeight + 30
+        minWidth: 280
+
+        onHoveredChanged: win.trayPointerChanged()
+
+        TrayMenu {
+            id: trayMenu
+
+            x: 20
+            y: 14
+            width: parent.width - 40
+            // kept while the card folds away, so it does not empty first;
+            // let go once it is gone, so the program's menu is closed too
+            item: trayDrop.visible ? win.trayItem : null
+            onDone: win.trayOpen = false
         }
     }
 }

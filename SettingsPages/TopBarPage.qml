@@ -24,7 +24,7 @@ Item {
     property bool hasBattery: true      // false: the Battery row says there is none
     readonly property var defaultOrder: [
         "workspaces", "ram", "cpu", "cpuTemp", "gpuTemp",
-        "date", "time", "media", "volume", "network", "battery", "power"
+        "date", "time", "media", "tray", "volume", "network", "battery", "power"
     ]
     property string status: ""
 
@@ -85,6 +85,7 @@ Item {
         { key: "cpuTemp",    label: "CPU temp",     icon: glyph(0xF050F) },
         { key: "gpuTemp",    label: "GPU temp",     icon: glyph(0xF08AE) },
         { key: "media",      label: "Now playing",  icon: glyph(0xF0387) },
+        { key: "tray",       label: "Tray",         icon: glyph(0xF003B), note: "programs' own icons; right-click for their menu" },
         { key: "volume",     label: "Volume",       icon: glyph(0xF057E) },
         { key: "network",    label: "Network",      icon: glyph(0xF0928), note: "Wi-Fi or offline; a cable shows nothing" },
         { key: "battery",    label: "Battery",      icon: glyph(0xF0079) },

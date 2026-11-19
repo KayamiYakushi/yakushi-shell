@@ -17,7 +17,7 @@ Item {
 
     readonly property var defaultOrder: [
         "workspaces", "ram", "cpu", "cpuTemp", "gpuTemp",
-        "date", "time", "media", "volume", "network", "battery", "power"
+        "date", "time", "media", "tray", "volume", "network", "battery", "power"
     ]
     property var order: defaultOrder
     property var modules: ({
@@ -27,6 +27,7 @@ Item {
         cpuTemp: true,
         gpuTemp: true,
         media: true,
+        tray: false,       // off until put on: the tray icons of programs
         volume: true,
         network: true,
         battery: true,

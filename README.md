@@ -89,6 +89,10 @@ needs no password at the computer itself (polkit, like power-profiles-daemon)
 and comes back after a reboot. From a terminal: `yakushi power-mode
 [saver|balanced|performance]`.
 
+The power menu's Restart asks for a second click; while it waits, BOOT
+MENU in its top right corner (or B) restarts into the boot loader's menu,
+for that one boot only: handy with a boot menu timeout of 0.
+
 Settings lists its pages as icons along its top edge; hold the pointer on
 one and its name hangs below it. Double-click an icon and keep the button
 down to move it (System stays first; the order is kept).

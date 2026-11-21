@@ -353,6 +353,8 @@ var APP_KEYS = [
     { app: "Power menu", combo: "Enter / Space", label: "Do it (shut down, restart...)",
       en: "confirm do", tr: "onayla uygula" },
     { app: "Power menu", combo: "Esc", label: "Close the menu", en: "close cancel", tr: "kapat vazgeç" },
+    { app: "Power menu", combo: "B", label: "Restart into the boot menu (after Restart once)",
+      en: "boot menu bootloader systemd-boot restart reboot kernel entry", tr: "boot menüsü önyükleme menüsü yeniden başlat çekirdek" },
 
     { app: "Lock screen", combo: "Enter", label: "Unlock", en: "unlock password log in submit",
       tr: "kilidi aç şifre parola gir" },

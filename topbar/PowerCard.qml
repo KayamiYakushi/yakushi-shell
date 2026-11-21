@@ -6,9 +6,12 @@ import "../"
 // Lock and Suspend act at once (Suspend locks the screen first, so the
 // computer never wakes up unlocked); Log out, Restart and Shut down ask for a
 // second click (or Enter) within a few seconds, so a stray click is harmless.
+// While Restart waits for that second click, BOOT MENU takes the uptime's
+// place: it restarts into the boot loader's menu, shown that one time only
+// (systemd-boot's one-shot timeout, set through logind: no password).
 //
 // Keyboard (when opened with the shortcut): Left/Right or Tab to move,
-// Enter/Space to choose, Esc to close.
+// Enter/Space to choose, Esc to close; B for BOOT MENU while Restart waits.
 Item {
     id: card
 
@@ -32,6 +35,16 @@ Item {
         { key: "shutdown", label: "Shut down", glyph: 0xF0425, confirm: true,
           args: ["systemctl", "poweroff"] }
     ]
+
+    // a restart that stops in the boot menu (for 10 seconds), this time only
+    readonly property var bootMenuArgs: ["systemctl", "reboot", "--boot-loader-menu=10"]
+    readonly property bool rebootArmed: armedIndex >= 0 && actions[armedIndex].key === "reboot"
+
+    function bootMenu() {
+        armedIndex = -1
+        closeRequested()
+        run(bootMenuArgs)
+    }
 
     property int focusIndex: -1
     property int armedIndex: -1
@@ -103,6 +116,8 @@ Item {
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
                 if (card.focusIndex >= 0)
                     card.choose(card.focusIndex)
+            } else if (event.key === Qt.Key_B && card.rebootArmed) {
+                card.bootMenu()
             } else {
                 return
             }
@@ -149,8 +164,59 @@ Item {
             }
         }
 
+        // while Restart waits: restart into the boot menu instead
+        Row {
+            id: bootLink
+
+            visible: card.rebootArmed
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                text: "or"
+                color: Theme.inkMute
+                font.family: Theme.mono
+                font.pixelSize: 9
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                text: "BOOT MENU"
+                color: bootMouse.containsMouse ? Theme.ink : Theme.accent
+                font.family: Theme.mono
+                font.pixelSize: 9
+                font.bold: true
+                font.letterSpacing: 2
+            }
+
+            Text {
+                textFormat: Text.PlainText
+                anchors.verticalCenter: parent.verticalCenter
+                text: "起動"
+                color: Theme.inkMute
+                font.family: "Noto Sans CJK JP"
+                font.pixelSize: 9
+            }
+        }
+
+        MouseArea {
+            id: bootMouse
+
+            visible: card.rebootArmed
+            anchors.fill: bootLink
+            anchors.margins: -5
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: card.bootMenu()
+        }
+
         Text {
             textFormat: Text.PlainText
+            visible: !card.rebootArmed
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: card.uptime

@@ -82,6 +82,13 @@ keys inside Yakushi's own windows (launcher, pickers, lock screen...) and
 shortcuts bound outside `keybinds.lua`. Put a square picture in Settings ->
 System to see yourself on the lock screen.
 
+The CPU power mode (power saving, balanced, performance) is the column of
+three icons at the far right of Settings -> System: the chosen one hangs
+down with its name, point at another to see its name, click to switch. It
+needs no password at the computer itself (polkit, like power-profiles-daemon)
+and comes back after a reboot. From a terminal: `yakushi power-mode
+[saver|balanced|performance]`.
+
 Settings lists its pages as icons along its top edge; hold the pointer on
 one and its name hangs below it. Double-click an icon and keep the button
 down to move it (System stays first; the order is kept).

@@ -10,7 +10,8 @@ import "../"
 // machine's name in the pocket between them. A block fills up with its own
 // load (in coarse cells, ragged at the top), votes calm (凪) or rough (荒),
 // and the decision stands under the name. Your picture and the facts
-// (system, kernel, uptime, user, disk) take the two top corners.
+// (system, kernel, uptime, user, disk) take the two top corners, and the
+// CPU power mode stands at the far right of the facts (PowerModes.qml).
 //
 // The guard (Settings -> Security) reports here too: beside the heading it
 // says CLEAR, or, while there are alerts, a warning box takes that corner
@@ -390,6 +391,77 @@ Item {
     function openSecurity() {
         if (hostWindow)
             hostWindow.go("Security")
+    }
+
+    // ---- the CPU power mode
+    // Read as you (scripts/yakushi-powerctl.py status) when the page opens
+    // and whenever the saved choice changes (also from `yakushi power-mode`);
+    // changed through pkexec and the package's root helper.
+    property string powerMode: ""
+    property var powerModes: []
+    property bool powerCanSet: false
+    property string powerHelper: ""
+    property string powerPending: ""
+    property bool powerFailed: false
+
+    function readPower() {
+        if (!powerStatus.running)
+            powerStatus.running = true
+    }
+
+    function setPower(mode) {
+        if (!powerCanSet || powerSet.running || powerHelper === "")
+            return
+        powerFailed = false
+        powerPending = mode
+        powerSet.command = ["pkexec", powerHelper, "set", mode]
+        powerSet.running = true
+    }
+
+    Process {
+        id: powerStatus
+
+        command: ["python3", page.scripts + "yakushi-powerctl.py", "status"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var d = JSON.parse(text)
+                    page.powerMode = String(d.mode || "")
+                    page.powerModes = Array.isArray(d.modes) ? d.modes : []
+                    page.powerCanSet = d.canSet === true
+                    page.powerHelper = String(d.helper || "")
+                } catch (e) {
+                }
+                page.powerPending = ""
+            }
+        }
+    }
+
+    Process {
+        id: powerSet
+
+        onExited: function(code) {
+            if (code !== 0) {
+                page.powerFailed = true
+                powerFailedTimer.restart()
+            }
+            page.readPower()
+        }
+    }
+
+    Timer {
+        id: powerFailedTimer
+
+        interval: 2500
+        onTriggered: page.powerFailed = false
+    }
+
+    FileView {
+        path: "/var/lib/yakushi-shell/power-mode"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: page.readPower()
     }
 
     // ---- the vote (Nagi 凪, the sea when the wind has dropped)
@@ -956,8 +1028,26 @@ Item {
                 width: council.cornerWidth
                 height: council.cornerHeight
 
-                // 薬師 (Yakushi), large and faint, behind them
+                readonly property real textWidth: width - (power.visible ? power.width + 14 : 0)
+
+                // the CPU power mode, at the far right
+                PowerModes {
+                    id: power
+
+                    anchors.right: parent.right
+                    height: parent.height
+                    mode: page.powerMode
+                    available: page.powerModes
+                    canSet: page.powerCanSet
+                    pending: page.powerPending
+                    failed: page.powerFailed
+                    onChose: function(mode) { page.setPower(mode) }
+                }
+
+                // 薬師 (Yakushi), large and faint, behind them (where the
+                // power mode cannot be changed)
                 Text {
+                    visible: !power.visible
                     textFormat: Text.PlainText
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
@@ -985,7 +1075,7 @@ Item {
                         required property int index
 
                         y: Math.round(index * factList.height / 5)
-                        width: factList.width
+                        width: factList.textWidth
                         height: factList.height / 5
 
                         Text {

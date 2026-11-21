@@ -98,6 +98,16 @@ package() {
     install -Dm644 -t "$theme" sddm/yakushi/Main.qml sddm/yakushi/CutBox.qml \
         sddm/yakushi/metadata.desktop sddm/yakushi/theme.conf
     install -Dm755 scripts/yakushi-sddm-rootctl.py "$pkgdir/usr/lib/$pkgname/yakushi-sddmctl"
+
+    # the CPU power mode (Settings -> System): the root helper, the polkit
+    # rule that lets the person at the computer use it, and the service that
+    # puts the chosen mode back at boot (always on; it waits for a choice)
+    install -Dm755 scripts/yakushi-powerctl.py "$pkgdir/usr/lib/$pkgname/yakushi-powerctl"
+    install -Dm644 packaging/org.yakushi.shell.power.policy \
+        "$pkgdir/usr/share/polkit-1/actions/org.yakushi.shell.power.policy"
+    install -Dm644 packaging/yakushi-power.service "$pkgdir/usr/lib/systemd/system/yakushi-power.service"
+    install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+    ln -s ../yakushi-power.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/yakushi-power.service"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

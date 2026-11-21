@@ -1,0 +1,20 @@
+# The CPU power mode chosen in Settings -> System, put back at every boot.
+# Does nothing until a mode has been chosen there once.
+[Unit]
+Description=Yakushi: the CPU power mode chosen in Settings
+ConditionPathExists=/var/lib/yakushi-shell/power-mode
+# an older governor service from the Yakushi dotfiles may run too: go after it
+After=yakushidotfiles-governor.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/yakushi-shell/yakushi-powerctl apply
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
